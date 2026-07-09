@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manage Plan Lifecycle"
+  short_description: "Move plans through repository lifecycle"
+  default_prompt: "Use $managing-plans-lifecycle to organize this plan at the correct lifecycle stage."

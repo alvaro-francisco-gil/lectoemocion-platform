@@ -1,7 +1,7 @@
 # LectoEmoción Platform Design
 
 Date: 2026-07-09  
-Status: Proposed for implementation planning
+Status: Approved product design
 
 ## 1. Product vision
 
@@ -95,13 +95,15 @@ LectoEmoción will use a TypeScript monorepo with these initial boundaries:
 apps/
   teacher-mobile/       Expo and React Native creation application
   player-web/           React application shell and Phaser player
-  api/                  Authentication, roster, media, and resource APIs
+
+functions/              Firebase Functions v2 for privileged operations
 
 packages/
   domain/               Domain types and policies
   resource-schema/      Versioned manifest schemas and validators
   template-sdk/         Stable API used by story/game templates
   template-catalog/     Product-authored templates
+  firebase/             Typed converters, service boundaries, and clients
   shared-config/        Shared TypeScript and tooling configuration
 ```
 
@@ -184,9 +186,13 @@ teacher-facing error.
 
 ## 6. Backend and media flow
 
-The initial backend provides:
+The initial backend uses Firebase and provides:
 
-- teacher authentication and sessions;
+- Firebase Authentication for adult teacher accounts only;
+- Cloud Firestore for classes, child records, template metadata, and playable
+  resource manifests;
+- Cloud Storage for private photos and pronunciation recordings;
+- Cloud Functions v2 for privileged operations and lifecycle jobs;
 - class and child-record CRUD operations;
 - direct-to-storage uploads using short-lived signed requests;
 - media validation and metadata removal where technically appropriate;
@@ -195,9 +201,22 @@ The initial backend provides:
 - short-lived playback manifests and media URLs;
 - audit events, deletion, and retention jobs.
 
-PostgreSQL stores structured records. Private EU-region object storage stores
-photos and audio. Background jobs handle media validation, derived thumbnails,
-and deletion. Uploaded files are never committed to the source repository.
+Firestore, Storage, and Functions must be provisioned explicitly in
+`europe-southwest1` (Madrid) unless a later ADR changes the region. Static
+player assets may use Firebase Hosting, but no child media may be published as
+public hosting content. Uploaded files are never committed to the source
+repository.
+
+Firebase Authentication is US-hosted. It contains adult teacher account data
+only; children never receive Firebase Authentication accounts. This
+international transfer must be documented in the transfer assessment and
+accepted by each controller before a pilot.
+
+Client code accesses Firebase only through typed services. Security Rules are
+mandatory but are not the sole business-rule layer: services validate
+preconditions, Rules enforce client permissions, and Functions own privileged
+or cross-document operations. Emulator-backed tests verify Firestore and
+Storage access boundaries.
 
 Offline playback is not an initial hard requirement. Resource manifests and
 assets must nevertheless be packageable and cacheable so a later service-worker
@@ -221,6 +240,8 @@ The initial product enforces:
 - encryption in transit and at rest;
 - EU-region hosting by default;
 - documented subprocessors;
+- explicit documentation that Firebase Authentication processes adult teacher
+  account data in the United States;
 - no public or unlisted-link access;
 - no advertising or behavioural profiling;
 - no use of customer media to train models;
@@ -328,4 +349,3 @@ The first implementation milestone is successful when one teacher can:
 
 Only synthetic data may be used until the privacy documentation, contracts,
 security controls, and pilot approval are in place.
-

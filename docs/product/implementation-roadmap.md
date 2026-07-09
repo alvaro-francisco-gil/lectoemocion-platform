@@ -6,6 +6,9 @@ and privacy boundaries.
 
 ## 1. Foundation and synthetic player
 
+Detailed plan:
+[foundation-and-synthetic-player.md](../plans/ready/foundation-and-synthetic-player.md)
+
 Create the TypeScript monorepo, versioned resource schema, template contract,
 deterministic roster selection, and a Phaser web player. Demonstrate one
 animated story and one interactive initials game using synthetic records only.
@@ -17,7 +20,8 @@ touch or mouse at phone and classroom-display sizes.
 
 Add teacher accounts, creator-only authorization, classes, child records,
 resource persistence, audit events, and tenant-isolation tests. Configure
-PostgreSQL and EU-region object storage abstractions.
+Firebase Authentication for teachers, Cloud Firestore in Madrid, typed service
+boundaries, Security Rules, and emulator-backed access tests.
 
 Exit condition: one teacher cannot read or modify another teacher's data, and
 all access paths are covered by authorization tests.
@@ -35,6 +39,9 @@ synthetic or consenting-adult test data.
 
 Add signed uploads, media validation, metadata handling, thumbnails, short-lived
 playback URLs, retention jobs, and complete deletion workflows.
+
+Store private media in Cloud Storage in Madrid and perform privileged lifecycle
+operations through second-generation Cloud Functions in Madrid.
 
 Exit condition: deleting a child record immediately revokes access and
 eventually removes all associated objects and derived files.
@@ -65,4 +72,3 @@ response, support-access controls, and production deployment.
 
 Exit condition: the controller and its Data Protection Officer approve a pilot.
 Real child data is prohibited before this milestone.
-
