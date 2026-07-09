@@ -5,6 +5,7 @@ export default defineProject({
   plugins: [react()],
   test: {
     environment: "jsdom",
+    exclude: ["e2e/**", "node_modules/**", "dist/**"],
     setupFiles: ["./src/test/setupTests.ts"]
   }
 });
