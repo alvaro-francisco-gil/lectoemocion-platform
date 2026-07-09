@@ -1,0 +1,4 @@
+interface:
+  display_name: "Add Firestore Collection"
+  short_description: "Add complete typed Firestore collection support"
+  default_prompt: "Use $add-firestore-collection to add a complete, secured Firestore collection to LectoEmoción."
