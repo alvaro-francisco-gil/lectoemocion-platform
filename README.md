@@ -10,14 +10,34 @@ predefined animated-story and game templates. Teachers play the resulting
 resources primarily on interactive classroom displays through an authenticated
 web player.
 
-The product design and first implementation plan are approved. Implementation
-has not started.
+The foundation player is implemented with synthetic records only.
+
+## Development
+
+Prerequisites: Node.js 22 and pnpm 10.
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Verification:
+
+```bash
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm test:e2e
+```
+
+Only synthetic records are permitted until pilot-readiness controls are
+approved.
 
 ## Documentation
 
 - [Product and architecture design](docs/product/platform-design.md)
 - [Implementation roadmap](docs/product/implementation-roadmap.md)
-- [Ready: foundation and synthetic player](docs/plans/ready/foundation-and-synthetic-player.md)
+- [Ongoing: foundation and synthetic player](docs/plans/ongoing/foundation-and-synthetic-player.md)
 - [Architecture decisions](docs/decisions/0001-platform-foundations.md)
 - [Firebase backend decision](docs/decisions/0002-firebase-backend.md)
 - [Game and story template guidelines](docs/game-guidelines/template-system.md)

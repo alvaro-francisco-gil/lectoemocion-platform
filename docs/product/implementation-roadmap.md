@@ -7,7 +7,9 @@ and privacy boundaries.
 ## 1. Foundation and synthetic player
 
 Detailed plan:
-[foundation-and-synthetic-player.md](../plans/ready/foundation-and-synthetic-player.md)
+[foundation-and-synthetic-player.md](../plans/ongoing/foundation-and-synthetic-player.md)
+
+Status: implemented and verified.
 
 Create the TypeScript monorepo, versioned resource schema, template contract,
 deterministic roster selection, and a Phaser web player. Demonstrate one
