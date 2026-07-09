@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     projects: [
       "packages/*/vitest.config.ts",
-      "apps/player-web/vitest.config.ts"
+      "apps/*/vitest.config.ts"
     ]
   }
 });
