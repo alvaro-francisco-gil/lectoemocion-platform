@@ -1,0 +1,4 @@
+interface:
+  display_name: "Enforce Write Guardrails"
+  short_description: "Place Firebase write checks at trust boundaries"
+  default_prompt: "Use $guardrail-enforcement to place this Firebase write guardrail at the correct trust boundary."
