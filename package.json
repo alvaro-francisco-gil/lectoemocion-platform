@@ -1,0 +1,18 @@
+{
+  "name": "lectoemocion-platform",
+  "private": true,
+  "packageManager": "pnpm@10.34.4",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --filter=@lectoemocion/player-web",
+    "test": "vitest run",
+    "test:e2e": "pnpm --filter @lectoemocion/player-web test:e2e",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.10",
+    "turbo": "^2.10.4",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
