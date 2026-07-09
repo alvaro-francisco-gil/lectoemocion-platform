@@ -1,0 +1,4 @@
+interface:
+  display_name: "Touch Firebase Service"
+  short_description: "Change typed Firebase service boundaries safely"
+  default_prompt: "Use $touch-firebase-service when adding or changing a LectoEmoción Firebase query or mutation."
