@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { assertNever } from "@lectoemocion/domain";
 import type { ResourceManifest } from "@lectoemocion/resource-schema";
 import { renderInitialsGame } from "../templates/renderInitialsGame";
 import { renderNameStory } from "../templates/renderNameStory";
@@ -9,10 +10,16 @@ export class ResourceScene extends Phaser.Scene {
   }
 
   create(): void {
-    if (this.resource.template.id === "name-story") {
-      renderNameStory(this, this.resource);
-      return;
+    const template = this.resource.template;
+    switch (template.id) {
+      case "name-story":
+        renderNameStory(this, this.resource);
+        return;
+      case "initials-game":
+        renderInitialsGame(this, this.resource);
+        return;
+      default:
+        assertNever(template, "template id");
     }
-    renderInitialsGame(this, this.resource);
   }
 }

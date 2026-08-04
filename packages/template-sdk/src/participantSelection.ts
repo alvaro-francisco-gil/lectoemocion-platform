@@ -1,4 +1,4 @@
-import type { ChildRecord } from "@lectoemocion/domain";
+import { assertNever, type ChildRecord } from "@lectoemocion/domain";
 import type { SelectionStrategy } from "./templateDefinition";
 
 function hashSeed(seed: string): number {
@@ -20,19 +20,26 @@ export function selectParticipants(
   strategy: SelectionStrategy,
   seed: string
 ): ChildRecord[] {
-  if (strategy.kind === "whole-class") {
-    return [...roster];
+  switch (strategy.kind) {
+    case "whole-class":
+      return [...roster];
+    case "matching-initial":
+      return roster.filter((child) => child.verifiedInitial === strategy.initial);
+    case "seeded-subset":
+      return seededSubset(roster, strategy.count, seed);
+    default:
+      return assertNever(strategy, "selection strategy");
   }
+}
 
-  if (strategy.kind === "matching-initial") {
-    return roster.filter(
-      (child) => child.verifiedInitial === strategy.initial
-    );
-  }
-
-  if (strategy.count > roster.length) {
+function seededSubset(
+  roster: readonly ChildRecord[],
+  count: number,
+  seed: string
+): ChildRecord[] {
+  if (count > roster.length) {
     throw new Error(
-      `Template requires ${strategy.count} participants but only ${roster.length} are available`
+      `Template requires ${count} participants but only ${roster.length} are available`
     );
   }
 
@@ -44,5 +51,5 @@ export function selectParticipants(
     const target = Math.floor(random * (index + 1));
     [shuffled[index], shuffled[target]] = [shuffled[target]!, shuffled[index]!];
   }
-  return shuffled.slice(0, strategy.count);
+  return shuffled.slice(0, count);
 }

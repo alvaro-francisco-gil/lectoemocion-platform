@@ -10,6 +10,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@lectoemocion/domain": "workspace:*",
     "@lectoemocion/resource-schema": "workspace:*",
     "@lectoemocion/template-catalog": "workspace:*",
     "phaser": "4.2.0",

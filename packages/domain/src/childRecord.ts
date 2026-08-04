@@ -1,9 +1,9 @@
-export type ChildRecordId = string;
+import type { ChildRecordId, MediaAssetId } from "./ids";
 
 export interface ChildRecord {
   id: ChildRecordId;
   displayName: string;
   verifiedInitial: string;
-  photoAssetId: string;
-  pronunciationAssetId: string;
+  photoAssetId: MediaAssetId;
+  pronunciationAssetId: MediaAssetId;
 }

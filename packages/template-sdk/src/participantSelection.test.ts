@@ -1,12 +1,30 @@
 import { describe, expect, it } from "vitest";
-import type { ChildRecord } from "@lectoemocion/domain";
+import {
+  childRecordId,
+  mediaAssetId,
+  type ChildRecord
+} from "@lectoemocion/domain";
 import { selectParticipants } from "./participantSelection";
 
+function child(
+  id: string,
+  displayName: string,
+  verifiedInitial: string
+): ChildRecord {
+  return {
+    id: childRecordId(id),
+    displayName,
+    verifiedInitial,
+    photoAssetId: mediaAssetId(`photo-${id}`),
+    pronunciationAssetId: mediaAssetId(`audio-${id}`)
+  };
+}
+
 const roster: ChildRecord[] = [
-  { id: "1", displayName: "Ana", verifiedInitial: "A", photoAssetId: "p1", pronunciationAssetId: "a1" },
-  { id: "2", displayName: "Álex", verifiedInitial: "A", photoAssetId: "p2", pronunciationAssetId: "a2" },
-  { id: "3", displayName: "Bruno", verifiedInitial: "B", photoAssetId: "p3", pronunciationAssetId: "a3" },
-  { id: "4", displayName: "Luna", verifiedInitial: "L", photoAssetId: "p4", pronunciationAssetId: "a4" }
+  child("1", "Ana", "A"),
+  child("2", "Álex", "A"),
+  child("3", "Bruno", "B"),
+  child("4", "Luna", "L")
 ];
 
 describe("selectParticipants", () => {

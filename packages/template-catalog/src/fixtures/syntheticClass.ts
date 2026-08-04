@@ -1,8 +1,26 @@
-import type { ChildRecord } from "@lectoemocion/domain";
+import {
+  childRecordId,
+  mediaAssetId,
+  type ChildRecord
+} from "@lectoemocion/domain";
 
-export const syntheticClass: ChildRecord[] = [
-  { id: "ana", displayName: "Ana", verifiedInitial: "A", photoAssetId: "avatar-ana", pronunciationAssetId: "silent-ana" },
-  { id: "alex", displayName: "Álex", verifiedInitial: "A", photoAssetId: "avatar-alex", pronunciationAssetId: "silent-alex" },
-  { id: "bruno", displayName: "Bruno", verifiedInitial: "B", photoAssetId: "avatar-bruno", pronunciationAssetId: "silent-bruno" },
-  { id: "luna", displayName: "Luna", verifiedInitial: "L", photoAssetId: "avatar-luna", pronunciationAssetId: "silent-luna" }
+function syntheticChild(
+  id: string,
+  displayName: string,
+  verifiedInitial: string
+): ChildRecord {
+  return {
+    id: childRecordId(id),
+    displayName,
+    verifiedInitial,
+    photoAssetId: mediaAssetId(`avatar-${id}`),
+    pronunciationAssetId: mediaAssetId(`silent-${id}`)
+  };
+}
+
+export const syntheticClass: readonly ChildRecord[] = [
+  syntheticChild("ana", "Ana", "A"),
+  syntheticChild("alex", "Álex", "A"),
+  syntheticChild("bruno", "Bruno", "B"),
+  syntheticChild("luna", "Luna", "L")
 ];
