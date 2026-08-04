@@ -1,16 +1,23 @@
 # LectoEmoción Platform
 
-LectoEmoción is a private educational platform for Spanish early-literacy
-activities for children aged 3–5.
+LectoEmoción is a private personalised early-literacy world for Spanish
+children aged 3–5, sold to schools and directly to families.
 
-Teachers use an iOS or Android application to create a class roster. Each child
-record contains a first name, a photo, a recording of the name, and a
-teacher-verified initial letter/sound. The platform combines those records with
-predefined animated-story and game templates. Teachers play the resulting
-resources primarily on interactive classroom displays through an authenticated
-web player.
+Children travel through a framing story told in animated chapters. A map is the
+hub of that world, and minigames unlock as the story advances. Every game is
+playable immediately with product-authored default content.
 
-The foundation player is implemented with synthetic records only.
+An adult may then use an iOS or Android application to add child records — a
+first name, a photo, a recording of the name, and a verified initial
+letter/sound. That content overrides the defaults, so the children on screen
+become the children in the room. Personalisation is an enhancement, never a
+prerequisite.
+
+Playback happens on interactive classroom displays and on tablets.
+
+One web player runtime serves both: it runs in the panel's browser on classroom
+displays, and embedded inside a native app on phones and tablets. The
+foundation player is implemented with synthetic records only.
 
 ## Development
 
@@ -40,6 +47,7 @@ approved.
 - [Ongoing: foundation and synthetic player](docs/plans/ongoing/foundation-and-synthetic-player.md)
 - [Architecture decisions](docs/decisions/0001-platform-foundations.md)
 - [Firebase backend decision](docs/decisions/0002-firebase-backend.md)
+- [Runtime and animation decision](docs/decisions/0003-runtime-and-animation.md)
 - [Game and story template guidelines](docs/game-guidelines/template-system.md)
 - [Privacy baseline](docs/privacy/spain-eu-baseline.md)
 - [Godot prototype assessment](docs/migration/godot-prototype.md)

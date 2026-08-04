@@ -10,11 +10,27 @@ boundaries. Avoid ceremony documentation that duplicates code.
 
 ## Product
 
-LectoEmoción creates private, personalised early-literacy games and animated
-stories for Spanish children aged 3–5. Teachers upload a child's first name,
-recognisable photo, pronunciation recording, and verified initial letter/sound.
-Product-authored templates combine several class records into deterministic
-resources. There is no AI-generated content.
+LectoEmoción is a personalised early-literacy world for Spanish children aged
+3–5, sold to schools and directly to families. A framing story unlocks
+minigames from a map hub.
+
+Every template ships with product-authored default content and is playable with
+no uploads. Adults may upload a child's first name, recognisable photo,
+pronunciation recording, and verified initial letter/sound, which **overrides**
+those defaults slot by slot. Personalisation is an enhancement, never a
+prerequisite. There is no AI-generated content.
+
+Tenancy is Account → Group → child records, where a group is a class or a
+family. No layer may assume a group is a school class.
+
+The institutional market comes first, piloted with default content and no child
+data at all. Personalisation is enabled per deployment only after that
+deployment's privacy artefacts are complete.
+
+One web player runtime serves every surface: the panel's browser on classroom
+displays, and an embedded player inside a native Expo shell on phones and
+tablets. A template is implemented exactly once. See
+[ADR 0003](docs/decisions/0003-runtime-and-animation.md).
 
 Read first:
 
@@ -38,7 +54,7 @@ Every change must leave the repository easier to navigate and modify.
 ## Planned architecture
 
 ```text
-apps/teacher-mobile/       Expo and React Native teacher workflow
+apps/mobile/               Expo native shell and embedded player
 apps/player-web/           React shell and Phaser 4 player
 functions/                 Firebase Functions v2
 packages/domain/           domain records and policies
@@ -54,8 +70,9 @@ Do not create a directory before its implementation plan reaches that task.
 
 1. Models and resource schemas are authoritative. Data crossing app, service,
    function, or player boundaries uses shared types and runtime validation.
-2. Templates and manifests are engine-neutral. They never contain Phaser
+2. Templates and manifests are engine-neutral. They never contain renderer
    objects, executable code, device-pixel coordinates, or Firebase references.
+   Templates never read or write progress state.
 3. Firebase SDK imports are confined to `packages/firebase/`, `functions/`, and
    narrowly documented app bootstrap files. UI, hooks, Phaser scenes, and
    templates call typed services.
@@ -63,8 +80,10 @@ Do not create a directory before its implementation plan reaches that task.
    Firestore/Storage Rules, and Functions for privileged operations. Hiding UI
    is never authorization.
 5. Published template and manifest versions are immutable.
-6. No silent fallbacks. Missing media, invalid schema versions, or denied
-   access fail closed with a recoverable teacher-facing error.
+6. No silent fallbacks. Invalid schema versions, missing *default* content, or
+   denied access fail closed with a recoverable adult-facing error. Missing
+   *personalised* media is the one declared exception: it falls back to default
+   content and playback continues.
 
 ## Privacy and test data
 
@@ -83,7 +102,7 @@ logs, analytics, issue reports, and source control.
 
 ## Firebase
 
-- Adult teachers authenticate with Firebase Authentication.
+- Adults — teachers or parents — authenticate with Firebase Authentication.
 - Firestore, Storage, and Functions use `europe-southwest1` unless an ADR
   explicitly changes the region.
 - New collections or storage paths require, in the same change: shared model,
