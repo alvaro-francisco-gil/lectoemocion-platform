@@ -51,6 +51,10 @@ This stage does not block stage 3.
 
 ## 3. World, progression, and default content
 
+Model personalisation slots so a slot and its default content are a single
+type. "Slot without a default" must fail compilation, not review.
+
+
 Add the map hub, progression state, resource kinds, and product-authored
 default content so the world is playable end to end with no uploads.
 

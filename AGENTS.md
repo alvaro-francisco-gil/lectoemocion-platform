@@ -85,6 +85,59 @@ Do not create a directory before its implementation plan reaches that task.
    *personalised* media is the one declared exception: it falls back to default
    content and playback continues.
 
+### Every invariant is enforced
+
+An invariant nothing checks is a suggestion, and suggestions decay. Each of the
+above has an executable guardrail; `pnpm guardrails` runs them all, and
+`pnpm check` includes them.
+
+| Invariant | Enforced by |
+|---|---|
+| 2 — engine-neutral contracts | `scripts/check-engine-neutral.mjs` |
+| 3 — Firebase boundary | `scripts/check-firebase-boundary.mjs` |
+| 5 — immutable published versions | `packages/template-catalog/src/publishedVersions.test.ts` |
+| Privacy — media and logging | `scripts/check-privacy.mjs` |
+| Strict typing | `scripts/check-strict-types.mjs` |
+
+**When you add an invariant, add its check in the same change.** The rules
+themselves live in `scripts/rules.mjs` and are unit-tested by
+`scripts/rules.test.ts`, which proves each one flags a real violation and
+accepts legitimate code. A guardrail without that test is decoration.
+
+Do not weaken a guardrail to make a change pass. Either the change is wrong, or
+the invariant has genuinely changed — in which case update the invariant, its
+check, its test, and the documentation together.
+
+## Typing
+
+Strict typing is a design tool here, not a formality. `tsconfig.base.json`
+enables `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,
+`noImplicitReturns`, `noFallthroughCasesInSwitch`, and
+`noPropertyAccessFromIndexSignature`.
+
+- **No `any`, `@ts-nocheck`, or bare `@ts-ignore`.** Use `unknown` and narrow at
+  the boundary. Enforced by `scripts/check-strict-types.mjs`.
+- **Identifiers are branded.** `AccountId`, `GroupId`, `ChildRecordId`,
+  `MediaAssetId`, `TemplateId`, and `ResourceId` are nominal types from
+  `@lectoemocion/domain`. Construct them with the matching constructor; never
+  cast a raw string. Passing a group id where a child id belongs is a
+  compile error.
+- **Discriminated unions get an exhaustiveness guard.** End every switch over a
+  union with `default: assertNever(value, "description")`. Adding a member then
+  breaks compilation at every site that must handle it, instead of silently
+  falling through to the last branch.
+- **Make illegal states unrepresentable.** Prefer a type that cannot express the
+  invalid case over a runtime check that rejects it. When personalisation slots
+  arrive, a slot and its default content must be one object, so "slot without a
+  default" is a type error rather than a test failure.
+- **Derive types from schemas.** Manifest types come from the TypeBox schema via
+  `Static<typeof Schema>`. Never hand-write a second declaration of a shape that
+  a schema already defines.
+
+There is no ESLint. `typescript-eslint` does not support TypeScript 7, which
+this repo pins; the guardrail scripts cover what those rules would have. Revisit
+when that support lands.
+
 ## Privacy and test data
 
 Real child data is prohibited in development, tests, screenshots, fixtures,
@@ -120,8 +173,30 @@ logs, analytics, issue reports, and source control.
 - Test the smallest public boundary that proves behaviour; avoid tests coupled
   to implementation details.
 - No `.skip`, `xit`, exclusion-list additions, hook bypasses, or muted failures.
-- Before claiming completion, run the exact typecheck, test, build, and
-  end-to-end commands required by the active plan and inspect their output.
+- Before claiming completion, run `pnpm check` and inspect its output, plus
+  `pnpm test:e2e` when the change touches the player.
+
+## Commands
+
+Run `pnpm commands` for the index. The one that matters is **`pnpm check`** —
+guardrails, typecheck, tests, and build, in that order. It is the same gate CI
+runs.
+
+### Never start long-lived processes
+
+These run until interrupted. The user owns that loop; starting one leaves you
+blocked and the terminal occupied.
+
+- `pnpm dev`, `vite`, or any dev server.
+- `firebase emulators:start` as a standalone session.
+- Any watch-mode test runner.
+
+If you need output from one, ask the user to run it and paste the relevant
+lines. Ephemeral, self-terminating runs — `pnpm check`, `pnpm test`,
+`pnpm test:e2e` — are yours to run freely.
+
+Never deploy or create cloud resources. That requires explicit authorization
+every time; prior approval does not carry over.
 
 ## Documentation lifecycle
 
@@ -145,4 +220,25 @@ lifecycle taxonomy.
 - Do not bypass hooks or amend commits unless explicitly requested.
 - Do not push, open a PR, deploy, or create remote resources without explicit
   authorization.
+
+## Be proactive
+
+Surface these as a one-line suggestion at the end of your response — or as an
+inline change when it is under about ten lines — whenever you notice:
+
+- **An invariant with no guardrail** → propose the check and its rule test.
+- **A manual procedure done twice** → a script under `scripts/`.
+- **An encodable workflow** (a migration ritual, an audit playbook) → a skill
+  under `.agents/skills/<name>/SKILL.md`.
+- **A convention used in three or more places but undocumented** → an addition
+  here, or a scoped `AGENTS.md` in that directory so agents working there do
+  not load this whole file.
+- **A single source of truth violated** (a duplicated shape, status string,
+  threshold, or colour) → consolidate in the same change if small.
+- **Documentation contradicting code** → fix or delete the document; never work
+  around it.
+- **A shipped plan still in `docs/plans/ongoing/`** → distil the durable
+  rationale into `docs/decisions/`, then delete the plan.
+- **A guardrail that would not have caught the bug you just fixed** → propose
+  strengthening it.
 

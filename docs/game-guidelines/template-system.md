@@ -39,6 +39,11 @@ manifest from the player and reports completion back to the shell.
 
 Every personalisable slot carries product-authored default art, text, or audio.
 
+**A slot and its default are one object, not two parallel maps.** "Slot without
+a default" must be a compile error, not a review comment or a test failure.
+Model the slot so the default is a required field of it; a map of slots and a
+separate map of defaults can disagree, and eventually will.
+
 - A template with a slot lacking a default is incomplete and must not ship.
 - Missing *personalised* media falls back to the default and playback
   continues.

@@ -48,6 +48,7 @@ approved.
 - [Architecture decisions](docs/decisions/0001-platform-foundations.md)
 - [Firebase backend decision](docs/decisions/0002-firebase-backend.md)
 - [Runtime and animation decision](docs/decisions/0003-runtime-and-animation.md)
+- [Enforced invariants decision](docs/decisions/0004-enforced-invariants.md)
 - [Game and story template guidelines](docs/game-guidelines/template-system.md)
 - [Privacy baseline](docs/privacy/spain-eu-baseline.md)
 - [Godot prototype assessment](docs/migration/godot-prototype.md)
