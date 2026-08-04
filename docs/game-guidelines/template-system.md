@@ -2,35 +2,65 @@
 
 ## Purpose
 
-Templates turn private class-roster content into predictable, reviewed learning
-experiences. They are deterministic product code, not teacher-authored scripts
-and not AI output.
+Templates are predictable, reviewed learning experiences. They are
+deterministic product code, not adult-authored scripts and not AI output.
+
+Every template is fully playable with product-authored default content.
+Adult-supplied names, photos, and recordings **override** those defaults slot by
+slot. Personalisation is an enhancement, never a prerequisite.
+
+## Resource kinds
+
+A template declares exactly one kind:
+
+- **cinematic** — a linear, non-interactive story chapter.
+- **minigame** — interactive and rule-based.
+- **non-interactive personalised resource** — a fixed animated timeline with
+  uploaded pictures placed into it, rendered by the player at playback time.
+  Never encoded as a file, never exportable, never shareable.
+
+The map hub is not a template. It belongs to the player shell, because it reads
+progress state that templates must not access.
 
 ## Required separation
 
 Every template has three independent layers:
 
 1. **Pedagogy** — objective, target letters/sounds, success rules, and feedback.
-2. **Content selection** — which roster records participate and in which roles.
+2. **Content binding** — which slots exist, their defaults, and which child
+   records may override them.
 3. **Presentation** — scenes, layout, animation, audio timing, and interaction.
 
-A template must not fetch arbitrary data, access authentication state, or build
-object-storage URLs. It receives a validated resource manifest from the player.
+A template must not fetch arbitrary data, access authentication state, read or
+write progress, or build object-storage URLs. It receives a validated resource
+manifest from the player and reports completion back to the shell.
 
-## Roster selection
+## Default content
 
-A template explicitly selects one strategy:
+Every personalisable slot carries product-authored default art, text, or audio.
 
-- whole class;
-- teacher-selected subset;
+- A template with a slot lacking a default is incomplete and must not ship.
+- Missing *personalised* media falls back to the default and playback
+  continues.
+- Missing *default* media is a product defect and fails closed.
+- Defaults must be pedagogically sound on their own. A game whose defaults are
+  filler is a game that fails for every user who has not uploaded anything.
+
+## Content selection
+
+When personalised records are available, a template explicitly selects one
+strategy:
+
+- whole group;
+- adult-selected subset;
 - fixed-size random subset;
 - rotating subset;
 - records matching a letter/sound;
 - balanced distractor and target groups.
 
-Random selection must be seedable so previews and classroom playback can be
-reproduced. A template must define behaviour when too few compatible records
-exist.
+Random selection must be seedable so sessions can be reproduced. A template
+must define how it fills remaining slots from defaults when too few compatible
+records exist. Insufficient records never block playback.
 
 ## Responsive design
 
@@ -38,6 +68,8 @@ exist.
   offsets.
 - Support 16:9 classroom displays first, then phone and tablet layouts.
 - Keep essential controls within declared safe areas.
+- On large panels, keep interactive elements within the lower reach band, where
+  a child aged 3–5 can physically touch them. The upper area is for display.
 - Make touch targets suitable for children aged 3–5.
 - Do not depend on hover; hover effects are optional enhancement.
 - Support touch, stylus, and mouse through the same semantic actions.
@@ -47,9 +79,9 @@ exist.
 - Treat names, photos, and recordings as private runtime assets.
 - Never include real child media in source control, fixtures, screenshots, or
   analytics.
-- Define aspect-ratio, resolution, duration, and file-size budgets.
-- Provide graceful placeholder behaviour only in authoring preview; production
-  playback fails closed when required private media is unavailable.
+- Define aspect-ratio, resolution, duration, and file-size budgets that apply
+  equally to default and personalised assets.
+- Personalised media that is unavailable or deleted falls back to the default.
 - Stop or transition all audio explicitly when scenes change.
 
 ## Interaction and feedback
@@ -72,10 +104,12 @@ must be explicit and reversible until the old version is retired.
 A template is complete only when it has:
 
 - reviewed learning objective;
+- product-authored default content for every personalisable slot;
 - schema and compatibility validation;
-- deterministic tests for selection and game rules;
+- deterministic tests for selection, binding, default fallback, and game rules;
 - keyboard/mouse fallback for testing and accessibility;
 - phone, tablet, HD, and 4K layout coverage;
+- reach-band verification on large panels;
 - missing-media and network-error behaviour;
 - performance budgets;
 - privacy-safe telemetry;
