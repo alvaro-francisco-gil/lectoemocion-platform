@@ -1,7 +1,21 @@
 # ADR 0001: Platform foundations
 
 Date: 2026-07-09  
-Status: Accepted for planning
+Status: Partially superseded on 2026-08-04 by
+[ADR 0003](0003-runtime-and-animation.md)
+
+## Superseded parts
+
+The runtime and distribution reasoning below is replaced by ADR 0003. Its
+"Why not a native board application?" argument rests on heterogeneous, unknown
+classroom hardware; ADR 0003 reaches a compatible conclusion for stronger
+reasons, and adds store distribution for the family market, which did not exist
+when this was written.
+
+Still binding: a TypeScript monorepo, engine-neutral resource schemas,
+deterministic predefined templates rather than AI generation, owner-only
+authentication, the Godot repository as prototype only, and gameplay
+implemented exactly once.
 
 ## Context
 
