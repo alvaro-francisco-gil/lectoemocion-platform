@@ -3,8 +3,11 @@
   "private": true,
   "packageManager": "pnpm@10.34.4",
   "scripts": {
+    "commands": "node scripts/help.mjs",
     "build": "turbo run build",
+    "check": "pnpm guardrails && pnpm typecheck && pnpm test && pnpm build",
     "dev": "turbo run dev --filter=@lectoemocion/player-web",
+    "guardrails": "node scripts/check-engine-neutral.mjs && node scripts/check-firebase-boundary.mjs && node scripts/check-strict-types.mjs && node scripts/check-privacy.mjs",
     "test": "vitest run",
     "test:e2e": "pnpm --filter @lectoemocion/player-web test:e2e",
     "typecheck": "turbo run typecheck"
