@@ -73,11 +73,11 @@ test("records the panel model and route alongside the measurements", async ({
   expect(parsed.route).toBe("connected-computer");
 });
 
-test("sends nothing to the network", async ({ page }) => {
+test("sends nothing to the network", async ({ page, baseURL }) => {
   const external: string[] = [];
   page.on("request", (request) => {
     const url = request.url();
-    if (!url.startsWith("http://127.0.0.1:4173")) external.push(url);
+    if (!url.startsWith(baseURL ?? "")) external.push(url);
     if (request.method() !== "GET") external.push(`${request.method()} ${url}`);
   });
 

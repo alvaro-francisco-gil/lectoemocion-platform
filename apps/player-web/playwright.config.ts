@@ -1,13 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const port = Number(process.env["PLAYER_PORT"] ?? 4173);
+const baseURL = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: "./e2e",
   use: {
-    baseURL: "http://127.0.0.1:4173"
+    baseURL
   },
   webServer: {
     command: "pnpm dev",
-    url: "http://127.0.0.1:4173",
+    url: baseURL,
     reuseExistingServer: !process.env.CI
   },
   projects: [

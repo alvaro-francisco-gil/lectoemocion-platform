@@ -105,6 +105,7 @@ above has an executable guardrail; `pnpm guardrails` runs them all, and
 | Invariant | Enforced by |
 |---|---|
 | 2 — engine-neutral contracts | `scripts/check-engine-neutral.mjs` |
+| 2 — templates never read progress | `scripts/check-progress-boundary.mjs` |
 | 3 — Firebase boundary | `scripts/check-firebase-boundary.mjs` |
 | 5 — immutable published versions | `packages/template-catalog/src/publishedVersions.test.ts` |
 | Privacy — media and logging | `scripts/check-privacy.mjs` |
@@ -138,9 +139,11 @@ enables `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,
   breaks compilation at every site that must handle it, instead of silently
   falling through to the last branch.
 - **Make illegal states unrepresentable.** Prefer a type that cannot express the
-  invalid case over a runtime check that rejects it. When personalisation slots
-  arrive, a slot and its default content must be one object, so "slot without a
-  default" is a type error rather than a test failure.
+  invalid case over a runtime check that rejects it. A personalisation slot and
+  its default content are one object (`ParticipantSlotSchema`), so "slot without
+  a default" is a compile error rather than a test failure, and `resolveSlot`
+  returns content rather than optional content, so the fallback cannot be
+  skipped.
 - **Derive types from schemas.** Manifest types come from the TypeBox schema via
   `Static<typeof Schema>`. Never hand-write a second declaration of a shape that
   a schema already defines.

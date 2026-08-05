@@ -8,9 +8,16 @@ inside the mobile shell. See
 ## Layering
 
 ```text
-src/app/      React shell — routing, resource selection, adult-facing UI
+src/app/      React shell — routing, adult-facing UI
+src/world/    progression — progress storage and the map view derived from it
 src/game/     the rendering adapter — the only place Phaser may appear
 ```
+
+Progression lives in `src/world/` and nowhere else.
+`scripts/check-progress-boundary.mjs` stops a template or a shared package
+importing it. The shell reads progress, derives a `MapView`, and hands the map
+scene that view plus a callback; it hands a template a manifest plus a
+completion callback. Neither ever sees `Progress`.
 
 `scripts/check-engine-neutral.mjs` enforces that boundary. Phaser types must not
 escape `src/game/` into the shell, shared packages, or manifests: the renderer
@@ -67,3 +74,11 @@ touch, which gives a current desktop browser.
 
 Run `pnpm test:e2e` from the repo root. Never start `pnpm dev` — that is a
 long-lived server the user owns.
+
+**In a git worktree, set `PLAYER_PORT`.** Playwright reuses an existing server
+on the configured port, so with the primary checkout's dev server running, a
+worktree's suite silently tests the primary checkout's code instead of its own:
+
+```bash
+PLAYER_PORT=4273 pnpm test:e2e
+```

@@ -8,6 +8,7 @@ const {
   isForbiddenInSharedPackage,
   isMediaFile,
   isPhaserImport,
+  isProgressImport,
   isReactImport,
   isStrictTypeEscape
 } = rules as {
@@ -16,6 +17,7 @@ const {
   isForbiddenInSharedPackage: (line: string) => boolean;
   isMediaFile: (name: string) => boolean;
   isPhaserImport: (line: string) => boolean;
+  isProgressImport: (line: string) => boolean;
   isReactImport: (line: string) => boolean;
   isStrictTypeEscape: (line: string) => boolean;
 };
@@ -123,5 +125,29 @@ describe("media rule", () => {
 
   it("allows generated vector art", () => {
     expect(isMediaFile("avatar.svg")).toBe(false);
+  });
+});
+
+describe("progress-boundary rule", () => {
+  it.each([
+    'import { LocalProgressStore } from "../world/progressStore";',
+    'import type { Progress } from "./mapView";',
+    'export { deriveMapView } from "../../world/mapView";',
+    "import { EMPTY_PROGRESS } from '@lectoemocion/player-web/src/world/progressStore'"
+  ])("flags %s", (line) => {
+    expect(isProgressImport(line)).toBe(true);
+  });
+
+  it("allows a template importing its own contracts", () => {
+    expect(
+      isProgressImport('import type { ManifestFor } from "@lectoemocion/resource-schema";')
+    ).toBe(false);
+    expect(isProgressImport('import { resolveSlot } from "./slots";')).toBe(false);
+  });
+
+  it("allows prose that merely mentions progress", () => {
+    expect(isProgressImport(" * The shell records progress after a win.")).toBe(
+      false
+    );
   });
 });

@@ -29,6 +29,21 @@ export const isFirebaseImport = (line) =>
 export const isForbiddenInSharedPackage = (line) =>
   isPhaserImport(line) || isReactImport(line) || isFirebaseImport(line);
 
+/** Where progress state lives. Nothing outside the shell may reach into it. */
+export const PROGRESS_MODULE = "apps/player-web/src/world/progressStore";
+
+/**
+ * Invariant 2: templates never read or write progress state.
+ *
+ * A template that can see progress can branch on it, and content that branches
+ * on progress stops being replayable, portable, or reviewable in isolation.
+ * The map is the one thing that legitimately reads progress, and it lives in
+ * the shell for exactly this reason.
+ */
+export const isProgressImport = (line) =>
+  /from\s+["'][^"']*(?:progressStore|\/world\/progress)["']/.test(line) ||
+  /from\s+["'][^"']*mapView["']/.test(line);
+
 export const isConsoleCall = (line) =>
   /\bconsole\.(log|info|warn|error|debug|trace|table|dir)\b/.test(line);
 

@@ -11,5 +11,5 @@
  * guarantee has to hold in `dist/`, not in source.
  */
 export function unlockAllEnabled(): boolean {
-  return import.meta.env["VITE_LECTOEMOCION_UNLOCK_ALL"] === "true";
+  return import.meta.env.VITE_LECTOEMOCION_UNLOCK_ALL === "true";
 }
