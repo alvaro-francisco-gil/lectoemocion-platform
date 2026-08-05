@@ -33,15 +33,20 @@ map, or default content.
 the classroom display. That is the decision's one material risk, and it is
 cheap to test.
 
-Build a capability probe page and open it on a real interactive panel. It must
-report user agent and browser engine version, WebGL support and version,
+Status: the probe is built; the measurement is pending physical access to a
+panel.
+
+The probe is `apps/player-web/public/probe.html`, served at `/probe.html`. It
+reports user agent and browser engine version, WebGL support and version,
 available memory, `devicePixelRatio` and reported resolution, simultaneous
-touch points, and whether audio unlocks after a first tap. Record the panel
-model and firmware version alongside the results.
+touch points — both reported and observed — a two-second frame-rate sample, and
+whether audio unlocks after a first tap. The operator records the panel model
+and firmware alongside it. Nothing leaves the device.
 
 The first target is a TTL-branded panel, whose model and firmware are not yet
 available. Run the same probe through the connected-computer path as well, so
-both routes are characterised.
+both routes are characterised. The pass criteria and the results table live in
+[ADR 0003](../decisions/0003-runtime-and-animation.md#classroom-panel-verification).
 
 Exit condition: either the panel browser is confirmed adequate, or the
 connected-computer fallback is confirmed as the supported path, and ADR 0003 is

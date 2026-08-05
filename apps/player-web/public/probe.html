@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Classroom panel capability probe</title>
+    <!--
+      Roadmap stage 2. This page measures whether a classroom panel's browser
+      can run the player (ADR 0003).
+
+      It is deliberately plain: ES5 only, no modules, no imports, no build
+      step, no external stylesheet, no network traffic of any kind. It has to
+      run on the browser we suspect is too old for the player — a probe that
+      needs the same platform as the thing it is testing measures nothing.
+      Vite copies public/ verbatim, so this file reaches dist/ untransformed.
+
+      Do not "modernise" this file. e2e/probe.spec.ts holds it to these
+      constraints.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 1.5rem;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        font-size: 18px;
+        line-height: 1.5;
+        color: #10233b;
+        background: #f6f8fb;
+      }
+      h1 {
+        font-size: 1.6rem;
+        margin: 0 0 0.25rem;
+      }
+      p.lede {
+        margin: 0 0 1.5rem;
+        color: #4a5b70;
+      }
+      section {
+        background: #fff;
+        border: 1px solid #d9e0ea;
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.25rem;
+      }
+      h2 {
+        font-size: 1.1rem;
+        margin: 0 0 0.75rem;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0.4rem 0.5rem;
+        border-bottom: 1px solid #eef1f6;
+        vertical-align: top;
+      }
+      th {
+        width: 16rem;
+        font-weight: 600;
+        color: #4a5b70;
+      }
+      td {
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        word-break: break-word;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        color: #4a5b70;
+        margin-bottom: 0.25rem;
+      }
+      .field {
+        margin-bottom: 0.9rem;
+      }
+      input,
+      select,
+      textarea {
+        font: inherit;
+        width: 100%;
+        max-width: 32rem;
+        padding: 0.45rem 0.6rem;
+        border: 1px solid #b9c4d2;
+        border-radius: 6px;
+        background: #fff;
+        color: inherit;
+      }
+      textarea {
+        max-width: none;
+        height: 18rem;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 14px;
+      }
+      button {
+        font: inherit;
+        font-weight: 600;
+        padding: 0.9rem 1.4rem;
+        border: 0;
+        border-radius: 8px;
+        background: #1d4ed8;
+        color: #fff;
+        cursor: pointer;
+      }
+      button:active {
+        background: #1739a0;
+      }
+      #touchpad {
+        margin-top: 0.9rem;
+        height: 8rem;
+        border: 2px dashed #b9c4d2;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #4a5b70;
+        touch-action: none;
+        user-select: none;
+      }
+      .note {
+        color: #4a5b70;
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Classroom panel capability probe</h1>
+    <p class="lede">
+      Everything stays on this device. Nothing is uploaded, stored, or sent
+      anywhere — copy the report at the bottom by hand.
+    </p>
+
+    <section>
+      <h2>1. Identify the panel</h2>
+      <div class="field">
+        <label for="panelModel">Panel model</label>
+        <input id="panelModel" type="text" placeholder="e.g. TTL-65-XYZ" />
+      </div>
+      <div class="field">
+        <label for="firmwareVersion">Firmware version</label>
+        <input id="firmwareVersion" type="text" placeholder="e.g. 3.1.4" />
+      </div>
+      <div class="field">
+        <label for="route">Delivery route</label>
+        <select id="route">
+          <option value="panel-browser">Panel's own browser</option>
+          <option value="connected-computer">
+            Computer connected by HDMI and USB touch
+          </option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="operatorNotes">Notes</label>
+        <input
+          id="operatorNotes"
+          type="text"
+          placeholder="Anything unusual: stutter, black canvas, no sound"
+        />
+      </div>
+    </section>
+
+    <section>
+      <h2>2. Tap to test audio</h2>
+      <p class="note">
+        Every browser blocks sound until the user touches the screen. Tap once
+        and listen for a short beep.
+      </p>
+      <button id="audioButton" type="button">Tap to test audio</button>
+    </section>
+
+    <section>
+      <h2>3. Touch as many fingers as you can</h2>
+      <p class="note">
+        Press the area below with several fingers at once. It records the most
+        the panel reported simultaneously.
+      </p>
+      <div id="touchpad">Press here with 3–10 fingers</div>
+    </section>
+
+    <section>
+      <h2>Measurements</h2>
+      <table>
+        <tbody>
+          <tr>
+            <th scope="row">User agent</th>
+            <td data-testid="measurement-userAgent">—</td>
+          </tr>
+          <tr>
+            <th scope="row">Browser engine</th>
+            <td data-testid="measurement-engine">—</td>
+          </tr>
+          <tr>
+            <th scope="row">WebGL</th>
+            <td data-testid="measurement-webgl">—</td>
+          </tr>
+          <tr>
+            <th scope="row">GPU renderer</th>
+            <td data-testid="measurement-webglRenderer">—</td>
+          </tr>
+          <tr>
+            <th scope="row">Device memory</th>
+            <td data-testid="measurement-deviceMemoryGb">—</td>
+          </tr>
+          <tr>
+            <th scope="row">JS heap limit</th>
+            <td data-testid="measurement-jsHeapLimitMb">—</td>
+          </tr>
+          <tr>
+            <th scope="row">Device pixel ratio</th>
+            <td data-testid="measurement-devicePixelRatio">—</td>
+          </tr>
+          <tr>
+            <th scope="row">Screen</th>
+            <td data-testid="measurement-screen">—</td>
+          </tr>
+          <tr>
+            <th scope="row">Touch points (reported)</th>
+            <td data-testid="measurement-maxTouchPoints">—</td>
+          </tr>
+          <tr>
+            <th scope="row">Touch points (observed)</th>
+            <td data-testid="measurement-observedTouchPoints">0</td>
+          </tr>
+          <tr>
+            <th scope="row">Frame rate</th>
+            <td data-testid="measurement-frameRate">measuring…</td>
+          </tr>
+          <tr>
+            <th scope="row">Audio unlocked by tap</th>
+            <td data-testid="measurement-audioUnlocked">not tested</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Report</h2>
+      <p class="note">
+        Paste this into the stage 2 results table in
+        docs/decisions/0003-runtime-and-animation.md.
+      </p>
+      <textarea id="report" data-testid="report" readonly></textarea>
+    </section>
+
+    <script>
+      /* ES5 only. See the comment in <head> before changing anything here. */
+      (function () {
+        "use strict";
+
+        var report = {
+          panelModel: "",
+          firmwareVersion: "",
+          route: "panel-browser",
+          operatorNotes: "",
+          userAgent: navigator.userAgent,
+          engine: null,
+          webgl: null,
+          webglRenderer: null,
+          maxTextureSize: null,
+          deviceMemoryGb: null,
+          jsHeapLimitMb: null,
+          devicePixelRatio: null,
+          screen: null,
+          maxTouchPoints: null,
+          observedTouchPoints: 0,
+          frameRate: null,
+          audioUnlocked: null
+        };
+
+        function byId(id) {
+          return document.getElementById(id);
+        }
+
+        function cell(key) {
+          return document.querySelector('[data-testid="measurement-' + key + '"]');
+        }
+
+        function show(key, text) {
+          var element = cell(key);
+          if (element) element.textContent = text;
+        }
+
+        function render() {
+          byId("report").value = JSON.stringify(report, null, 2);
+        }
+
+        /* --- browser engine ------------------------------------------------ */
+
+        function detectEngine(ua) {
+          var patterns = [
+            ["Edge", /Edge?\/([\d.]+)/],
+            ["Opera", /(?:OPR|Opera)\/([\d.]+)/],
+            ["Samsung Internet", /SamsungBrowser\/([\d.]+)/],
+            ["Chrome", /(?:Chrome|CriOS|Chromium)\/([\d.]+)/],
+            ["Firefox", /(?:Firefox|FxiOS)\/([\d.]+)/],
+            ["Safari", /Version\/([\d.]+).*Safari/]
+          ];
+          for (var index = 0; index < patterns.length; index += 1) {
+            var match = ua.match(patterns[index][1]);
+            if (match) return patterns[index][0] + " " + match[1];
+          }
+          return "unrecognised";
+        }
+
+        report.engine = detectEngine(navigator.userAgent);
+        show("userAgent", navigator.userAgent);
+        show("engine", report.engine);
+
+        /* --- WebGL --------------------------------------------------------- */
+
+        function probeWebgl() {
+          var canvas = document.createElement("canvas");
+          var names = ["webgl2", "webgl", "experimental-webgl"];
+          for (var index = 0; index < names.length; index += 1) {
+            var context = null;
+            try {
+              context = canvas.getContext(names[index]);
+            } catch (error) {
+              context = null;
+            }
+            if (context) return { name: names[index], context: context };
+          }
+          return null;
+        }
+
+        var gl = probeWebgl();
+        if (!gl) {
+          report.webgl = "unsupported";
+          show("webgl", "unsupported — the player cannot run here");
+          show("webglRenderer", "n/a");
+        } else {
+          report.webgl = gl.name;
+          show("webgl", gl.name);
+          try {
+            report.maxTextureSize = gl.context.getParameter(
+              gl.context.MAX_TEXTURE_SIZE
+            );
+          } catch (error) {
+            report.maxTextureSize = null;
+          }
+          var renderer = null;
+          try {
+            var info = gl.context.getExtension("WEBGL_debug_renderer_info");
+            renderer = info
+              ? gl.context.getParameter(info.UNMASKED_RENDERER_WEBGL)
+              : gl.context.getParameter(gl.context.RENDERER);
+          } catch (error) {
+            renderer = null;
+          }
+          report.webglRenderer = renderer;
+          show(
+            "webglRenderer",
+            (renderer || "unavailable") +
+              " · max texture " +
+              (report.maxTextureSize === null ? "?" : report.maxTextureSize)
+          );
+        }
+
+        /* --- memory, display, touch ---------------------------------------- */
+
+        if (typeof navigator.deviceMemory === "number") {
+          report.deviceMemoryGb = navigator.deviceMemory;
+          show("deviceMemoryGb", navigator.deviceMemory + " GB");
+        } else {
+          show("deviceMemoryGb", "not reported");
+        }
+
+        if (window.performance && performance.memory) {
+          report.jsHeapLimitMb = Math.round(
+            performance.memory.jsHeapSizeLimit / (1024 * 1024)
+          );
+          show("jsHeapLimitMb", report.jsHeapLimitMb + " MB");
+        } else {
+          show("jsHeapLimitMb", "not reported");
+        }
+
+        report.devicePixelRatio = window.devicePixelRatio || 1;
+        show("devicePixelRatio", String(report.devicePixelRatio));
+
+        report.screen = {
+          screenWidth: screen.width,
+          screenHeight: screen.height,
+          availWidth: screen.availWidth,
+          availHeight: screen.availHeight,
+          innerWidth: window.innerWidth,
+          innerHeight: window.innerHeight,
+          physicalWidth: Math.round(screen.width * report.devicePixelRatio),
+          physicalHeight: Math.round(screen.height * report.devicePixelRatio)
+        };
+        show(
+          "screen",
+          report.screen.innerWidth +
+            "×" +
+            report.screen.innerHeight +
+            " css · " +
+            report.screen.physicalWidth +
+            "×" +
+            report.screen.physicalHeight +
+            " physical"
+        );
+
+        report.maxTouchPoints =
+          typeof navigator.maxTouchPoints === "number"
+            ? navigator.maxTouchPoints
+            : 0;
+        show("maxTouchPoints", String(report.maxTouchPoints));
+
+        function recordTouches(event) {
+          var count = event.touches ? event.touches.length : 0;
+          if (count > report.observedTouchPoints) {
+            report.observedTouchPoints = count;
+            show("observedTouchPoints", String(count));
+            render();
+          }
+        }
+
+        var touchpad = byId("touchpad");
+        touchpad.addEventListener("touchstart", recordTouches, false);
+        touchpad.addEventListener("touchmove", recordTouches, false);
+
+        /* --- frame rate ----------------------------------------------------- */
+
+        /*
+         * A user agent string cannot tell us whether the panel can animate. Two
+         * seconds of requestAnimationFrame can.
+         */
+        function measureFrameRate() {
+          if (!window.requestAnimationFrame) {
+            report.frameRate = 0;
+            show("frameRate", "0 fps — no requestAnimationFrame");
+            render();
+            return;
+          }
+          var frames = 0;
+          var started = new Date().getTime();
+          function tick() {
+            frames += 1;
+            var elapsed = new Date().getTime() - started;
+            if (elapsed < 2000) {
+              requestAnimationFrame(tick);
+              return;
+            }
+            report.frameRate = Math.round((frames * 1000) / elapsed);
+            show("frameRate", report.frameRate + " fps");
+            render();
+          }
+          requestAnimationFrame(tick);
+        }
+
+        /* --- audio unlock ---------------------------------------------------- */
+
+        function settleAudio(context) {
+          var unlocked = context.state === "running";
+          report.audioUnlocked = unlocked;
+          show("audioUnlocked", unlocked ? "yes" : "no");
+          render();
+          if (!unlocked) return;
+          try {
+            var oscillator = context.createOscillator();
+            var gain = context.createGain();
+            gain.gain.value = 0.05;
+            oscillator.frequency.value = 660;
+            oscillator.connect(gain);
+            gain.connect(context.destination);
+            oscillator.start(0);
+            oscillator.stop(context.currentTime + 0.2);
+          } catch (error) {
+            /* The beep is confirmation for the operator, not the measurement. */
+          }
+        }
+
+        byId("audioButton").addEventListener(
+          "click",
+          function () {
+            var Context = window.AudioContext || window.webkitAudioContext;
+            if (!Context) {
+              report.audioUnlocked = false;
+              show("audioUnlocked", "no");
+              render();
+              return;
+            }
+            var context = new Context();
+            var resumed = context.resume ? context.resume() : null;
+            if (resumed && typeof resumed.then === "function") {
+              resumed.then(
+                function () {
+                  settleAudio(context);
+                },
+                function () {
+                  settleAudio(context);
+                }
+              );
+            } else {
+              settleAudio(context);
+            }
+          },
+          false
+        );
+
+        /* --- operator fields -------------------------------------------------- */
+
+        function bind(id, key) {
+          var element = byId(id);
+          function update() {
+            report[key] = element.value;
+            render();
+          }
+          element.addEventListener("input", update, false);
+          element.addEventListener("change", update, false);
+        }
+
+        bind("panelModel", "panelModel");
+        bind("firmwareVersion", "firmwareVersion");
+        bind("route", "route");
+        bind("operatorNotes", "operatorNotes");
+
+        render();
+        measureFrameRate();
+      })();
+    </script>
+  </body>
+</html>

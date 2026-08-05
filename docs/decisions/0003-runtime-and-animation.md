@@ -114,6 +114,45 @@ requires store presence.
   handoff from native UI into the player feel seamless is explicit work.
 - Choreography written now survives the arrival of an animator.
 
+## Classroom-panel verification
+
+This decision is contingent on measurement, not on argument. The instrument is
+`apps/player-web/public/probe.html`, served at `/probe.html` alongside the
+player. Open it on the panel, tap the audio button, press the touch pad with
+several fingers, fill in the model and firmware, and copy the JSON report.
+
+Run it twice: once in the panel's own browser, once through the
+connected-computer path, so both routes are characterised rather than only the
+one that happens to work.
+
+### The bar
+
+Stated before going on site, so "adequate" is not decided under pressure in a
+school corridor. A route passes when all of these hold:
+
+| Measurement | Passing | Why this bar |
+|---|---|---|
+| `webgl` | `webgl` or `webgl2` | Phaser cannot render without it. A canvas-2D fallback is not in scope. |
+| `frameRate` | ≥ 50 fps | Below this, choreographed animation reads as stutter to a child. |
+| `audioUnlocked` | `true` | Story narration is not optional content. |
+| `maxTouchPoints` | ≥ 2 | One point plays; two is the floor for anything cooperative. |
+| `deviceMemoryGb` | ≥ 2, or not reported | Under 2 GB, expect the WebView to evict the player on backgrounding. |
+| `engine` | Chrome ≥ 80 or equivalent | Below this, ES2020 and modern canvas behaviour stop being safe assumptions. |
+
+A route failing any row is inadequate. If the panel browser fails and the
+connected computer passes, the connected computer is the supported path for
+that panel model — per the Consequences above, that is a supported outcome and
+not a degradation.
+
+### Results
+
+Not yet measured. The first target is a TTL-branded panel whose model and
+firmware are not yet known.
+
+| Date | Panel model | Firmware | Route | Verdict | Report |
+|---|---|---|---|---|---|
+| — | — | — | — | — | — |
+
 ## Revisit when
 
 - The SMART panel probe shows a browser too old to run the player acceptably,

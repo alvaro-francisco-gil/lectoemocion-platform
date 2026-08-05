@@ -37,6 +37,19 @@ coming out.
   template kind must break compilation here, not silently render the wrong
   scene.
 
+## The capability probe
+
+`public/probe.html` measures whether a classroom panel can run the player. It
+is **ES5, unbundled, and dependency-free on purpose**: it has to run on the
+browser we suspect is too old for the player, and a probe that needs the same
+platform as the thing it tests measures nothing. Vite copies `public/`
+verbatim, so it ships to `dist/probe.html` untransformed.
+
+Do not modernise it, import into it, or move it into the React shell.
+`e2e/probe.spec.ts` fails if it grows a module script, an external stylesheet,
+or a network request. Results go in
+[ADR 0003](../../docs/decisions/0003-runtime-and-animation.md#classroom-panel-verification).
+
 ## Target hardware
 
 The classroom display may run an old vendor Chromium on weak ARM hardware, with
