@@ -8,19 +8,9 @@ const createGame = vi.fn(
   (_parent: HTMLElement, _resource: unknown, _onComplete: () => void):
     Destroyable => ({ destroy: () => undefined })
 );
-const createMapGame = vi.fn(
-  (_parent: HTMLElement, _view: unknown, _onSelect: (id: string) => void):
-    Destroyable => ({ destroy: () => undefined })
-);
-
 vi.mock("../game/createGame", () => ({
   createGame: (parent: HTMLElement, resource: unknown, onComplete: () => void) =>
-    createGame(parent, resource, onComplete),
-  createMapGame: (
-    parent: HTMLElement,
-    view: unknown,
-    onSelect: (id: string) => void
-  ) => createMapGame(parent, view, onSelect)
+    createGame(parent, resource, onComplete)
 }));
 
 /** Completes the resource the shell most recently opened. */
@@ -39,17 +29,18 @@ describe("the world shell", () => {
   beforeEach(() => {
     localStorage.clear();
     createGame.mockClear();
-    createMapGame.mockClear();
   });
 
   it("starts on the map with only the entry node open", () => {
     render(<App />);
-    expect(createMapGame).toHaveBeenCalled();
+    expect(createGame).not.toHaveBeenCalled();
 
     const open = screen
       .getAllByRole("button")
       .filter((button) => !button.hasAttribute("disabled"));
-    expect(open.map((button) => button.textContent)).toEqual(["El encuentro"]);
+    expect(
+      open.map((button) => button.querySelector(".world-node__title")?.textContent)
+    ).toEqual(["El encuentro"]);
   });
 
   it("refuses to open a locked node", () => {
@@ -67,7 +58,7 @@ describe("the world shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Volver al mapa" }));
     await waitFor(() =>
-      expect(screen.getByTestId("progress-summary")).toBeInTheDocument()
+      expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument()
     );
   });
 
@@ -119,6 +110,21 @@ describe("the world shell", () => {
     );
   });
 
+  it("shows the world as one ordered path", () => {
+    render(<App />);
+    const titles = screen
+      .getAllByRole("button")
+      .map((button) => button.querySelector(".world-node__title")?.textContent);
+    expect(titles).toEqual([
+      "El encuentro",
+      "Las iniciales",
+      "El bosque de parejas",
+      "¿Cuál es?",
+      "El puente de sílabas",
+      "Nuestro álbum"
+    ]);
+  });
+
   it("hides the world list while a resource is playing", () => {
     render(<App />);
     expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
@@ -128,18 +134,40 @@ describe("the world shell", () => {
     /* Only "Volver al mapa" remains: no shortcuts past the progression, and
        nothing competing with the game at a child's eye level. */
     expect(screen.queryByRole("navigation", { name: "Mundo" })).toBeNull();
-    expect(screen.getAllByRole("button").map((each) => each.textContent)).toEqual(
-      ["Volver al mapa"]
-    );
+    expect(
+      screen
+        .getAllByRole("button")
+        .map((each) => each.getAttribute("aria-label"))
+    ).toEqual(["Volver al mapa"]);
 
     returnToMap();
     expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
   });
 
-  it("tells the adult how much of the world is open", () => {
+  it("shows the duende on the map as decoration only", () => {
+    const { container } = render(<App />);
+
+    /* Present, but nameless: it guides the eye, not the screen reader, and it
+       must never compete with a node for a tap. */
+    expect(container.querySelector(".map__duende")).toBeInTheDocument();
+    expect(screen.queryAllByRole("img")).toEqual([]);
+
+    fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
+    expect(container.querySelector(".map__duende")).toBeNull();
+  });
+
+  it("marks each node's state without relying on colour", () => {
     render(<App />);
-    expect(screen.getByTestId("progress-summary")).toHaveTextContent(
-      "1 de 6 desbloqueados"
-    );
+    const states = screen
+      .getAllByRole("button")
+      .map((button) => button.querySelector(".world-node__state")?.textContent);
+    expect(states).toEqual([
+      "Historia",
+      "Bloqueado",
+      "Bloqueado",
+      "Bloqueado",
+      "Bloqueado",
+      "Bloqueado"
+    ]);
   });
 });

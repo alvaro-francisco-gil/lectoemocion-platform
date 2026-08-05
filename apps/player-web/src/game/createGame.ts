@@ -1,7 +1,5 @@
 import * as Phaser from "phaser";
 import type { ResourceManifest } from "@lectoemocion/resource-schema";
-import type { MapView } from "../world/mapView";
-import { MapScene } from "./scenes/MapScene";
 import { ResourceScene } from "./scenes/ResourceScene";
 
 /**
@@ -13,7 +11,14 @@ const PRESENTATION = {
   backgroundColor: "#f7f2ff",
   scale: {
     mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
+    /*
+     * Centering is the host element's job. Phaser centres by writing a margin
+     * onto the canvas, and a margin is layout: it grows the host, so the next
+     * parent measurement is larger than the one that produced it and the
+     * picture walks down the screen. CSS centres the canvas without changing
+     * the box the scale manager measures.
+     */
+    autoCenter: Phaser.Scale.NO_CENTER,
     width: 1280,
     height: 720
   },
@@ -32,14 +37,3 @@ export function createGame(
   });
 }
 
-export function createMapGame(
-  parent: HTMLElement,
-  view: MapView,
-  onSelect: (nodeId: string) => void
-): Phaser.Game {
-  return new Phaser.Game({
-    ...PRESENTATION,
-    parent,
-    scene: [new MapScene(view, onSelect)]
-  });
-}

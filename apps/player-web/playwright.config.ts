@@ -19,12 +19,14 @@ const viewport = {
 export default defineConfig({
   testDir: "./e2e",
   /*
-   * Playwright's default is 30 seconds, and the album cinematic alone runs for
-   * about 24 of them. That left no headroom at all: with three viewport
-   * projects rendering at once — one of them 4K — the timeline tests lost the
-   * race to their own budget rather than to any defect.
+   * Playwright's default is 30 seconds, and this suite watches real timelines
+   * play: the album alone runs about 24, and the sweep through every resource
+   * boots six Phaser games in turn. Three viewport projects render those at
+   * once, one of them at 4K, so wall-clock stretches two to three times over
+   * the same work measured alone. The budget has to cover the slow case or the
+   * suite reports contention as failure.
    */
-  timeout: 90_000,
+  timeout: 180_000,
   use: {
     baseURL
   },

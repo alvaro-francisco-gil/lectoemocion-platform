@@ -5,33 +5,158 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
-main { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; }
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  background: white;
-}
-h1 { margin: 0; font-size: 1.4rem; }
-nav { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-button {
-  min-height: 44px;
-  padding: 0.6rem 0.9rem;
+/*
+ * The shell is exactly one viewport tall, never taller. The canvas is sized to
+ * fit its host, so a host that could grow with its content would size the
+ * canvas from a height the canvas itself decided — the picture jumps and the
+ * page scrolls out from under a child. `dvh` keeps that true while mobile
+ * browser chrome collapses.
+ */
+body { margin: 0; min-width: 320px; overflow: hidden; }
+main { height: 100dvh; }
+
+/* ---------------------------------------------------------------- playing */
+
+/*
+ * A game fills the screen. The only chrome is the way back, and it sits in the
+ * top-left corner: adult navigation may sit high, but never where a child's
+ * hands land during play.
+ */
+/*
+ * Exactly one viewport tall, not merely at least: the canvas is sized from its
+ * host, so a host free to grow with its content would size the canvas from a
+ * height the canvas itself decided, and the picture walks down the screen.
+ */
+.playing { height: 100dvh; display: grid; }
+.playing .game-host { grid-area: 1 / 1; }
+
+.back {
+  grid-area: 1 / 1;
+  z-index: 1;
+  align-self: start;
+  justify-self: start;
+  margin: 0.75rem;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  padding: 0;
   border: 2px solid #7b2cbf;
-  border-radius: 999px;
-  background: white;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.9);
   color: #402060;
-  font: inherit;
-  font-weight: 700;
+  cursor: pointer;
 }
-button[aria-pressed="true"] { background: #7b2cbf; color: white; }
+.back:hover { background: #fff; }
+.back:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
+
 .game-host { min-height: 0; display: grid; place-items: center; overflow: hidden; }
 .game-host canvas { max-width: 100%; max-height: 100%; touch-action: none; }
 
-@media (max-width: 600px) {
-  header { align-items: stretch; flex-direction: column; }
-  nav > button { flex: 1; }
+/* ------------------------------------------------------------------- map */
+
+/*
+ * The world reads left to right as one path, so progress is a place you have
+ * reached rather than a number. It sits low: a child aged 3–5 cannot reach the
+ * top of an 86-inch display.
+ */
+.map {
+  display: grid;
+  align-content: end;
+  padding-bottom: clamp(2rem, 12vh, 8rem);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/*
+ * The guide watches from the top-right corner. Fixed rather than absolute
+ * because `.map` scrolls horizontally when the path outgrows the viewport, and
+ * a guide that slid away with the path would be decoration that moves for no
+ * reason. `pointer-events: none` so it can never swallow a tap meant for a
+ * node, and it is sized off the viewport height so it shrinks on a phone in
+ * landscape instead of covering the path.
+ */
+.map__duende {
+  position: fixed;
+  top: clamp(0.5rem, 2vh, 1.5rem);
+  right: clamp(0.5rem, 2vw, 2rem);
+  height: clamp(88px, 26vh, 260px);
+  width: auto;
+  pointer-events: none;
+  user-select: none;
+}
+
+.world-path {
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(0.5rem, 3vw, 2.5rem);
+  margin: 0;
+  padding: 0 clamp(1rem, 5vw, 4rem);
+  list-style: none;
+  min-width: max-content;
+  justify-content: center;
+}
+
+/* The line that makes a row of buttons read as one journey. */
+.world-path > li {
+  position: relative;
+  display: flex;
+}
+.world-path > li + li::before {
+  content: "";
+  position: absolute;
+  top: 46px;
+  right: 100%;
+  width: clamp(0.5rem, 3vw, 2.5rem);
+  height: 6px;
+  border-radius: 3px;
+  background: #d7c9ea;
+}
+.world-path > li:has(.world-node[data-state="completed"]) + li::before {
+  background: #7b2cbf;
+}
+
+.world-node {
+  width: clamp(104px, 15vw, 168px);
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: #402060;
+  cursor: pointer;
+}
+.world-node[disabled] { cursor: not-allowed; color: #6f6280; }
+
+.world-node__marker {
+  width: 92px;
+  height: 92px;
+  display: grid;
+  place-items: center;
+  border: 6px solid #7b2cbf;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 2.2rem;
+  font-weight: 800;
+}
+.world-node[data-state="completed"] .world-node__marker {
+  background: #95d5b2;
+  border-color: #4a3a63;
+}
+.world-node[data-state="locked"] .world-node__marker {
+  background: #e7e1ef;
+  border-color: #b9a7c9;
+  font-size: 1.8rem;
+}
+
+.world-node__title { font-weight: 700; font-size: 1rem; line-height: 1.2; }
+.world-node__state { font-size: 0.85rem; opacity: 0.8; }
+
+.world-node:focus-visible { outline: 3px solid #402060; outline-offset: 4px; }
+.world-node:not([disabled]):hover .world-node__marker { transform: scale(1.06); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .world-node__marker { transition: transform 120ms ease-out; }
 }
