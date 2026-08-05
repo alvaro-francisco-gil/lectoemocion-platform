@@ -1,23 +1,62 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ResourceManifest } from "@lectoemocion/resource-schema";
 import {
   createInitialsGameResource,
   createNameStoryResource,
+  createPairsGameResource,
+  createSyllablesGameResource,
+  createWordPictureGameResource,
+  defaultVocabulary,
   syntheticClass
 } from "@lectoemocion/template-catalog";
 import { createGame } from "../game/createGame";
 
-type ResourceChoice = "story" | "game";
+interface ResourceChoice {
+  readonly id: string;
+  readonly label: string;
+  readonly create: () => ResourceManifest;
+}
+
+const CHOICES: readonly ResourceChoice[] = [
+  {
+    id: "story",
+    label: "Historia de nombres",
+    create: () => createNameStoryResource(syntheticClass, "demo-story")
+  },
+  {
+    id: "initials",
+    label: "Juego de iniciales",
+    create: () => createInitialsGameResource(syntheticClass, "A", "demo-game")
+  },
+  {
+    id: "pairs",
+    label: "Parejas",
+    create: () => createPairsGameResource(defaultVocabulary, 3, "demo-pairs")
+  },
+  {
+    id: "word-picture",
+    label: "¿Cuál es?",
+    create: () =>
+      createWordPictureGameResource(defaultVocabulary, "casa", 3, "demo-word")
+  },
+  {
+    id: "syllables",
+    label: "Sílabas",
+    create: () =>
+      createSyllablesGameResource(defaultVocabulary, "mariposa", "demo-syllables")
+  }
+];
 
 export function App() {
-  const [choice, setChoice] = useState<ResourceChoice>("story");
+  const [choiceId, setChoiceId] = useState<string>("story");
   const gameHost = useRef<HTMLDivElement>(null);
-  const resource = useMemo(
-    () =>
-      choice === "story"
-        ? createNameStoryResource(syntheticClass, "demo-story")
-        : createInitialsGameResource(syntheticClass, "A", "demo-game"),
-    [choice]
-  );
+  const resource = useMemo(() => {
+    const choice = CHOICES.find((candidate) => candidate.id === choiceId);
+    if (!choice) {
+      throw new Error(`Unknown resource choice: ${choiceId}`);
+    }
+    return choice.create();
+  }, [choiceId]);
 
   useEffect(() => {
     if (!gameHost.current) return;
@@ -30,18 +69,15 @@ export function App() {
       <header>
         <h1>LectoEmoción</h1>
         <nav aria-label="Recursos">
-          <button
-            aria-pressed={choice === "story"}
-            onClick={() => setChoice("story")}
-          >
-            Historia de nombres
-          </button>
-          <button
-            aria-pressed={choice === "game"}
-            onClick={() => setChoice("game")}
-          >
-            Juego de iniciales
-          </button>
+          {CHOICES.map((choice) => (
+            <button
+              key={choice.id}
+              aria-pressed={choice.id === choiceId}
+              onClick={() => setChoiceId(choice.id)}
+            >
+              {choice.label}
+            </button>
+          ))}
         </nav>
       </header>
       <div ref={gameHost} className="game-host" data-testid="game-host" />

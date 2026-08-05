@@ -1,13 +1,10 @@
 import * as Phaser from "phaser";
-import type { ResourceManifest } from "@lectoemocion/resource-schema";
+import type { ManifestFor } from "@lectoemocion/resource-schema";
 
 export function renderInitialsGame(
   scene: Phaser.Scene,
-  resource: ResourceManifest
+  resource: ManifestFor<"initials-game">
 ): void {
-  if (resource.template.id !== "initials-game") {
-    throw new Error("Initials renderer received an incompatible resource");
-  }
   const targetInitial = resource.template.targetInitial;
   let remaining = resource.participants.filter(
     (child) => child.verifiedInitial === targetInitial

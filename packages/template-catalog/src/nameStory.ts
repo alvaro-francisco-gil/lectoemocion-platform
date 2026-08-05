@@ -1,5 +1,5 @@
 import type { ChildRecord } from "@lectoemocion/domain";
-import type { ResourceManifest } from "@lectoemocion/resource-schema";
+import type { ManifestFor } from "@lectoemocion/resource-schema";
 import { selectParticipants } from "@lectoemocion/template-sdk";
 
 function toParticipant(child: ChildRecord) {
@@ -15,7 +15,7 @@ function toParticipant(child: ChildRecord) {
 export function createNameStoryResource(
   roster: readonly ChildRecord[],
   seed: string
-): ResourceManifest {
+): ManifestFor<"name-story"> {
   return {
     schemaVersion: 1,
     resourceId: `name-story-${seed}`,

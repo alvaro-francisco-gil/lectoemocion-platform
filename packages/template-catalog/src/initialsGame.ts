@@ -1,12 +1,12 @@
 import type { ChildRecord } from "@lectoemocion/domain";
-import type { ResourceManifest } from "@lectoemocion/resource-schema";
+import type { ManifestFor } from "@lectoemocion/resource-schema";
 import { selectParticipants } from "@lectoemocion/template-sdk";
 
 export function createInitialsGameResource(
   roster: readonly ChildRecord[],
   initial: string,
   seed: string
-): ResourceManifest {
+): ManifestFor<"initials-game"> {
   const targets = selectParticipants(
     roster,
     { kind: "matching-initial", initial },

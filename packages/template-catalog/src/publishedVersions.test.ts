@@ -1,6 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { createInitialsGameResource, createNameStoryResource } from ".";
+import {
+  createInitialsGameResource,
+  createNameStoryResource,
+  createPairsGameResource,
+  createSyllablesGameResource,
+  createWordPictureGameResource
+} from ".";
+import { defaultVocabulary } from "./fixtures/defaultVocabulary";
 import { syntheticClass } from "./fixtures/syntheticClass";
+
+const casa = {
+  vocabularyItemId: "casa",
+  syllables: ["ca", "sa"],
+  imageUrl: "/synthetic/picture-casa.svg"
+};
+
+const flor = {
+  vocabularyItemId: "flor",
+  syllables: ["flor"],
+  imageUrl: "/synthetic/picture-flor.svg"
+};
+
+const sol = {
+  vocabularyItemId: "sol",
+  syllables: ["sol"],
+  imageUrl: "/synthetic/picture-sol.svg"
+};
 
 /**
  * Invariant 5 (AGENTS.md): published template and manifest versions are
@@ -58,5 +83,68 @@ describe("published versions are immutable", () => {
     expect(
       createInitialsGameResource(syntheticClass, "A", "immutability-seed").template
     ).toEqual({ id: "initials-game", version: 1, targetInitial: "A" });
+  });
+
+  it("pins pairs-game version 1 output", () => {
+    expect(
+      createPairsGameResource(defaultVocabulary, 3, "immutability-seed")
+    ).toEqual({
+      schemaVersion: 1,
+      resourceId: "pairs-game-immutability-seed",
+      template: { id: "pairs-game", version: 1 },
+      seed: "immutability-seed",
+      vocabulary: [
+        {
+          vocabularyItemId: "luna",
+          syllables: ["lu", "na"],
+          imageUrl: "/synthetic/picture-luna.svg"
+        },
+        {
+          vocabularyItemId: "zapato",
+          syllables: ["za", "pa", "to"],
+          imageUrl: "/synthetic/picture-zapato.svg"
+        },
+        flor
+      ]
+    });
+  });
+
+  it("pins word-picture-game version 1 output", () => {
+    expect(
+      createWordPictureGameResource(
+        defaultVocabulary,
+        "casa",
+        3,
+        "immutability-seed"
+      )
+    ).toEqual({
+      schemaVersion: 1,
+      resourceId: "word-picture-game-immutability-seed",
+      template: {
+        id: "word-picture-game",
+        version: 1,
+        targetVocabularyItemId: "casa"
+      },
+      seed: "immutability-seed",
+      vocabulary: [casa, flor, sol]
+    });
+  });
+
+  it("pins syllables-game version 1 output", () => {
+    expect(
+      createSyllablesGameResource(defaultVocabulary, "mariposa", "immutability-seed")
+    ).toEqual({
+      schemaVersion: 1,
+      resourceId: "syllables-game-immutability-seed",
+      template: { id: "syllables-game", version: 1 },
+      seed: "immutability-seed",
+      vocabulary: [
+        {
+          vocabularyItemId: "mariposa",
+          syllables: ["ma", "ri", "po", "sa"],
+          imageUrl: "/synthetic/picture-mariposa.svg"
+        }
+      ]
+    });
   });
 });

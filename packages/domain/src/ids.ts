@@ -15,6 +15,7 @@ export type ChildRecordId = Branded<string, "ChildRecordId">;
 export type MediaAssetId = Branded<string, "MediaAssetId">;
 export type TemplateId = Branded<string, "TemplateId">;
 export type ResourceId = Branded<string, "ResourceId">;
+export type VocabularyItemId = Branded<string, "VocabularyItemId">;
 
 function requireNonEmpty(kind: string, value: string): string {
   const trimmed = value.trim();
@@ -49,4 +50,8 @@ export function templateId(value: string): TemplateId {
 
 export function resourceId(value: string): ResourceId {
   return requireNonEmpty("ResourceId", value) as ResourceId;
+}
+
+export function vocabularyItemId(value: string): VocabularyItemId {
+  return requireNonEmpty("VocabularyItemId", value) as VocabularyItemId;
 }

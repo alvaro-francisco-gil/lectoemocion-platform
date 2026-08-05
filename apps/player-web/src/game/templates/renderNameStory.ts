@@ -1,9 +1,9 @@
 import * as Phaser from "phaser";
-import type { ResourceManifest } from "@lectoemocion/resource-schema";
+import type { ManifestFor } from "@lectoemocion/resource-schema";
 
 export function renderNameStory(
   scene: Phaser.Scene,
-  resource: ResourceManifest
+  resource: ManifestFor<"name-story">
 ): void {
   scene.add.text(640, 80, "Nuestra clase", {
     fontFamily: "system-ui",

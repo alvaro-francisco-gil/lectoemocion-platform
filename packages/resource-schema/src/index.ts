@@ -1,6 +1,20 @@
 export {
+  InitialsGameManifestSchema,
+  MultiSyllableVocabularyItemSchema,
+  NameStoryManifestSchema,
+  PairsGameManifestSchema,
   ParticipantSchema,
   ResourceManifestSchema,
-  parseResourceManifest
+  SyllablesGameManifestSchema,
+  VocabularyItemSchema,
+  WordPictureGameManifestSchema,
+  isTemplate,
+  parseResourceManifest,
+  vocabularyWord
 } from "./resourceManifest";
-export type { ResourceManifest } from "./resourceManifest";
+export type {
+  ManifestFor,
+  ResourceManifest,
+  TemplateIdentifier,
+  VocabularyItem
+} from "./resourceManifest";

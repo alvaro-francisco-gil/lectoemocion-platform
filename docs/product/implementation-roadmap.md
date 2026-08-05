@@ -27,6 +27,15 @@ This stage predates the story-world model. It validated the manifest and
 template boundaries, which remain valid. It does not implement progression, the
 map, or default content.
 
+The three vocabulary minigames reimplemented from the Godot prototype —
+`pairs-game`, `word-picture-game`, and `syllables-game` — build on these same
+boundaries. See
+[godot-prototype.md](../migration/godot-prototype.md). They carry
+product-authored default vocabulary and no child data, so they are playable
+without uploads; their artwork is outstanding
+([plan](../plans/ideas/default-vocabulary-artwork.md)). They do not implement
+progression or the map, which remain stage 3.
+
 ## 2. Classroom-panel verification
 
 [ADR 0003](../decisions/0003-runtime-and-animation.md) places a web player on

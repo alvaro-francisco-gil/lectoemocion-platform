@@ -13,6 +13,7 @@
     "@lectoemocion/domain": "workspace:*",
     "@lectoemocion/resource-schema": "workspace:*",
     "@lectoemocion/template-catalog": "workspace:*",
+    "@lectoemocion/template-sdk": "workspace:*",
     "phaser": "4.2.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"

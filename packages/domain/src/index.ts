@@ -7,7 +7,8 @@ export {
   groupId,
   mediaAssetId,
   resourceId,
-  templateId
+  templateId,
+  vocabularyItemId
 } from "./ids";
 export type {
   AccountId,
@@ -16,5 +17,6 @@ export type {
   GroupId,
   MediaAssetId,
   ResourceId,
-  TemplateId
+  TemplateId,
+  VocabularyItemId
 } from "./ids";

@@ -33,6 +33,24 @@ this repository.
 - The README claims HTML5 export readiness, but an export preset is not
   committed.
 
+## Status
+
+| Prototype minigame | New template | State |
+|---|---|---|
+| `iniciales` | `initials-game` | reimplemented (roadmap stage 1) |
+| `parejas` | `pairs-game` | reimplemented |
+| `cartapum` | `word-picture-game` | reimplemented |
+| `silabas` | `syllables-game` | reimplemented |
+
+Rules and objectives are in
+[minigame-specifications.md](minigame-specifications.md), which is authoritative
+where it disagrees with the prototype. Rules live in
+`packages/template-sdk/src/rules/`; presentation lives in
+`apps/player-web/src/game/templates/`.
+
+No asset has been imported from the prototype. Step 6 stays open until
+provenance and usage rights are documented.
+
 ## Selective migration process
 
 For each old minigame:

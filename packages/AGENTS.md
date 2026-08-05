@@ -26,7 +26,7 @@ here.
 |---|---|
 | `domain/` | Records, policies, branded identifiers, `assertNever` |
 | `resource-schema/` | Versioned manifest schemas, validators, derived types |
-| `template-sdk/` | The template contract and participant selection |
+| `template-sdk/` | The template contract, deterministic selection, and minigame rules |
 | `template-catalog/` | Product-authored templates and synthetic fixtures |
 
 One shape has one definition. `resource-schema` derives its types from TypeBox
