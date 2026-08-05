@@ -11,10 +11,10 @@ classroom-panel verification in stage 2.
 
 ## 1. Foundation and synthetic player
 
-Detailed plan:
-[foundation-and-synthetic-player.md](../plans/ongoing/foundation-and-synthetic-player.md)
+Boundaries it established:
+[ADR 0005](../decisions/0005-content-pipeline-boundaries.md)
 
-Status: implemented and verified.
+Status: implemented and verified on 2026-08-05.
 
 Create the TypeScript monorepo, versioned resource schema, template contract,
 deterministic roster selection, and a Phaser web player. Demonstrate one

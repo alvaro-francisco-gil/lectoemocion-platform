@@ -44,11 +44,11 @@ approved.
 
 - [Product and architecture design](docs/product/platform-design.md)
 - [Implementation roadmap](docs/product/implementation-roadmap.md)
-- [Ongoing: foundation and synthetic player](docs/plans/ongoing/foundation-and-synthetic-player.md)
 - [Architecture decisions](docs/decisions/0001-platform-foundations.md)
 - [Firebase backend decision](docs/decisions/0002-firebase-backend.md)
 - [Runtime and animation decision](docs/decisions/0003-runtime-and-animation.md)
 - [Enforced invariants decision](docs/decisions/0004-enforced-invariants.md)
+- [Content pipeline boundaries decision](docs/decisions/0005-content-pipeline-boundaries.md)
 - [Game and story template guidelines](docs/game-guidelines/template-system.md)
 - [Privacy baseline](docs/privacy/spain-eu-baseline.md)
 - [Godot prototype assessment](docs/migration/godot-prototype.md)
