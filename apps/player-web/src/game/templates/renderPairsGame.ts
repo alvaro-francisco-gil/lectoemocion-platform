@@ -7,17 +7,15 @@ import {
   type PairsCard,
   type PairsRound
 } from "@lectoemocion/template-sdk";
-import { addPictureGlyph } from "./pictureGlyph";
+import { addLabel, addPicture, CARD, VocabularyCard } from "./vocabularyCard";
 
-const CARD_WIDTH = 200;
-const CARD_HEIGHT = 150;
-const PICTURE_ROW_Y = 390;
-const WORD_ROW_Y = 570;
+const PICTURE_ROW_Y = 360;
+const WORD_ROW_Y = 590;
 
 interface CardView {
   readonly card: PairsCard;
-  readonly frame: Phaser.GameObjects.Rectangle;
-  readonly home: number;
+  readonly view: VocabularyCard;
+  readonly contents: readonly Phaser.GameObjects.GameObject[];
 }
 
 export function renderPairsGame(
@@ -28,7 +26,7 @@ export function renderPairsGame(
   let round = createPairsRound(resource);
 
   const banner = scene.add
-    .text(640, 70, "Une cada dibujo con su palabra", {
+    .text(640, 60, "Une cada dibujo con su palabra", {
       fontFamily: "system-ui",
       fontSize: "42px",
       color: "#402060"
@@ -36,7 +34,11 @@ export function renderPairsGame(
     .setOrigin(0.5);
 
   const lives = scene.add
-    .text(640, 140, "", { fontFamily: "system-ui", fontSize: "30px", color: "#7b2cbf" })
+    .text(640, 118, "", {
+      fontFamily: "system-ui",
+      fontSize: "30px",
+      color: "#7b2cbf"
+    })
     .setOrigin(0.5);
 
   const views = new Map<string, CardView>();
@@ -45,27 +47,17 @@ export function renderPairsGame(
     round.cards.filter((card) => card.group === group);
 
   const place = (card: PairsCard, index: number, total: number, y: number) => {
-    const spacing = Math.min(240, 1180 / total);
+    const spacing = Math.min(CARD.size + 40, 1200 / total);
     const x = 640 + (index - (total - 1) / 2) * spacing;
-    const frame = scene.add
-      .rectangle(x, y, CARD_WIDTH, CARD_HEIGHT, 0xffffff)
-      .setStrokeStyle(6, 0x7b2cbf)
-      .setInteractive({ useHandCursor: true });
+    const view = new VocabularyCard(scene, x, y);
 
-    if (card.group === "picture") {
-      addPictureGlyph(scene, card.vocabularyItemId, x, y, 48);
-    } else {
-      scene.add
-        .text(x, y, card.word, {
-          fontFamily: "system-ui",
-          fontSize: "36px",
-          color: "#241133"
-        })
-        .setOrigin(0.5);
-    }
+    const contents =
+      card.group === "picture"
+        ? [addPicture(scene, card, x, y, CARD.size)]
+        : [addLabel(scene, card.word, x, y, 40)];
 
-    frame.on("pointerdown", () => attempt(card.cardId));
-    views.set(card.cardId, { card, frame, home: x });
+    view.onTap(() => attempt(card.cardId));
+    views.set(card.cardId, { card, view, contents });
   };
 
   const pictures = rowOf("picture");
@@ -77,33 +69,25 @@ export function renderPairsGame(
 
   const paint = () => {
     lives.setText(`Vidas: ${"♥".repeat(round.livesRemaining)}`);
-    for (const view of views.values()) {
-      if (round.matched.includes(view.card.vocabularyItemId)) {
-        view.frame.setFillStyle(0x95d5b2).disableInteractive();
-      } else if (view.card.cardId === round.selectedCardId) {
-        view.frame.setFillStyle(0xffe8a3).setStrokeStyle(8, 0xf4845f);
+    for (const entry of views.values()) {
+      if (round.matched.includes(entry.card.vocabularyItemId)) {
+        entry.view.paint(CARD.matched);
+        entry.view.disable();
+      } else if (entry.card.cardId === round.selectedCardId) {
+        entry.view.paint(CARD.selected, CARD.border, CARD.borderWidth + 2);
       } else {
-        view.frame.setFillStyle(0xffffff).setStrokeStyle(6, 0x7b2cbf);
+        entry.view.paint(CARD.fill);
       }
     }
   };
 
   const shake = (cardIds: readonly string[]) => {
     for (const cardId of cardIds) {
-      const view = views.get(cardId);
-      if (!view) continue;
-      view.frame.setFillStyle(0xffadad);
-      scene.tweens.add({
-        targets: view.frame,
-        x: { from: view.home - 12, to: view.home + 12 },
-        yoyo: true,
-        repeat: 2,
-        duration: 70,
-        onComplete: () => {
-          view.frame.setX(view.home);
-          paint();
-        }
-      });
+      const entry = views.get(cardId);
+      if (!entry) continue;
+      entry.view.paint(CARD.wrong);
+      entry.view.shake(entry.contents);
+      scene.time.delayedCall(500, paint);
     }
   };
 

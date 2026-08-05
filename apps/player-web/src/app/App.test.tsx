@@ -30,6 +30,11 @@ function completeActiveResource(): void {
   call?.[2]();
 }
 
+/** Finishing a resource does not leave it: the child goes back to the map. */
+function returnToMap(): void {
+  fireEvent.click(screen.getByRole("button", { name: "Volver al mapa" }));
+}
+
 describe("the world shell", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -70,6 +75,7 @@ describe("the world shell", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
     completeActiveResource();
+    returnToMap();
 
     await waitFor(() =>
       expect(
@@ -82,6 +88,7 @@ describe("the world shell", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
     completeActiveResource();
+    returnToMap();
 
     await waitFor(() =>
       expect(
@@ -97,6 +104,7 @@ describe("the world shell", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
     completeActiveResource();
+    returnToMap();
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "Las iniciales" })
@@ -109,6 +117,23 @@ describe("the world shell", () => {
         remounted.getAllByRole("button", { name: "Las iniciales" }).at(-1)
       ).not.toBeDisabled()
     );
+  });
+
+  it("hides the world list while a resource is playing", () => {
+    render(<App />);
+    expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
+
+    /* Only "Volver al mapa" remains: no shortcuts past the progression, and
+       nothing competing with the game at a child's eye level. */
+    expect(screen.queryByRole("navigation", { name: "Mundo" })).toBeNull();
+    expect(screen.getAllByRole("button").map((each) => each.textContent)).toEqual(
+      ["Volver al mapa"]
+    );
+
+    returnToMap();
+    expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
   });
 
   it("tells the adult how much of the world is open", () => {

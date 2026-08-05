@@ -94,17 +94,24 @@ export function App() {
           be able to see what the class can actually reach before a session
           starts (platform-design.md §6.1), and it is what a screen reader can
           read.
+
+          It belongs to the map, not to play: while a resource is running the
+          only way onward is finishing it or going back, so a permanent strip of
+          shortcuts along the top is both a distraction at a child's eye level
+          and a way around the progression.
         */}
-        <nav aria-label="Mundo">
-          {view.nodes.map((node) => (
-            <NodeButton
-              key={node.id}
-              node={node}
-              active={node.id === activeNodeId}
-              onSelect={select}
-            />
-          ))}
-        </nav>
+        {!activeNode && (
+          <nav aria-label="Mundo">
+            {view.nodes.map((node) => (
+              <NodeButton
+                key={node.id}
+                node={node}
+                active={node.id === activeNodeId}
+                onSelect={select}
+              />
+            ))}
+          </nav>
+        )}
       </header>
       <div ref={host} className="game-host" data-testid="game-host" />
     </main>

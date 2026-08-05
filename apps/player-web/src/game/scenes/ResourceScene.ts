@@ -7,13 +7,31 @@ import { renderNameStory } from "../templates/renderNameStory";
 import { renderPairsGame } from "../templates/renderPairsGame";
 import { renderSyllablesGame } from "../templates/renderSyllablesGame";
 import { renderWordPictureGame } from "../templates/renderWordPictureGame";
+import { queueVocabularyPictures } from "../templates/vocabularyCard";
 
 export class ResourceScene extends Phaser.Scene {
+  private missingPictures = 0;
+
   constructor(
     private readonly resource: ResourceManifest,
     private readonly onComplete: () => void
   ) {
     super(`resource-${resource.resourceId}`);
+  }
+
+  /**
+   * A vocabulary resource's pictures are *default* content, so a picture that
+   * fails to load is invariant 6's fail-closed case, not its personalised-media
+   * exception. Count the failures here and refuse to render the game.
+   */
+  preload(): void {
+    const resource = this.resource;
+    if ("vocabulary" in resource) {
+      queueVocabularyPictures(this, resource.vocabulary);
+      this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, () => {
+        this.missingPictures += 1;
+      });
+    }
   }
 
   /**
@@ -30,6 +48,11 @@ export class ResourceScene extends Phaser.Scene {
    * keeps invariant 2 true while the world still learns what was played.
    */
   create(): void {
+    if (this.missingPictures > 0) {
+      this.reportMissingContent();
+      return;
+    }
+
     const resource = this.resource;
     const done = () => this.onComplete();
 
@@ -58,5 +81,23 @@ export class ResourceScene extends Phaser.Scene {
       return;
     }
     assertNever(resource, "resource manifest");
+  }
+
+  /** Adult-facing and recoverable: it names the fault and offers the way back. */
+  private reportMissingContent(): void {
+    this.add
+      .text(
+        640,
+        320,
+        "No se pudo cargar el contenido de esta actividad.\n" +
+          "Vuelve al mapa e inténtalo de nuevo.",
+        {
+          fontFamily: "system-ui",
+          fontSize: "36px",
+          color: "#402060",
+          align: "center"
+        }
+      )
+      .setOrigin(0.5);
   }
 }

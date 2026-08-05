@@ -12,20 +12,44 @@ import { syntheticClass } from "./fixtures/syntheticClass";
 const casa = {
   vocabularyItemId: "casa",
   syllables: ["ca", "sa"],
-  imageUrl: "/synthetic/picture-casa.svg"
+  imageUrl: "/vocabulary/casa.webp"
 };
 
 const flor = {
   vocabularyItemId: "flor",
   syllables: ["flor"],
-  imageUrl: "/synthetic/picture-flor.svg"
+  imageUrl: "/vocabulary/flor.webp"
 };
 
 const sol = {
   vocabularyItemId: "sol",
   syllables: ["sol"],
-  imageUrl: "/synthetic/picture-sol.svg"
+  imageUrl: "/vocabulary/sol.webp"
 };
+
+const luna = {
+  vocabularyItemId: "luna",
+  syllables: ["lu", "na"],
+  imageUrl: "/vocabulary/luna.webp"
+};
+
+const mariposa = {
+  vocabularyItemId: "mariposa",
+  syllables: ["ma", "ri", "po", "sa"],
+  imageUrl: "/vocabulary/mariposa.webp"
+};
+
+/**
+ * A frozen vocabulary, deliberately *not* `defaultVocabulary`.
+ *
+ * Invariant 5 pins what a published version produces from a given input. Which
+ * words the catalogue currently ships is content, not version — if these pins
+ * read the live catalogue, adding one picture would present as a breaking
+ * version change and no word could ever be added. So the version pins feed a
+ * fixture that never moves, and `defaultVocabulary` is checked separately for
+ * being well-formed.
+ */
+const PINNED = [casa, flor, sol, luna, mariposa];
 
 /**
  * Invariant 5 (AGENTS.md): published template and manifest versions are
@@ -159,37 +183,18 @@ describe("published versions are immutable", () => {
   });
 
   it("pins pairs-game version 1 output", () => {
-    expect(
-      createPairsGameResource(defaultVocabulary, 3, "immutability-seed")
-    ).toEqual({
+    expect(createPairsGameResource(PINNED, 3, "immutability-seed")).toEqual({
       schemaVersion: 1,
       resourceId: "pairs-game-immutability-seed",
       template: { id: "pairs-game", version: 1 },
       seed: "immutability-seed",
-      vocabulary: [
-        {
-          vocabularyItemId: "luna",
-          syllables: ["lu", "na"],
-          imageUrl: "/synthetic/picture-luna.svg"
-        },
-        {
-          vocabularyItemId: "zapato",
-          syllables: ["za", "pa", "to"],
-          imageUrl: "/synthetic/picture-zapato.svg"
-        },
-        flor
-      ]
+      vocabulary: [casa, sol, flor]
     });
   });
 
   it("pins word-picture-game version 1 output", () => {
     expect(
-      createWordPictureGameResource(
-        defaultVocabulary,
-        "casa",
-        3,
-        "immutability-seed"
-      )
+      createWordPictureGameResource(PINNED, "casa", 3, "immutability-seed")
     ).toEqual({
       schemaVersion: 1,
       resourceId: "word-picture-game-immutability-seed",
@@ -199,25 +204,45 @@ describe("published versions are immutable", () => {
         targetVocabularyItemId: "casa"
       },
       seed: "immutability-seed",
-      vocabulary: [casa, flor, sol]
+      vocabulary: [casa, mariposa, sol]
     });
   });
 
   it("pins syllables-game version 1 output", () => {
     expect(
-      createSyllablesGameResource(defaultVocabulary, "mariposa", "immutability-seed")
+      createSyllablesGameResource(PINNED, "mariposa", "immutability-seed")
     ).toEqual({
       schemaVersion: 1,
       resourceId: "syllables-game-immutability-seed",
       template: { id: "syllables-game", version: 1 },
       seed: "immutability-seed",
-      vocabulary: [
-        {
-          vocabularyItemId: "mariposa",
-          syllables: ["ma", "ri", "po", "sa"],
-          imageUrl: "/synthetic/picture-mariposa.svg"
-        }
-      ]
+      vocabulary: [mariposa]
     });
+  });
+});
+
+/**
+ * Content checks, not version checks. These may change freely as pictures are
+ * added; what they guarantee is that the shipped catalogue is playable.
+ */
+describe("the default vocabulary is well formed", () => {
+  it("gives every item a picture under /vocabulary/", () => {
+    expect(defaultVocabulary.length).toBeGreaterThan(0);
+    for (const item of defaultVocabulary) {
+      expect(item.imageUrl.startsWith("/vocabulary/")).toBe(true);
+      expect(item.syllables.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("has unique identifiers", () => {
+    const ids = defaultVocabulary.map((item) => item.vocabularyItemId);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("holds enough multi-syllable words for a syllables round", () => {
+    const segmentable = defaultVocabulary.filter(
+      (item) => item.syllables.length >= 2
+    );
+    expect(segmentable.length).toBeGreaterThan(10);
   });
 });

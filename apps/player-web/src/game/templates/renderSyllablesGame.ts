@@ -6,12 +6,18 @@ import {
   placeSyllable,
   type SyllableCard
 } from "@lectoemocion/template-sdk";
-import { addPictureGlyph } from "./pictureGlyph";
+import {
+  addLabel,
+  addPicture,
+  CARD,
+  SYLLABLE_BACKGROUND,
+  VocabularyCard
+} from "./vocabularyCard";
 
-const SLOT_ROW_Y = 420;
-const TRAY_ROW_Y = 600;
-const CARD_WIDTH = 150;
-const CARD_HEIGHT = 110;
+const SLOT_ROW_Y = 430;
+const TRAY_ROW_Y = 610;
+const SLOT_WIDTH = 150;
+const SLOT_HEIGHT = 110;
 
 /**
  * Placement is tap-card-then-tap-slot rather than a drag.
@@ -28,21 +34,30 @@ export function renderSyllablesGame(
   let round = createSyllablesRound(resource);
   let heldCardId: string | null = null;
 
+  /* The prototype's turquoise field. */
+  scene.add
+    .rectangle(640, 360, 1280, 720, SYLLABLE_BACKGROUND)
+    .setDepth(-1);
+
   const banner = scene.add
-    .text(640, 60, "Ordena las sílabas", {
+    .text(640, 45, "Ordena las sílabas", {
       fontFamily: "system-ui",
       fontSize: "40px",
-      color: "#402060"
+      color: "#0f4f47"
     })
     .setOrigin(0.5);
 
-  addPictureGlyph(scene, resource.vocabulary[0]?.vocabularyItemId ?? "", 640, 200, 80);
+  const target = resource.vocabulary[0];
+  if (target) {
+    new VocabularyCard(scene, 640, 210, 240, 240);
+    addPicture(scene, target, 640, 210, 240);
+  }
 
   const lives = scene.add
-    .text(640, 310, "", {
+    .text(640, 350, "", {
       fontFamily: "system-ui",
       fontSize: "30px",
-      color: "#7b2cbf"
+      color: "#0f4f47"
     })
     .setOrigin(0.5);
 
@@ -50,58 +65,38 @@ export function renderSyllablesGame(
     640 + (index - (total - 1) / 2) * Math.min(190, 1180 / total);
 
   const slotCount = round.slots.length;
-  const slotFrames: Phaser.GameObjects.Rectangle[] = [];
+  const slots: VocabularyCard[] = [];
   const slotLabels: Phaser.GameObjects.Text[] = [];
 
   for (let index = 0; index < slotCount; index += 1) {
     const x = columnX(index, slotCount);
-    const frame = scene.add
-      .rectangle(x, SLOT_ROW_Y, CARD_WIDTH, CARD_HEIGHT, 0xf1e6ff)
-      .setStrokeStyle(6, 0x7b2cbf)
-      .setInteractive({ useHandCursor: true });
-    const label = scene.add
-      .text(x, SLOT_ROW_Y, "", {
-        fontFamily: "system-ui",
-        fontSize: "40px",
-        color: "#241133"
-      })
-      .setOrigin(0.5);
-    frame.on("pointerdown", () => dropInto(index));
-    slotFrames.push(frame);
-    slotLabels.push(label);
+    const slot = new VocabularyCard(scene, x, SLOT_ROW_Y, SLOT_WIDTH, SLOT_HEIGHT);
+    slot.onTap(() => dropInto(index));
+    slots.push(slot);
+    slotLabels.push(addLabel(scene, "", x, SLOT_ROW_Y, 40));
   }
 
   interface TrayView {
-    readonly frame: Phaser.GameObjects.Rectangle;
+    readonly card: VocabularyCard;
     readonly label: Phaser.GameObjects.Text;
-    readonly home: number;
   }
-  const trayViews = new Map<string, TrayView>();
+  const tray = new Map<string, TrayView>();
 
-  round.tray.forEach((card: SyllableCard, index) => {
+  round.tray.forEach((syllable: SyllableCard, index) => {
     const x = columnX(index, round.tray.length);
-    const frame = scene.add
-      .rectangle(x, TRAY_ROW_Y, CARD_WIDTH, CARD_HEIGHT, 0xffffff)
-      .setStrokeStyle(6, 0xf4845f)
-      .setInteractive({ useHandCursor: true });
-    const label = scene.add
-      .text(x, TRAY_ROW_Y, card.syllable, {
-        fontFamily: "system-ui",
-        fontSize: "40px",
-        color: "#241133"
-      })
-      .setOrigin(0.5);
-    frame.on("pointerdown", () => {
-      heldCardId = heldCardId === card.cardId ? null : card.cardId;
+    const card = new VocabularyCard(scene, x, TRAY_ROW_Y, SLOT_WIDTH, SLOT_HEIGHT);
+    const label = addLabel(scene, syllable.syllable, x, TRAY_ROW_Y, 40);
+    card.onTap(() => {
+      heldCardId = heldCardId === syllable.cardId ? null : syllable.cardId;
       paint();
     });
-    trayViews.set(card.cardId, { frame, label, home: x });
+    tray.set(syllable.cardId, { card, label });
   });
 
   function dropInto(slotIndex: number): void {
     if (!heldCardId) return;
     const cardId = heldCardId;
-    const view = trayViews.get(cardId);
+    const held = tray.get(cardId);
     const result = placeSyllable(round, cardId, slotIndex);
     round = result.round;
     const outcome = result.attempt;
@@ -109,22 +104,27 @@ export function renderSyllablesGame(
     switch (outcome.kind) {
       case "placed":
         heldCardId = null;
-        view?.frame.setVisible(false).disableInteractive();
-        view?.label.setVisible(false);
+        held?.card.disable();
+        held?.card.paint(CARD.fill, SYLLABLE_BACKGROUND, 0);
+        held?.label.setVisible(false);
         if (round.status === "won") {
           banner.setText("¡Muy bien!");
           onComplete();
         }
         paint();
         return;
-      case "rejected":
+      case "rejected": {
         heldCardId = null;
-        rejectSlot(slotIndex);
+        const slot = slots[slotIndex];
+        slot?.paint(CARD.wrong);
+        slot?.shake([]);
         if (round.status === "lost") {
           banner.setText("Vamos a intentarlo otra vez");
         }
+        scene.time.delayedCall(500, paint);
         paint();
         return;
+      }
       case "ignored":
         return;
       default:
@@ -132,33 +132,21 @@ export function renderSyllablesGame(
     }
   }
 
-  function rejectSlot(slotIndex: number): void {
-    const frame = slotFrames[slotIndex];
-    if (!frame) return;
-    const home = frame.x;
-    frame.setFillStyle(0xffadad);
-    scene.tweens.add({
-      targets: frame,
-      x: { from: home - 12, to: home + 12 },
-      yoyo: true,
-      repeat: 2,
-      duration: 70,
-      onComplete: () => {
-        frame.setX(home);
-        paint();
-      }
-    });
-  }
-
   function paint(): void {
     lives.setText(`Vidas: ${"♥".repeat(round.livesRemaining)}`);
-    round.slots.forEach((slot, index) => {
-      slotLabels[index]?.setText(slot ? slot.syllable : "");
-      slotFrames[index]?.setFillStyle(slot ? 0x95d5b2 : 0xf1e6ff);
+    round.slots.forEach((filled, index) => {
+      slotLabels[index]?.setText(
+        filled ? filled.syllable.toLocaleUpperCase("es-ES") : ""
+      );
+      slots[index]?.paint(filled ? CARD.matched : CARD.fill);
     });
-    for (const [cardId, view] of trayViews) {
-      view.frame.setStrokeStyle(cardId === heldCardId ? 10 : 6, 0xf4845f);
-      view.frame.setFillStyle(cardId === heldCardId ? 0xffe8a3 : 0xffffff);
+    for (const [cardId, view] of tray) {
+      if (!round.tray.some((each) => each.cardId === cardId)) continue;
+      view.card.paint(
+        cardId === heldCardId ? CARD.selected : CARD.fill,
+        CARD.border,
+        cardId === heldCardId ? CARD.borderWidth + 4 : CARD.borderWidth
+      );
     }
   }
 

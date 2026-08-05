@@ -107,14 +107,33 @@ slots and always terminates.
 
 ## Pictures
 
-No default artwork is authored yet. Every vocabulary item names an `imageUrl`,
-which is the contract the artwork will satisfy, and until then the player draws
-a deterministic geometric glyph derived from the item's identifier — the same
-synthetic-content approach the roster games use for avatars.
+Every vocabulary item names an `imageUrl` under `/vocabulary/`, served from
+`apps/player-web/public/vocabulary/` and loaded by the scene's `preload`.
 
-The renderer does not fetch `imageUrl`, because a missing default must fail
-closed (invariant 6) and a 404 during a lesson is exactly that failure. Wiring
-the loader is the job of the change that authors the artwork.
+The pictures come from the prototype, imported by
+`scripts/import-vocabulary-images.mjs` — which is also the provenance record,
+because it states exactly which source produced each committed file. Rights are
+recorded in `apps/player-web/public/vocabulary/PROVENANCE.md`. Nothing is added
+to that directory by hand.
+
+A picture that fails to load is a missing **default**, so it fails closed
+(invariant 6): `ResourceScene` counts loader failures and shows an adult-facing
+message instead of rendering a game with holes in it. This is not the
+personalised-media exception, which does not apply — these games do not
+personalise.
+
+## Style
+
+The card is the prototype's, reproduced in `vocabularyCard.ts`: 200×200, white,
+a 6px `#B359E6` border, a 20px corner radius, pictures inset by 10px, uppercase
+black labels, green on a match and red on a mistake, and the syllables game on
+its turquoise `#33F2D9` field. Those values are the prototype's Godot colours
+converted from 0–1 floats.
+
+What is deliberately *not* reproduced is its layout: the prototype positioned
+cards at fixed pixel offsets, which is one of the practices
+[godot-prototype.md](godot-prototype.md) rejects. Rows here are centred and
+spaced from the logical canvas size.
 
 ## Lives
 

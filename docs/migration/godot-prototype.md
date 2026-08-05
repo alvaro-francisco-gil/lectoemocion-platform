@@ -48,8 +48,12 @@ where it disagrees with the prototype. Rules live in
 `packages/template-sdk/src/rules/`; presentation lives in
 `apps/player-web/src/game/templates/`.
 
-No asset has been imported from the prototype. Step 6 stays open until
-provenance and usage rights are documented.
+Step 6 is done for the vocabulary pictures: 109 of them were imported by
+`scripts/import-vocabulary-images.mjs`, resized and re-encoded as WebP, with
+rights recorded in `apps/player-web/public/vocabulary/PROVENANCE.md`. Read that
+file's "Known limitation" before relying on the licensing.
+
+The prototype's sounds and background textures have not been imported.
 
 ## Selective migration process
 

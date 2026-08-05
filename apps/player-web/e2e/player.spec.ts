@@ -14,6 +14,27 @@ async function withProgress(page: Page, completedNodes: string[]) {
   }, completedNodes);
 }
 
+/**
+ * The world list is hidden while a resource plays, so completion is observed
+ * where it is actually recorded rather than through a button that is not on
+ * screen yet.
+ *
+ * The timeout is generous because these resources are fixed timelines, not
+ * races: the album alone runs about twenty seconds, and this suite shares a
+ * machine with three viewport projects and the bypass spec's Vite builds.
+ */
+async function completed(page: Page, nodeId: string, timeout = 60_000) {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          localStorage.getItem("lectoemocion.progress.local")
+        ),
+      { timeout }
+    )
+    .toContain(nodeId);
+}
+
 async function canvasBox(page: Page) {
   const canvas = page.locator("canvas");
   await expect(canvas).toBeVisible();
@@ -42,11 +63,10 @@ test("playing the first chapter unlocks the next node and persists", async ({
   await expect(page.locator("canvas")).toBeVisible();
 
   /* The cinematic completes when its choreography ends; nothing to win. */
-  await expect(page.getByRole("button", { name: SECOND })).toBeEnabled({
-    timeout: 15_000
-  });
+  await completed(page, "encuentro");
 
   await page.getByRole("button", { name: "Volver al mapa" }).click();
+  await expect(page.getByRole("button", { name: SECOND })).toBeEnabled();
   await expect(page.getByTestId("progress-summary")).toHaveText(
     "2 de 6 desbloqueados"
   );
@@ -86,9 +106,13 @@ test("the non-interactive resource plays to its end", async ({ page }) => {
   await expect(page.locator("canvas")).toBeVisible();
 
   /* It is a fixed timeline: it finishes on its own, with nothing to press. */
-  await expect(album).toHaveAttribute("data-state", "completed", {
-    timeout: 30_000
-  });
+  await completed(page, "album");
+
+  await page.getByRole("button", { name: "Volver al mapa" }).click();
+  await expect(page.getByRole("button", { name: ALBUM })).toHaveAttribute(
+    "data-state",
+    "completed"
+  );
 });
 
 test("the world and every resource fit the viewport", async ({ page }) => {
@@ -143,6 +167,20 @@ test("a minigame survives taps in the child reach band", async ({ page }) => {
   }
 
   expect(failures).toEqual([]);
+});
+
+test("the world list is gone while a resource plays", async ({ page }) => {
+  await page.goto("/");
+  const worldList = page.getByRole("navigation", { name: "Mundo" });
+  await expect(worldList).toBeVisible();
+
+  await page.getByRole("button", { name: ENTRY }).click();
+  await expect(page.locator("canvas")).toBeVisible();
+  await expect(worldList).toBeHidden();
+  await expect(page.getByRole("button", { name: SECOND })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Volver al mapa" }).click();
+  await expect(worldList).toBeVisible();
 });
 
 test("a locked node cannot be opened from the map", async ({ page }) => {

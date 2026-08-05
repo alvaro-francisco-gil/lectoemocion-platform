@@ -19,20 +19,35 @@ import { expect, test } from "@playwright/test";
 const FLAG = "VITE_LECTOEMOCION_UNLOCK_ALL";
 const app = join(import.meta.dirname, "..");
 
-function buildInto(outDir: string, env: NodeJS.ProcessEnv = {}): string[] {
-  execFileSync("pnpm", ["exec", "vite", "build", "--outDir", outDir], {
-    cwd: app,
-    stdio: "pipe",
-    env: { ...process.env, ...env }
-  });
-  const assets = join(app, outDir, "assets");
-  return readdirSync(assets)
-    .filter((name) => name.endsWith(".js"))
-    .map((name) => readFileSync(join(assets, name), "utf8"));
+/**
+ * Every build gets its own output directory.
+ *
+ * This file runs once per viewport project, and each test builds twice, so a
+ * shared `dist/` means several `vite build` runs writing and reading the same
+ * assets at once — one truncating a bundle another is mid-read.
+ */
+let buildCounter = 0;
+
+function build(env: NodeJS.ProcessEnv = {}): string[] {
+  buildCounter += 1;
+  const outDir = `dist-bypass-${process.pid}-${buildCounter}`;
+  try {
+    execFileSync("pnpm", ["exec", "vite", "build", "--outDir", outDir], {
+      cwd: app,
+      stdio: "pipe",
+      env: { ...process.env, ...env }
+    });
+    const assets = join(app, outDir, "assets");
+    return readdirSync(assets)
+      .filter((name) => name.endsWith(".js"))
+      .map((name) => readFileSync(join(assets, name), "utf8"));
+  } finally {
+    rmSync(join(app, outDir), { recursive: true, force: true });
+  }
 }
 
 test("a production build carries no unlock bypass", () => {
-  const bundles = buildInto("dist");
+  const bundles = build();
   expect(bundles.length).toBeGreaterThan(0);
   for (const bundle of bundles) {
     expect(bundle).not.toContain(FLAG);
@@ -45,10 +60,9 @@ test("a production build carries no unlock bypass", () => {
  * reason and the test would guard nothing.
  */
 test("the bypass does change a build that asks for it", () => {
-  const outDir = "dist-bypass-check";
-  try {
-    const withFlag = buildInto(outDir, { [FLAG]: "true" }).join("");
-    const without = buildInto("dist").join("");
+  {
+    const withFlag = build({ [FLAG]: "true" }).join("");
+    const without = build().join("");
 
     /*
      * The minifier folds the comparison away in both builds, so neither the
@@ -58,7 +72,5 @@ test("the bypass does change a build that asks for it", () => {
      * catch.
      */
     expect(withFlag).not.toEqual(without);
-  } finally {
-    rmSync(join(app, outDir), { recursive: true, force: true });
   }
 });

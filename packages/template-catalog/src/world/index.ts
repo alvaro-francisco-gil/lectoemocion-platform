@@ -56,7 +56,7 @@ export const world: World = parseWorld({
       resource: {
         template: "word-picture-game",
         seed: "cual-es",
-        targetVocabularyItemId: "casa",
+        targetVocabularyItemId: "manzana",
         choiceCount: 3
       }
     },
