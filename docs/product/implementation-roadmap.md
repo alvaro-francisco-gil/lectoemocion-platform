@@ -33,7 +33,7 @@ boundaries. See
 [godot-prototype.md](../migration/godot-prototype.md). They carry
 product-authored default vocabulary and no child data, so they are playable
 without uploads; their artwork is outstanding
-([plan](../plans/ideas/default-vocabulary-artwork.md)). They do not implement
+([plan](../plans/ideas/default-artwork.md)). They do not implement
 progression or the map, which remain stage 3.
 
 ## 2. Classroom-panel verification
@@ -65,16 +65,23 @@ This stage does not block stage 3.
 
 ## 3. World, progression, and default content
 
-Model personalisation slots so a slot and its default content are a single
-type. "Slot without a default" must fail compilation, not review.
+Decisions it recorded:
+[ADR 0007](../decisions/0007-progression-and-default-content.md), and
+[ADR 0006](../decisions/0006-published-means-reachable.md) for what "published"
+means.
 
+Status: implemented and verified on 2026-08-05.
 
-Add the map hub, progression state, resource kinds, and product-authored
-default content so the world is playable end to end with no uploads.
+Personalisation slots carry their default content as one object, the map hub
+sequences six nodes, progression derives from completions, and every resource
+plays with no uploads. `memory-album` adds the non-interactive kind.
 
-Exit condition: an adult can open the world, play a story chapter, unlock a
+Exit condition met: an adult can open the world, play a story chapter, unlock a
 minigame, replay it, and reach a non-interactive resource — using default
 content only, with progress persisting across sessions.
+
+Default artwork remains outstanding for both the vocabulary items and the
+character cast ([plan](../plans/ideas/default-artwork.md)).
 
 ## 4. Private backend and authentication
 

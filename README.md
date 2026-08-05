@@ -50,6 +50,7 @@ approved.
 - [Enforced invariants decision](docs/decisions/0004-enforced-invariants.md)
 - [Content pipeline boundaries decision](docs/decisions/0005-content-pipeline-boundaries.md)
 - ["Published" means reachable decision](docs/decisions/0006-published-means-reachable.md)
+- [Progression and default content decision](docs/decisions/0007-progression-and-default-content.md)
 - [Game and story template guidelines](docs/game-guidelines/template-system.md)
 - [Privacy baseline](docs/privacy/spain-eu-baseline.md)
 - [Godot prototype assessment](docs/migration/godot-prototype.md)
