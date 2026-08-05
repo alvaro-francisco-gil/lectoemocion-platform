@@ -8,6 +8,16 @@ Optimize for strict types, small explicit interfaces, deterministic scripts,
 fast feedback, searchable names, durable decisions, and tests at real
 boundaries. Avoid ceremony documentation that duplicates code.
 
+`CLAUDE.md` is a symlink to this file. Edit `AGENTS.md`; never create a second
+copy for one tool.
+
+Scoped contracts exist for the areas with their own rules — read the one for
+where you are working rather than only this file:
+
+- [`packages/AGENTS.md`](packages/AGENTS.md) — shared contracts
+- [`apps/player-web/AGENTS.md`](apps/player-web/AGENTS.md) — the player
+- [`scripts/AGENTS.md`](scripts/AGENTS.md) — guardrails
+
 ## Product
 
 LectoEmoción is a personalised early-literacy world for Spanish children aged
@@ -220,6 +230,38 @@ lifecycle taxonomy.
 - Do not bypass hooks or amend commits unless explicitly requested.
 - Do not push, open a PR, deploy, or create remote resources without explicit
   authorization.
+
+### The primary checkout stays on `main`
+
+The repository root is the user's editor workspace. Switching its branch
+changes what the user is looking at, mid-thought, without warning.
+
+**Never run `git checkout <branch>`, `git switch <branch>`, or anything else
+that moves `HEAD` in the repository root.** To work on a branch, add a
+worktree:
+
+```bash
+git worktree add .worktrees/<short-name> -b <type>/<short-name>
+```
+
+Then do all work inside `.worktrees/<short-name>/`. Merging back:
+
+```bash
+# from the repository root, which is already on main
+git merge --ff-only <type>/<short-name>
+git worktree remove .worktrees/<short-name>
+git branch -d <type>/<short-name>
+```
+
+`.worktrees/` is gitignored. Remove a worktree once merged; do not leave
+abandoned ones behind.
+
+Run `pnpm install` inside a new worktree before verifying — it has its own
+`node_modules`.
+
+Exception: committing directly to `main` in the root is acceptable for a small,
+self-contained change the user has asked for in the current turn. Anything
+speculative, long-running, or parallel gets a worktree.
 
 ## Be proactive
 
