@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import type { ManifestFor } from "@lectoemocion/resource-schema";
+import { resolveSlot, type ManifestFor } from "@lectoemocion/resource-schema";
 
 export function renderNameStory(
   scene: Phaser.Scene,
@@ -11,8 +11,9 @@ export function renderNameStory(
     color: "#402060"
   }).setOrigin(0.5);
 
-  resource.participants.forEach((child, index) => {
-    const angle = (Math.PI * 2 * index) / resource.participants.length;
+  resource.slots.forEach((slot, index) => {
+    const child = resolveSlot(slot);
+    const angle = (Math.PI * 2 * index) / resource.slots.length;
     const x = 640 + Math.cos(angle) * 360;
     const y = 380 + Math.sin(angle) * 220;
     const circle = scene.add.circle(x, y, 72, 0xffd166);

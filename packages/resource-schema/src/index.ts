@@ -1,9 +1,19 @@
 export {
+  CharacterSchema,
+  ParticipantSlotSchema,
+  PersonalisedCharacterSchema,
+  resolveSlot
+} from "./participantSlot";
+export type {
+  Character,
+  ParticipantSlot,
+  PersonalisedCharacter
+} from "./participantSlot";
+export {
   InitialsGameManifestSchema,
   MultiSyllableVocabularyItemSchema,
   NameStoryManifestSchema,
   PairsGameManifestSchema,
-  ParticipantSchema,
   ResourceManifestSchema,
   SyllablesGameManifestSchema,
   VocabularyItemSchema,

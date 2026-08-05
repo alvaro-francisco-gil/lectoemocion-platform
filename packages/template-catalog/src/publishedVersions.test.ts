@@ -37,52 +37,125 @@ const sol = {
  */
 describe("published versions are immutable", () => {
   it("pins the manifest schema version", () => {
-    expect(createNameStoryResource(syntheticClass, "seed").schemaVersion).toBe(1);
+    expect(createNameStoryResource("seed").schemaVersion).toBe(1);
   });
 
-  it("pins name-story version 1 output", () => {
-    expect(createNameStoryResource(syntheticClass, "immutability-seed")).toEqual({
+  /**
+   * Version 2 replaced participants with slots. Version 1 is not pinned here
+   * because it was deleted rather than carried: it was never reachable by a
+   * user, so it was never published. See ADR 0006.
+   */
+  it("pins name-story version 2 default output", () => {
+    expect(createNameStoryResource("immutability-seed")).toEqual({
       schemaVersion: 1,
       resourceId: "name-story-immutability-seed",
-      template: { id: "name-story", version: 1 },
+      template: { id: "name-story", version: 2 },
       seed: "immutability-seed",
-      participants: [
+      slots: [
         {
-          childRecordId: "ana",
-          displayName: "Ana",
-          verifiedInitial: "A",
-          photoUrl: "/synthetic/avatar-ana.svg",
-          pronunciationUrl: "/synthetic/silent-ana.mp3"
+          slotId: "character-1",
+          default: {
+            displayName: "Ada",
+            verifiedInitial: "A",
+            photoUrl: "/synthetic/character-ada.svg",
+            pronunciationUrl: "/synthetic/silent-ada.mp3"
+          }
         },
         {
-          childRecordId: "alex",
-          displayName: "Álex",
-          verifiedInitial: "A",
-          photoUrl: "/synthetic/avatar-alex.svg",
-          pronunciationUrl: "/synthetic/silent-alex.mp3"
+          slotId: "character-2",
+          default: {
+            displayName: "Aro",
+            verifiedInitial: "A",
+            photoUrl: "/synthetic/character-aro.svg",
+            pronunciationUrl: "/synthetic/silent-aro.mp3"
+          }
         },
         {
-          childRecordId: "bruno",
-          displayName: "Bruno",
-          verifiedInitial: "B",
-          photoUrl: "/synthetic/avatar-bruno.svg",
-          pronunciationUrl: "/synthetic/silent-bruno.mp3"
+          slotId: "character-3",
+          default: {
+            displayName: "Bibi",
+            verifiedInitial: "B",
+            photoUrl: "/synthetic/character-bibi.svg",
+            pronunciationUrl: "/synthetic/silent-bibi.mp3"
+          }
         },
         {
-          childRecordId: "luna",
-          displayName: "Luna",
-          verifiedInitial: "L",
-          photoUrl: "/synthetic/avatar-luna.svg",
-          pronunciationUrl: "/synthetic/silent-luna.mp3"
+          slotId: "character-4",
+          default: {
+            displayName: "Bruma",
+            verifiedInitial: "B",
+            photoUrl: "/synthetic/character-bruma.svg",
+            pronunciationUrl: "/synthetic/silent-bruma.mp3"
+          }
+        },
+        {
+          slotId: "character-5",
+          default: {
+            displayName: "Luli",
+            verifiedInitial: "L",
+            photoUrl: "/synthetic/character-luli.svg",
+            pronunciationUrl: "/synthetic/silent-luli.mp3"
+          }
+        },
+        {
+          slotId: "character-6",
+          default: {
+            displayName: "Mimo",
+            verifiedInitial: "M",
+            photoUrl: "/synthetic/character-mimo.svg",
+            pronunciationUrl: "/synthetic/silent-mimo.mp3"
+          }
+        },
+        {
+          slotId: "character-7",
+          default: {
+            displayName: "Nube",
+            verifiedInitial: "N",
+            photoUrl: "/synthetic/character-nube.svg",
+            pronunciationUrl: "/synthetic/silent-nube.mp3"
+          }
+        },
+        {
+          slotId: "character-8",
+          default: {
+            displayName: "Sena",
+            verifiedInitial: "S",
+            photoUrl: "/synthetic/character-sena.svg",
+            pronunciationUrl: "/synthetic/silent-sena.mp3"
+          }
         }
       ]
     });
   });
 
-  it("pins initials-game version 1 template parameters", () => {
-    expect(
-      createInitialsGameResource(syntheticClass, "A", "immutability-seed").template
-    ).toEqual({ id: "initials-game", version: 1, targetInitial: "A" });
+  it("pins a personalised slot's shape", () => {
+    const [first] = createNameStoryResource(
+      "immutability-seed",
+      syntheticClass
+    ).slots;
+
+    expect(first).toEqual({
+      slotId: "character-1",
+      default: {
+        displayName: "Ada",
+        verifiedInitial: "A",
+        photoUrl: "/synthetic/character-ada.svg",
+        pronunciationUrl: "/synthetic/silent-ada.mp3"
+      },
+      personalised: {
+        childRecordId: "ana",
+        displayName: "Ana",
+        verifiedInitial: "A",
+        photoUrl: "/synthetic/avatar-ana.svg",
+        pronunciationUrl: "/synthetic/silent-ana.mp3"
+      }
+    });
+  });
+
+  it("pins initials-game version 2 template parameters", () => {
+    expect(createInitialsGameResource("A", "immutability-seed").template).toEqual(
+      { id: "initials-game", version: 2, targetInitial: "A" }
+    );
   });
 
   it("pins pairs-game version 1 output", () => {

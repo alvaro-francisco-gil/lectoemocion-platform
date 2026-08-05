@@ -1,16 +1,6 @@
 import { Type, type Static } from "@sinclair/typebox";
 import Ajv from "ajv";
-
-export const ParticipantSchema = Type.Object(
-  {
-    childRecordId: Type.String({ minLength: 1 }),
-    displayName: Type.String({ minLength: 1, maxLength: 80 }),
-    verifiedInitial: Type.String({ minLength: 1, maxLength: 2 }),
-    photoUrl: Type.String({ minLength: 1 }),
-    pronunciationUrl: Type.String({ minLength: 1 })
-  },
-  { additionalProperties: false }
-);
+import { ParticipantSlotSchema } from "./participantSlot";
 
 /**
  * A picture and the syllable sequence that spells its word.
@@ -48,7 +38,12 @@ const envelope = {
   seed: Type.String({ minLength: 1 })
 };
 
-const participants = Type.Array(ParticipantSchema, {
+/**
+ * Roster templates carry slots, not children. Every slot has product-authored
+ * default content, so these templates play with no uploads and personalisation
+ * overrides slot by slot.
+ */
+const slots = Type.Array(ParticipantSlotSchema, {
   minItems: 1,
   maxItems: 30
 });
@@ -63,10 +58,10 @@ export const NameStoryManifestSchema = Type.Object(
   {
     ...envelope,
     template: Type.Object(
-      { id: Type.Literal("name-story"), version: Type.Literal(1) },
+      { id: Type.Literal("name-story"), version: Type.Literal(2) },
       { additionalProperties: false }
     ),
-    participants
+    slots
   },
   { additionalProperties: false }
 );
@@ -77,12 +72,12 @@ export const InitialsGameManifestSchema = Type.Object(
     template: Type.Object(
       {
         id: Type.Literal("initials-game"),
-        version: Type.Literal(1),
+        version: Type.Literal(2),
         targetInitial: Type.String({ minLength: 1, maxLength: 2 })
       },
       { additionalProperties: false }
     ),
-    participants
+    slots
   },
   { additionalProperties: false }
 );

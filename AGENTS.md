@@ -89,7 +89,8 @@ Do not create a directory before its implementation plan reaches that task.
 4. Guardrails live at every relevant trust boundary: service validation,
    Firestore/Storage Rules, and Functions for privileged operations. Hiding UI
    is never authorization.
-5. Published template and manifest versions are immutable.
+5. Published template and manifest versions are immutable. "Published" means
+   reachable by a user — see [ADR 0006](docs/decisions/0006-published-means-reachable.md).
 6. No silent fallbacks. Invalid schema versions, missing *default* content, or
    denied access fail closed with a recoverable adult-facing error. Missing
    *personalised* media is the one declared exception: it falls back to default

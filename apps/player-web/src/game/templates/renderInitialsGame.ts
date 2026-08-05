@@ -1,12 +1,13 @@
 import * as Phaser from "phaser";
-import type { ManifestFor } from "@lectoemocion/resource-schema";
+import { resolveSlot, type ManifestFor } from "@lectoemocion/resource-schema";
 
 export function renderInitialsGame(
   scene: Phaser.Scene,
   resource: ManifestFor<"initials-game">
 ): void {
   const targetInitial = resource.template.targetInitial;
-  let remaining = resource.participants.filter(
+  const cast = resource.slots.map(resolveSlot);
+  let remaining = cast.filter(
     (child) => child.verifiedInitial === targetInitial
   ).length;
 
@@ -17,7 +18,7 @@ export function renderInitialsGame(
     { fontFamily: "system-ui", fontSize: "42px", color: "#402060" }
   ).setOrigin(0.5);
 
-  resource.participants.forEach((child, index) => {
+  cast.forEach((child, index) => {
     const column = index % 4;
     const row = Math.floor(index / 4);
     const x = 260 + column * 250;

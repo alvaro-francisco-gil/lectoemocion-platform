@@ -4,15 +4,24 @@ import { parseResourceManifest, vocabularyWord } from "./resourceManifest";
 const validManifest = {
   schemaVersion: 1,
   resourceId: "resource-1",
-  template: { id: "name-story", version: 1 },
+  template: { id: "name-story", version: 2 },
   seed: "class-a-lesson-1",
-  participants: [
+  slots: [
     {
-      childRecordId: "child-1",
-      displayName: "Luna",
-      verifiedInitial: "L",
-      photoUrl: "/synthetic/luna.svg",
-      pronunciationUrl: "/synthetic/silence.mp3"
+      slotId: "character-1",
+      default: {
+        displayName: "Nube",
+        verifiedInitial: "N",
+        photoUrl: "/synthetic/character-nube.svg",
+        pronunciationUrl: "/synthetic/silent-nube.mp3"
+      },
+      personalised: {
+        childRecordId: "child-1",
+        displayName: "Luna",
+        verifiedInitial: "L",
+        photoUrl: "/synthetic/luna.svg",
+        pronunciationUrl: "/synthetic/silence.mp3"
+      }
     }
   ]
 };
@@ -81,11 +90,29 @@ describe("parseResourceManifest", () => {
     expect(parseResourceManifest(manifest)).toEqual(manifest);
   });
 
-  it("rejects a vocabulary resource that also carries participants", () => {
+  it("rejects a vocabulary resource that also carries slots", () => {
     expect(() =>
       parseResourceManifest({
         ...validPairsManifest,
-        participants: validManifest.participants
+        slots: validManifest.slots
+      })
+    ).toThrow("Invalid resource manifest");
+  });
+
+  it("rejects a slot with no default content", () => {
+    expect(() =>
+      parseResourceManifest({
+        ...validManifest,
+        slots: [{ slotId: "character-1" }]
+      })
+    ).toThrow("Invalid resource manifest");
+  });
+
+  it("rejects a retired template version", () => {
+    expect(() =>
+      parseResourceManifest({
+        ...validManifest,
+        template: { id: "name-story", version: 1 }
       })
     ).toThrow("Invalid resource manifest");
   });

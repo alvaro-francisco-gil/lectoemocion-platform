@@ -6,8 +6,7 @@ import {
   createPairsGameResource,
   createSyllablesGameResource,
   createWordPictureGameResource,
-  defaultVocabulary,
-  syntheticClass
+  defaultVocabulary
 } from "@lectoemocion/template-catalog";
 import { createGame } from "../game/createGame";
 
@@ -21,12 +20,12 @@ const CHOICES: readonly ResourceChoice[] = [
   {
     id: "story",
     label: "Historia de nombres",
-    create: () => createNameStoryResource(syntheticClass, "demo-story")
+    create: () => createNameStoryResource("demo-story")
   },
   {
     id: "initials",
     label: "Juego de iniciales",
-    create: () => createInitialsGameResource(syntheticClass, "A", "demo-game")
+    create: () => createInitialsGameResource("A", "demo-game")
   },
   {
     id: "pairs",
