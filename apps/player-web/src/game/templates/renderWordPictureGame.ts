@@ -11,7 +11,8 @@ const CHOICE_ROW_Y = 480;
 
 export function renderWordPictureGame(
   scene: Phaser.Scene,
-  resource: ManifestFor<"word-picture-game">
+  resource: ManifestFor<"word-picture-game">,
+  onComplete: () => void
 ): void {
   let round = createWordPictureRound(resource);
 
@@ -66,6 +67,7 @@ export function renderWordPictureGame(
           banner.setText("¡Muy bien!");
           for (const other of frames.values()) other.disableInteractive();
           paint();
+          onComplete();
           return;
         case "incorrect":
           frame.setFillStyle(0xffadad);

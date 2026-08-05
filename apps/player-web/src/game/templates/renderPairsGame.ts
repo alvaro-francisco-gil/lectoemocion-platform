@@ -22,7 +22,8 @@ interface CardView {
 
 export function renderPairsGame(
   scene: Phaser.Scene,
-  resource: ManifestFor<"pairs-game">
+  resource: ManifestFor<"pairs-game">,
+  onComplete: () => void
 ): void {
   let round = createPairsRound(resource);
 
@@ -132,7 +133,10 @@ export function renderPairsGame(
   }
 
   const finish = (current: PairsRound) => {
-    if (current.status === "won") banner.setText("¡Muy bien!");
+    if (current.status === "won") {
+      banner.setText("¡Muy bien!");
+      onComplete();
+    }
     if (current.status === "lost") banner.setText("Vamos a intentarlo otra vez");
   };
 

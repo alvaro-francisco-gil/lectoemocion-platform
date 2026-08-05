@@ -3,7 +3,8 @@ import { resolveSlot, type ManifestFor } from "@lectoemocion/resource-schema";
 
 export function renderInitialsGame(
   scene: Phaser.Scene,
-  resource: ManifestFor<"initials-game">
+  resource: ManifestFor<"initials-game">,
+  onComplete: () => void
 ): void {
   const targetInitial = resource.template.targetInitial;
   const cast = resource.slots.map(resolveSlot);
@@ -39,6 +40,7 @@ export function renderInitialsGame(
         remaining -= 1;
         if (remaining === 0) {
           instruction.setText("¡Muy bien!");
+          onComplete();
           scene.tweens.add({
             targets: [instruction, label],
             scale: 1.15,

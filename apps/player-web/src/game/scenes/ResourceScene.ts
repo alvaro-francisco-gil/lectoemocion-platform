@@ -2,13 +2,17 @@ import * as Phaser from "phaser";
 import { assertNever } from "@lectoemocion/domain";
 import { isTemplate, type ResourceManifest } from "@lectoemocion/resource-schema";
 import { renderInitialsGame } from "../templates/renderInitialsGame";
+import { renderMemoryAlbum } from "../templates/renderMemoryAlbum";
 import { renderNameStory } from "../templates/renderNameStory";
 import { renderPairsGame } from "../templates/renderPairsGame";
 import { renderSyllablesGame } from "../templates/renderSyllablesGame";
 import { renderWordPictureGame } from "../templates/renderWordPictureGame";
 
 export class ResourceScene extends Phaser.Scene {
-  constructor(private readonly resource: ResourceManifest) {
+  constructor(
+    private readonly resource: ResourceManifest,
+    private readonly onComplete: () => void
+  ) {
     super(`resource-${resource.resourceId}`);
   }
 
@@ -20,27 +24,37 @@ export class ResourceScene extends Phaser.Scene {
    *
    * The final call is unreachable for any manifest that came through
    * `parseResourceManifest`; it exists so the compiler proves that.
+   *
+   * A template receives a completion callback and nothing else. It cannot read
+   * progress and cannot tell whether anything is listening, which is what
+   * keeps invariant 2 true while the world still learns what was played.
    */
   create(): void {
     const resource = this.resource;
+    const done = () => this.onComplete();
+
     if (isTemplate(resource, "name-story")) {
-      renderNameStory(this, resource);
+      renderNameStory(this, resource, done);
       return;
     }
     if (isTemplate(resource, "initials-game")) {
-      renderInitialsGame(this, resource);
+      renderInitialsGame(this, resource, done);
+      return;
+    }
+    if (isTemplate(resource, "memory-album")) {
+      renderMemoryAlbum(this, resource, done);
       return;
     }
     if (isTemplate(resource, "pairs-game")) {
-      renderPairsGame(this, resource);
+      renderPairsGame(this, resource, done);
       return;
     }
     if (isTemplate(resource, "word-picture-game")) {
-      renderWordPictureGame(this, resource);
+      renderWordPictureGame(this, resource, done);
       return;
     }
     if (isTemplate(resource, "syllables-game")) {
-      renderSyllablesGame(this, resource);
+      renderSyllablesGame(this, resource, done);
       return;
     }
     assertNever(resource, "resource manifest");

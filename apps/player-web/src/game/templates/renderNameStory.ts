@@ -3,13 +3,21 @@ import { resolveSlot, type ManifestFor } from "@lectoemocion/resource-schema";
 
 export function renderNameStory(
   scene: Phaser.Scene,
-  resource: ManifestFor<"name-story">
+  resource: ManifestFor<"name-story">,
+  onComplete: () => void
 ): void {
   scene.add.text(640, 80, "Nuestra clase", {
     fontFamily: "system-ui",
     fontSize: "56px",
     color: "#402060"
   }).setOrigin(0.5);
+
+  /*
+   * A cinematic completes when it finishes playing: there is nothing to win.
+   * The delay is the last character's entrance, so the chapter is over exactly
+   * when the choreography is.
+   */
+  scene.time.delayedCall(resource.slots.length * 250 + 500, onComplete);
 
   resource.slots.forEach((slot, index) => {
     const child = resolveSlot(slot);

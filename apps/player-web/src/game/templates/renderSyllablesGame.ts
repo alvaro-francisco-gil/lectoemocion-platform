@@ -22,7 +22,8 @@ const CARD_HEIGHT = 110;
  */
 export function renderSyllablesGame(
   scene: Phaser.Scene,
-  resource: ManifestFor<"syllables-game">
+  resource: ManifestFor<"syllables-game">,
+  onComplete: () => void
 ): void {
   let round = createSyllablesRound(resource);
   let heldCardId: string | null = null;
@@ -110,7 +111,10 @@ export function renderSyllablesGame(
         heldCardId = null;
         view?.frame.setVisible(false).disableInteractive();
         view?.label.setVisible(false);
-        if (round.status === "won") banner.setText("¡Muy bien!");
+        if (round.status === "won") {
+          banner.setText("¡Muy bien!");
+          onComplete();
+        }
         paint();
         return;
       case "rejected":

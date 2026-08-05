@@ -23,8 +23,5 @@ export type {
   WordPictureChoice,
   WordPictureRound
 } from "./rules/wordPictureGame";
-export type {
-  ResourceKind,
-  SelectionStrategy,
-  TemplateDefinition
-} from "./templateDefinition";
+export { TEMPLATE_KINDS, templateKind } from "./templateDefinition";
+export type { ResourceKind, SelectionStrategy } from "./templateDefinition";

@@ -11,6 +11,7 @@ export type {
 } from "./participantSlot";
 export {
   InitialsGameManifestSchema,
+  MemoryAlbumManifestSchema,
   MultiSyllableVocabularyItemSchema,
   NameStoryManifestSchema,
   PairsGameManifestSchema,
@@ -28,3 +29,5 @@ export type {
   TemplateIdentifier,
   VocabularyItem
 } from "./resourceManifest";
+export { WorldNodeSchema, WorldSchema, parseWorld } from "./worldSchema";
+export type { NodeResource, World, WorldNode } from "./worldSchema";

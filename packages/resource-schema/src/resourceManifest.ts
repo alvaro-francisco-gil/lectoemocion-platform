@@ -82,6 +82,24 @@ export const InitialsGameManifestSchema = Type.Object(
   { additionalProperties: false }
 );
 
+/**
+ * The non-interactive kind (platform-design.md §6.3): a fixed timeline that
+ * shows each slot in turn. It is rendered at playback time rather than encoded
+ * as a video, and it is deliberately not exportable, downloadable, or
+ * shareable — it plays inside the application only.
+ */
+export const MemoryAlbumManifestSchema = Type.Object(
+  {
+    ...envelope,
+    template: Type.Object(
+      { id: Type.Literal("memory-album"), version: Type.Literal(1) },
+      { additionalProperties: false }
+    ),
+    slots
+  },
+  { additionalProperties: false }
+);
+
 export const PairsGameManifestSchema = Type.Object(
   {
     ...envelope,
@@ -128,6 +146,7 @@ export const SyllablesGameManifestSchema = Type.Object(
 export const ResourceManifestSchema = Type.Union([
   NameStoryManifestSchema,
   InitialsGameManifestSchema,
+  MemoryAlbumManifestSchema,
   PairsGameManifestSchema,
   WordPictureGameManifestSchema,
   SyllablesGameManifestSchema

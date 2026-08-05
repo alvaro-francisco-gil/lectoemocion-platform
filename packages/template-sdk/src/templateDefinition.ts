@@ -1,4 +1,4 @@
-import type { ResourceManifest } from "@lectoemocion/resource-schema";
+import type { TemplateIdentifier } from "@lectoemocion/resource-schema";
 
 /**
  * Resource kinds as defined in docs/product/platform-design.md section 6.3.
@@ -14,12 +14,25 @@ export type SelectionStrategy =
   | { kind: "matching-initial"; initial: string }
   | { kind: "seeded-subset"; count: number };
 
-export interface TemplateDefinition {
-  id: ResourceManifest["template"]["id"];
-  version: 1;
-  title: string;
-  kind: ResourceKind;
-  selection: SelectionStrategy;
-  minimumParticipants: number;
-  maximumParticipants: number;
+/**
+ * What kind of thing each template is.
+ *
+ * A total `Record` over `TemplateIdentifier`, so adding a template fails to
+ * compile here until its kind is declared. The world cannot silently acquire a
+ * node it does not know how to describe.
+ *
+ * This replaced a `TemplateDefinition` interface that nothing constructed and
+ * that still described participants rather than slots.
+ */
+export const TEMPLATE_KINDS: Record<TemplateIdentifier, ResourceKind> = {
+  "name-story": "cinematic",
+  "initials-game": "minigame",
+  "memory-album": "non-interactive",
+  "pairs-game": "minigame",
+  "word-picture-game": "minigame",
+  "syllables-game": "minigame"
+};
+
+export function templateKind(id: TemplateIdentifier): ResourceKind {
+  return TEMPLATE_KINDS[id];
 }
