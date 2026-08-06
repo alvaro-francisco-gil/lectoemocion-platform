@@ -247,17 +247,7 @@ test("the world and every resource fit the viewport", async ({ page }) => {
   expect(page_.scrollWidth).toBeLessThanOrEqual(viewport.width);
   expect(page_.scrollHeight).toBeLessThanOrEqual(viewport.height);
 
-  for (const title of [
-    ENTRY,
-    SECOND,
-    "El bosque de parejas",
-    "¿Cuál es?",
-    "Las primeras letras",
-    "El puente de sílabas",
-    "El taller de letras",
-    "Empieza igual",
-    ALBUM
-  ]) {
+  for (const title of world.nodes.map((node) => node.title)) {
     await page.getByRole("button", { name: title, exact: true }).click();
     const box = await canvasBox(page);
     expect(box.width, `${title} fits`).toBeLessThanOrEqual(viewport.width);
