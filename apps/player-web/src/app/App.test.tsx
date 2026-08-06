@@ -3,9 +3,11 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor
+  waitFor,
+  within
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { world } from "@lectoemocion/template-catalog";
 import { App } from "./App";
 
 type Destroyable = { destroy: () => void };
@@ -51,6 +53,18 @@ function starTotal(): string {
   );
 }
 
+/**
+ * The chapters on the path.
+ *
+ * Scoped to the world list rather than the whole map, so the corner controls —
+ * which are about the app, not about where to go next — never read as places.
+ */
+function worldButtons(): HTMLElement[] {
+  return within(screen.getByRole("navigation", { name: "Mundo" })).getAllByRole(
+    "button"
+  );
+}
+
 /** Opens a chest and acknowledges the animal inside, landing back on the map. */
 async function openChest(which = 1): Promise<string> {
   const chest = await screen.findByRole("button", {
@@ -82,9 +96,9 @@ describe("the world shell", () => {
     render(<App />);
     expect(createGame).not.toHaveBeenCalled();
 
-    const open = screen
-      .getAllByRole("button")
-      .filter((button) => !button.hasAttribute("disabled"));
+    const open = worldButtons().filter(
+      (button) => !button.hasAttribute("disabled")
+    );
     expect(
       open.map((button) => button.querySelector(".world-node__title")?.textContent)
     ).toEqual(["El encuentro"]);
@@ -162,20 +176,53 @@ describe("the world shell", () => {
 
   it("shows the world as one ordered path", () => {
     render(<App />);
-    const titles = screen
-      .getAllByRole("button")
-      .map((button) => button.querySelector(".world-node__title")?.textContent);
+    const titles = worldButtons().map(
+      (button) => button.querySelector(".world-node__title")?.textContent
+    );
     expect(titles).toEqual([
       "El encuentro",
       "El gallo Rayo",
       "Las iniciales",
       "El bosque de parejas",
       "¿Cuál es?",
+      "Las primeras letras",
       "El puente de sílabas",
       "El taller de letras",
       "Empieza igual",
       "Nuestro álbum"
     ]);
+  });
+
+  it("opens and closes the menu from the map", () => {
+    render(<App />);
+    expect(screen.queryByRole("dialog", { name: "Menú" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+    expect(screen.getByRole("dialog", { name: "Menú" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar el menú" }));
+    expect(screen.queryByRole("dialog", { name: "Menú" })).toBeNull();
+  });
+
+  /* A panel with no way out is a trap on a device with no back button. */
+  it("closes the menu on Escape", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: "Menú" })).toBeNull();
+  });
+
+  /* One screen at a time: the map is not left underneath to be tapped through. */
+  it("puts the world away while the menu is open", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+
+    expect(screen.queryByRole("navigation", { name: "Mundo" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar el menú" }));
+    expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
   });
 
   it("hides the world list while a resource is playing", () => {
@@ -210,34 +257,18 @@ describe("the world shell", () => {
 
     /* Slots are a record, not a route: nothing in the row is pressable. */
     expect(container.querySelectorAll(".collection button")).toHaveLength(0);
-    expect(collection(container)).toEqual([
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null
-    ]);
+    /* One slot per chapter, counted from the world rather than listed here. */
+    expect(collection(container)).toEqual(world.nodes.map(() => null));
   });
 
   it("marks each node's state without relying on colour", () => {
     render(<App />);
-    const states = screen
-      .getAllByRole("button")
-      .map((button) => button.querySelector(".world-node__state")?.textContent);
+    const states = worldButtons().map(
+      (button) => button.querySelector(".world-node__state")?.textContent
+    );
     expect(states).toEqual([
       "Historia",
-      "Bloqueado",
-      "Bloqueado",
-      "Bloqueado",
-      "Bloqueado",
-      "Bloqueado",
-      "Bloqueado",
-      "Bloqueado",
-      "Bloqueado"
+      ...world.nodes.slice(1).map(() => "Bloqueado")
     ]);
   });
 });
@@ -305,14 +336,7 @@ describe("the chest a chapter is worth", () => {
     await waitFor(() =>
       expect(collection(container)).toEqual([
         won,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
+        ...world.nodes.slice(1).map(() => null)
       ])
     );
   });
@@ -380,14 +404,7 @@ describe("the chest a chapter is worth", () => {
     await waitFor(() =>
       expect(collection(remounted.container)).toEqual([
         won,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
+        ...world.nodes.slice(1).map(() => null)
       ])
     );
   });

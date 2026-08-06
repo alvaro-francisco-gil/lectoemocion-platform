@@ -12,6 +12,12 @@ import {
   placeSyllable,
   type SyllablesRound
 } from "./syllablesGame";
+import {
+  createInitialLetterRound,
+  selectInitialLetterCard,
+  wordInitial,
+  type InitialLetterRound
+} from "./initialLetterGame";
 
 /**
  * Properties every round must hold, checked across many seeds and shapes
@@ -64,6 +70,18 @@ const wordPictureManifest = (
     version: 1,
     targetVocabularyItemId: "item-0"
   },
+  seed,
+  vocabulary: vocabulary(count)
+});
+
+/* The fixture's first eight words start with eight different letters. */
+const initialLetterManifest = (
+  count: number,
+  seed: string
+): ManifestFor<"initial-letter-game"> => ({
+  schemaVersion: 1,
+  resourceId: `initial-letter-${seed}`,
+  template: { id: "initial-letter-game", version: 1 },
   seed,
   vocabulary: vocabulary(count)
 });
@@ -210,6 +228,66 @@ describe("word-picture rounds, over many seeds and sizes", () => {
     const snapshot = structuredClone(round);
     chooseWordPicture(round, round.choices[0]!.vocabularyItemId);
     expect(round).toEqual(snapshot);
+  });
+});
+
+describe("initial-letter rounds, over many seeds and sizes", () => {
+  const sizes = [3, 4];
+
+  it.each(sizes)("deals a picture and a letter per word at %i", (size) => {
+    for (const seed of SEEDS) {
+      const round = createInitialLetterRound(initialLetterManifest(size, seed));
+      expect(round.cards).toHaveLength(size * 2);
+      expect(new Set(round.cards.map((card) => card.cardId)).size).toBe(size * 2);
+
+      const perGroup = round.cards.filter((card) => card.group === "letter");
+      expect(perGroup).toHaveLength(size);
+      /* One letter card per initial: no letter answers two pictures. */
+      expect(new Set(perGroup.map((card) => card.initial)).size).toBe(size);
+    }
+  });
+
+  it.each(sizes)("can always be won without losing a life at %i", (size) => {
+    for (const seed of SEEDS) {
+      let round = createInitialLetterRound(initialLetterManifest(size, seed));
+      for (const item of vocabulary(size)) {
+        round = selectInitialLetterCard(
+          round,
+          `${item.vocabularyItemId}-picture`
+        ).round;
+        round = selectInitialLetterCard(
+          round,
+          `${wordInitial(item)}-letter`
+        ).round;
+      }
+      expect(round.status).toBe("won");
+      expect(round.livesRemaining).toBe(ROUND_LIVES);
+      expect(round.matched).toHaveLength(size);
+    }
+  });
+
+  it("never lets lives fall below zero or status regress", () => {
+    for (const seed of SEEDS) {
+      let round: InitialLetterRound = createInitialLetterRound(
+        initialLetterManifest(4, seed)
+      );
+      const ids = round.cards.map((card) => card.cardId);
+
+      /* Deterministic pseudo-random tapping, including invalid orders. */
+      for (let step = 0; step < 60; step += 1) {
+        const previous = round;
+        const cardId = ids[(step * 7 + 3) % ids.length]!;
+        round = selectInitialLetterCard(round, cardId).round;
+
+        expect(round.livesRemaining).toBeGreaterThanOrEqual(0);
+        expect(round.livesRemaining).toBeLessThanOrEqual(previous.livesRemaining);
+        expect(round.matched.length).toBeGreaterThanOrEqual(
+          previous.matched.length
+        );
+        assertStatusProgression(previous.status, round.status);
+        if (round.status === "lost") expect(round.livesRemaining).toBe(0);
+      }
+    }
   });
 });
 

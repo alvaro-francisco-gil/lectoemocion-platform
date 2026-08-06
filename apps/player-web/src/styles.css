@@ -90,12 +90,18 @@ main { height: 100dvh; }
  * The path itself scrolls, not the page. `.map` fills the screen exactly, so a
  * path wider than it has to take its overflow here.
  *
- * `align-self: center` against the map's single full-height row is what puts
- * the path in the middle of the *screen*, not in the middle of whatever the
- * collection leaves over.
+ * The band is the whole screen rather than a strip around the nodes, because
+ * what a hand grabs to pan the world is the world: a child dragging the barn
+ * floor or the sky above the path expects it to move, and a drag surface that
+ * only starts a few pixels from a chapter is a target they cannot see. The path
+ * is then centred *inside* that full-height band — `align-content` on the grid,
+ * so the row keeps its own `flex-start` alignment and the connecting line stays
+ * on one level across nodes with labels of different heights.
  */
 .map__world {
-  align-self: center;
+  align-self: stretch;
+  display: grid;
+  align-content: center;
   overflow-x: auto;
   overflow-y: hidden;
   padding-block: clamp(0.75rem, 4vh, 3rem);
@@ -202,7 +208,11 @@ main { height: 100dvh; }
 /* ---------------------------------------------------------------- stars */
 
 /*
- * The running total, over the map's top-right corner.
+ * The running total, over the map's top-left corner.
+ *
+ * On the left because it is the child's number, and the corner opposite is
+ * where the app's own controls live: what was won and what an adult can change
+ * never share a corner.
  *
  * Out of the flow on purpose: the map is a two-band layout and the path owns
  * the middle of the screen, so a third band for one number would push the path
@@ -212,7 +222,7 @@ main { height: 100dvh; }
 .star-counter {
   position: absolute;
   top: clamp(0.5rem, 2vh, 1.25rem);
-  right: clamp(0.5rem, 2vw, 1.5rem);
+  left: clamp(0.5rem, 2vw, 1.5rem);
   z-index: 1;
   display: flex;
   align-items: center;
@@ -231,6 +241,59 @@ main { height: 100dvh; }
   height: 1.3em;
 }
 
+/* -------------------------------------------------------------- the menu */
+
+/*
+ * The way into the app itself, in the map's top-right corner.
+ *
+ * High and in a corner: adult chrome may sit above the world, but never in the
+ * band where a child's hands land on the path. Same disc as the way back out of
+ * a game, because they are the same kind of control — the app talking, not the
+ * world.
+ */
+.menu-button {
+  position: absolute;
+  top: clamp(0.5rem, 2vh, 1.25rem);
+  right: clamp(0.5rem, 2vw, 1.5rem);
+  z-index: 1;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 2px solid #7b2cbf;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.9);
+  color: #402060;
+  cursor: pointer;
+}
+.menu-button:hover { background: #fff; }
+.menu-button:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
+
+/* A screen, not a layer: the map is gone while this is up, so there is nothing
+   underneath to tap through. Empty until it holds something. */
+.menu {
+  position: relative;
+  background: #f6f2fb;
+}
+
+.menu__close {
+  position: absolute;
+  top: clamp(0.5rem, 2vh, 1.25rem);
+  right: clamp(0.5rem, 2vw, 1.5rem);
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 2px solid #7b2cbf;
+  border-radius: 50%;
+  background: #fff;
+  color: #402060;
+  cursor: pointer;
+}
+.menu__close:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
+
 /* ------------------------------------------------------------ collection */
 
 /*
@@ -238,6 +301,12 @@ main { height: 100dvh; }
  * so it may sit at the very bottom edge where a stray hand rests, and it may
  * overlay the path rather than push it: out of the flow, it cannot move the one
  * thing on this screen a child aims at.
+ *
+ * No band behind it. The animals are kept in the barn, not in a drawer bolted
+ * over it, so they stand on the floor of the room the framing story put the
+ * child in. Contrast is carried by the slots themselves — every square is its
+ * own opaque tile — which is what makes dropping the panel safe: nothing here
+ * ever asks straw to be the background of a letter.
  */
 .collection {
   position: absolute;
@@ -245,10 +314,6 @@ main { height: 100dvh; }
   z-index: 1;
   padding: clamp(0.5rem, 1.5vh, 1.25rem) clamp(0.5rem, 3vw, 2rem)
     clamp(0.75rem, 2.5vh, 2rem);
-  border-top: 3px solid #e2d8f0;
-  /* Nearly opaque, because it sits over the barn floor: the empty slots are
-     pale grey and a translucent band would let the straw read as a filled one. */
-  background: rgb(255 255 255 / 0.88);
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -299,10 +364,6 @@ main { height: 100dvh; }
   padding: 6%;
 }
 
-.collection__name {
-  font-size: clamp(0.65rem, 1.2vw, 0.9rem);
-  font-weight: 700;
-}
 
 /* ---------------------------------------------------------------- reward */
 

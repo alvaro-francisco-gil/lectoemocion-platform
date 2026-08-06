@@ -10,6 +10,7 @@ export { createInitialsGameResource } from "./initialsGame";
 export { createMemoryAlbumResource } from "./memoryAlbum";
 export { createNameStoryResource } from "./nameStory";
 export {
+  createInitialLetterGameResource,
   createInitialSyllableGameResource,
   createLettersGameResource,
   createPairsGameResource,

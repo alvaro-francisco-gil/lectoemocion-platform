@@ -1,11 +1,15 @@
-import type { ManifestFor, VocabularyItem } from "@lectoemocion/resource-schema";
+import {
+  vocabularyWord,
+  type ManifestFor,
+  type VocabularyItem
+} from "@lectoemocion/resource-schema";
 import {
   assertSpellable,
   seededShuffle,
   sharesInitialSyllable,
+  wordInitial,
   wordLetters
 } from "@lectoemocion/template-sdk";
-import { vocabularyWord } from "@lectoemocion/resource-schema";
 
 function requireItem(
   vocabulary: readonly VocabularyItem[],
@@ -91,6 +95,47 @@ export function createWordPictureGameResource(
     },
     seed,
     vocabulary: [target, ...distractors]
+  };
+}
+
+/**
+ * Connect each picture to the letter its word begins with.
+ *
+ * The draw is filtered rather than merely sampled: a set with two words under
+ * the same letter is not playable (`assertDistinctInitials`), so items whose
+ * initial is already taken are skipped as the shuffled vocabulary is walked.
+ * Taking the first `n` and then complaining would make the game fail on a seed
+ * for reasons no author could see.
+ */
+export function createInitialLetterGameResource(
+  vocabulary: readonly VocabularyItem[],
+  pictureCount: number,
+  seed: string
+): ManifestFor<"initial-letter-game"> {
+  requireCount(vocabulary, pictureCount, "vocabulary items");
+
+  const chosen: VocabularyItem[] = [];
+  const taken = new Set<string>();
+  for (const item of seededShuffle(vocabulary, `${seed}-selection`)) {
+    if (chosen.length === pictureCount) break;
+    const initial = wordInitial(item);
+    if (taken.has(initial)) continue;
+    taken.add(initial);
+    chosen.push(item);
+  }
+
+  if (chosen.length < pictureCount) {
+    throw new Error(
+      `Only ${chosen.length} of the ${pictureCount} pictures this game needs have distinct initial letters`
+    );
+  }
+
+  return {
+    schemaVersion: 1,
+    resourceId: `initial-letter-game-${seed}`,
+    template: { id: "initial-letter-game", version: 1 },
+    seed,
+    vocabulary: chosen
   };
 }
 

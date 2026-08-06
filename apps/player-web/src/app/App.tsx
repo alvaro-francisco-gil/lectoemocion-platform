@@ -42,9 +42,9 @@ const store = new LocalProgressStore(
  * around the progression.
  *
  * Exactly one screen is on at a time: a playing resource, the letriestrellas
- * just won, the animal just revealed, the chests owed for a first finish, or
- * the map. They are exclusive rather than layered so that nothing a child can
- * touch is ever hidden behind something else.
+ * just won, the animal just revealed, the chests owed for a first finish, the
+ * menu, or the map. They are exclusive rather than layered so that nothing a
+ * child can touch is ever hidden behind something else.
  */
 export function App() {
   const [progress, setProgress] = useState<Progress>(EMPTY_PROGRESS);
@@ -61,6 +61,8 @@ export function App() {
    * this the reveal would vanish in the same frame the chest opened.
    */
   const [revealed, setRevealed] = useState<CollectibleAnimal | null>(null);
+  /* The menu is a screen of its own, so whether it is on is part of which one. */
+  const [menuOpen, setMenuOpen] = useState(false);
   const host = useRef<HTMLDivElement>(null);
   const panWorld = useDragScroll();
 
@@ -157,9 +159,21 @@ export function App() {
     return <Chests reward={view.pendingReward} onOpen={openChest} />;
   }
 
+  if (menuOpen) {
+    return <Menu onClose={() => setMenuOpen(false)} />;
+  }
+
   return (
     <main className="map">
       <StarCounter stars={view.stars} />
+      <button
+        type="button"
+        className="menu-button"
+        aria-label="Menú"
+        onClick={() => setMenuOpen(true)}
+      >
+        <MenuIcon />
+      </button>
       {/*
         An ordered list because the world is a sequence: that is what a screen
         reader should hear, and it is what the connecting line draws.
@@ -179,7 +193,7 @@ export function App() {
 }
 
 /**
- * Every letriestrella won so far, in the map's top corner.
+ * Every letriestrella won so far, in the map's top-left corner.
  *
  * A running total rather than a per-chapter mark: stars are paid for playing,
  * including replaying, and a number that only ever goes up is the part of the
@@ -193,6 +207,38 @@ function StarCounter({ stars }: { stars: number }) {
       <StarIcon />
       <span className="star-counter__count">{stars}</span>
     </section>
+  );
+}
+
+/**
+ * The adult's way in, in the map's top-right corner.
+ *
+ * Empty for now: it is the place the app's own settings will live, kept apart
+ * from the world so that nothing on the map is about the app rather than about
+ * playing. It takes the screen rather than floating over the map, like every
+ * other screen here — a panel a child can tap through is a way to leave the
+ * world by accident.
+ */
+function Menu({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <main className="menu" role="dialog" aria-modal="true" aria-label="Menú">
+      <button
+        type="button"
+        className="menu__close"
+        aria-label="Cerrar el menú"
+        onClick={onClose}
+      >
+        <CloseIcon />
+      </button>
+    </main>
   );
 }
 
@@ -255,12 +301,18 @@ function Collection({ slots }: { slots: readonly CollectionSlotView[] }) {
             {slot.animal ? (
               <>
                 {/*
-                  Empty `alt`: the name below is the accessible text, and a
-                  screen reader announcing the picture as well would say it
-                  twice.
+                  Empty `alt`: the name is the accessible text, and a screen
+                  reader announcing the picture as well would say it twice.
+
+                  Spoken but not drawn, like the empty slot below it. A child of
+                  three does not read the label, the picture is the animal they
+                  remember winning, and a word under every square turns a row of
+                  animals into a row of text.
                 */}
                 <img src={slot.animal.imageUrl} alt="" />
-                <span className="collection__name">{slot.animal.label}</span>
+                <span className="collection__name visually-hidden">
+                  {slot.animal.label}
+                </span>
               </>
             ) : (
               <>
@@ -437,6 +489,35 @@ function StarIcon() {
         stroke="#c98a1b"
         strokeWidth="5"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Three bars: the one shape an adult reads as "everything else" without a word. */
+function MenuIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+      <path
+        d="M4 7h16M4 12h16M4 17h16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+      <path
+        d="M6 6l12 12M18 6L6 18"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
       />
     </svg>
   );

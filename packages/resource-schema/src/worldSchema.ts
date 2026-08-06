@@ -93,6 +93,25 @@ const NodeResourceSchema = Type.Union([
   ),
   Type.Object(
     {
+      template: Type.Literal("initial-letter-game"),
+      seed: Type.String({ minLength: 1 }),
+      pictureCount: Type.Integer({ minimum: 3, maximum: 4 })
+    },
+    { additionalProperties: false }
+  ),
+  Type.Object(
+    {
+      template: Type.Literal("initial-letter-game"),
+      seed: Type.String({ minLength: 1 }),
+      vocabulary: Type.Array(Type.String({ minLength: 1 }), {
+        minItems: 3,
+        maxItems: 4
+      })
+    },
+    { additionalProperties: false }
+  ),
+  Type.Object(
+    {
       template: Type.Literal("syllables-game"),
       seed: Type.String({ minLength: 1 }),
       targetVocabularyItemId: Type.String({ minLength: 1 })

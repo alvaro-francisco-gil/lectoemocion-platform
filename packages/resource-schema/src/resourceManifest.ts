@@ -129,6 +129,28 @@ export const WordPictureGameManifestSchema = Type.Object(
   { additionalProperties: false }
 );
 
+/**
+ * Match each picture to the letter its word begins with.
+ *
+ * Three or four pictures: the whole board has to be readable at once by a
+ * child who is still learning that a word *has* a first letter, and a fifth
+ * column turns that into a search. Which pictures may sit together is a rules
+ * question rather than a schema one — two words sharing an initial would make
+ * a letter card match two pictures — so `assertDistinctInitials` in
+ * `@lectoemocion/template-sdk` is what refuses that, on the derived word.
+ */
+export const InitialLetterGameManifestSchema = Type.Object(
+  {
+    ...envelope,
+    template: Type.Object(
+      { id: Type.Literal("initial-letter-game"), version: Type.Literal(1) },
+      { additionalProperties: false }
+    ),
+    vocabulary: Type.Array(VocabularyItemSchema, { minItems: 3, maxItems: 4 })
+  },
+  { additionalProperties: false }
+);
+
 export const SyllablesGameManifestSchema = Type.Object(
   {
     ...envelope,
@@ -227,6 +249,7 @@ export const ResourceManifestSchema = Type.Union([
   MemoryAlbumManifestSchema,
   PairsGameManifestSchema,
   WordPictureGameManifestSchema,
+  InitialLetterGameManifestSchema,
   SyllablesGameManifestSchema,
   InitialSyllableGameManifestSchema,
   LettersGameManifestSchema

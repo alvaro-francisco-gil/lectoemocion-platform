@@ -7,6 +7,7 @@ import {
 import {
   chooseInitialSyllable,
   chooseWordPicture,
+  createInitialLetterRound,
   createInitialSyllableRound,
   createLettersRound,
   createPairsRound,
@@ -15,13 +16,16 @@ import {
   initialSyllable,
   placeLetter,
   placeSyllable,
+  selectInitialLetterCard,
   selectPairsCard,
+  wordInitial,
   wordLetters,
   LETTERS_MAXIMUM,
   LETTERS_MINIMUM,
   ROUND_LIVES
 } from "@lectoemocion/template-sdk";
 import {
+  createInitialLetterGameResource,
   createInitialSyllableGameResource,
   createLettersGameResource,
   createPairsGameResource,
@@ -302,6 +306,49 @@ describe("pairs rounds over the real vocabulary", () => {
   });
 });
 
+describe("initial-letter rounds over the real vocabulary", () => {
+  it.each([3, 4])("is winnable with %i pictures", (pictureCount) => {
+    const resource = createInitialLetterGameResource(
+      defaultVocabulary,
+      pictureCount,
+      `sweep-initial-letter-${pictureCount}`
+    );
+    expect(parseResourceManifest(resource)).toEqual(resource);
+    expect(resource.vocabulary).toHaveLength(pictureCount);
+
+    const initials = resource.vocabulary.map(wordInitial);
+    expect(new Set(initials).size).toBe(pictureCount);
+
+    let round = createInitialLetterRound(resource);
+    for (const item of resource.vocabulary) {
+      round = selectInitialLetterCard(
+        round,
+        `${item.vocabularyItemId}-picture`
+      ).round;
+      round = selectInitialLetterCard(round, `${wordInitial(item)}-letter`).round;
+    }
+    expect(round.status).toBe("won");
+    expect(round.livesRemaining).toBe(ROUND_LIVES);
+  });
+
+  /*
+   * The draw skips an initial it already has, so every seed must still fill
+   * the board. A seed that could not is a chapter that fails to open for the
+   * children it was dealt to and nobody else.
+   */
+  it.each(["a", "b", "lesson-1", "seed-42", "ñ", "0"])(
+    "fills a four-picture board from seed %s",
+    (seed) => {
+      const resource = createInitialLetterGameResource(
+        defaultVocabulary,
+        4,
+        seed
+      );
+      expect(new Set(resource.vocabulary.map(wordInitial)).size).toBe(4);
+    }
+  );
+});
+
 describe("builders refuse content they cannot play", () => {
   it("refuses a single-syllable word for segmentation", () => {
     const single = defaultVocabulary.find((item) => item.syllables.length === 1);
@@ -347,6 +394,17 @@ describe("builders refuse content they cannot play", () => {
     expect(() =>
       createPairsGameResource(defaultVocabulary, defaultVocabulary.length + 1, "s")
     ).toThrow("but only");
+  });
+
+  it("refuses a board it cannot fill with distinct initial letters", () => {
+    const sameLetter = [
+      { vocabularyItemId: "luna", syllables: ["lu", "na"], imageUrl: "/vocabulary/luna.webp" },
+      { vocabularyItemId: "lupa", syllables: ["lu", "pa"], imageUrl: "/vocabulary/lupa.webp" },
+      { vocabularyItemId: "sol", syllables: ["sol"], imageUrl: "/vocabulary/sol.webp" }
+    ];
+    expect(() => createInitialLetterGameResource(sameLetter, 3, "s")).toThrow(
+      "distinct initial letters"
+    );
   });
 
   it("refuses a target it does not have", () => {

@@ -13,6 +13,7 @@ export { StoryPageSchema, pageLabel, pageShortLabel } from "./storyPage";
 export type { StoryPage } from "./storyPage";
 export {
   IllustratedStoryManifestSchema,
+  InitialLetterGameManifestSchema,
   InitialSyllableGameManifestSchema,
   InitialsGameManifestSchema,
   LettersGameManifestSchema,

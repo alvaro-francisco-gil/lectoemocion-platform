@@ -16,6 +16,7 @@ import { setDefaultResultOrder } from "node:dns";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
+import { removeWhiteBackground } from "./lib/remove-white-background.mjs";
 
 /* Some networks advertise IPv6 for github.com but cannot route it. */
 setDefaultResultOrder("ipv4first");
@@ -98,14 +99,7 @@ async function main() {
       throw new Error(`Downloading ${item.entry.name} failed: ${response.status}`);
     }
     const source = Buffer.from(await response.arrayBuffer());
-    const output = await sharp(source)
-      .resize(EDGE, EDGE, {
-        fit: "inside",
-        withoutEnlargement: true,
-        background: { r: 255, g: 255, b: 255, alpha: 0 }
-      })
-      .webp({ quality: QUALITY })
-      .toBuffer();
+    const output = await encode(source);
 
     await writeFile(join(OUTPUT_DIR, `${item.word}.webp`), output);
     imported.push({ ...item, bytes: output.length, sourceBytes: source.length });
@@ -120,6 +114,35 @@ async function main() {
     `${imported.length} pictures, ${(before / 1e6).toFixed(1)} MB source ` +
       `-> ${(after / 1e6).toFixed(1)} MB WebP\n`
   );
+}
+
+/**
+ * Half the prototype's pictures were cut out and half were shot on a flat white
+ * card. The player composites both over painted scenery, so the ones with a card
+ * are matted here — once, at import — rather than every surface working around
+ * an opaque square. A picture that already carries alpha was cut out by its
+ * author and is left exactly as it is.
+ */
+async function encode(source) {
+  const resized = sharp(source).resize(EDGE, EDGE, {
+    fit: "inside",
+    withoutEnlargement: true,
+    background: { r: 255, g: 255, b: 255, alpha: 0 }
+  });
+  if ((await sharp(source).metadata()).hasAlpha) {
+    return resized.webp({ quality: QUALITY }).toBuffer();
+  }
+
+  const { data, info } = await resized
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  removeWhiteBackground(data, info);
+  return sharp(data, {
+    raw: { width: info.width, height: info.height, channels: 4 }
+  })
+    .webp({ quality: QUALITY })
+    .toBuffer();
 }
 
 function renderFixture(items) {
@@ -200,6 +223,12 @@ Each source image was resized to fit within ${EDGE}×${EDGE} without
 enlargement and re-encoded as WebP at quality ${QUALITY}, preserving
 transparency. Where the prototype shipped the same word in two formats, one was
 chosen by the preference ${EXTENSION_PREFERENCE.join(" > ")}.
+
+A source with no alpha channel was shot on a flat white card, which the player
+would composite over painted scenery as an opaque square. Those are matted by
+\`scripts/lib/remove-white-background.mjs\`, which grows a transparent region
+inward from the border and so removes the card without touching white *inside*
+the silhouette. Sources that already carry alpha are left untouched.
 
 ## Held back
 

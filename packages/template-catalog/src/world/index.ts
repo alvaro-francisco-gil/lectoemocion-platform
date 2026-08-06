@@ -7,6 +7,7 @@ import { createInitialsGameResource } from "../initialsGame";
 import { createMemoryAlbumResource } from "../memoryAlbum";
 import { createNameStoryResource } from "../nameStory";
 import {
+  createInitialLetterGameResource,
   createInitialSyllableGameResource,
   createLettersGameResource,
   createPairsGameResource,
@@ -14,6 +15,7 @@ import {
   createWordPictureGameResource,
   requireItems
 } from "../vocabularyGames";
+import { assertDistinctInitials } from "@lectoemocion/template-sdk";
 import {
   parseWorld,
   type CollectibleAnimal,
@@ -137,6 +139,29 @@ export const world: World = parseWorld({
       }
     },
     {
+      id: "primeras-letras",
+      title: "Las primeras letras",
+      unlockedBy: ["cual-es"],
+      /*
+       * Four letters a child can tell apart at a glance, on four unrelated
+       * pictures. No two may share an initial — a letter card that fitted two
+       * pictures would have no right answer — and the builder refuses a set
+       * that does.
+       */
+      resource: {
+        template: "initial-letter-game",
+        seed: "primeras-letras",
+        vocabulary: ["luna", "sol", "pato", "flor"]
+      },
+      reward: {
+        choices: [
+          animal("caballo", "Caballo"),
+          animal("vaca", "Vaca"),
+          animal("oveja", "Oveja")
+        ]
+      }
+    },
+    {
       id: "silabas",
       title: "El puente de sílabas",
       unlockedBy: ["parejas"],
@@ -196,7 +221,7 @@ export const world: World = parseWorld({
     {
       id: "album",
       title: "Nuestro álbum",
-      unlockedBy: ["cual-es", "empieza-igual"],
+      unlockedBy: ["primeras-letras", "empieza-igual"],
       resource: { template: "memory-album", seed: "album" },
       reward: {
         choices: [
@@ -264,6 +289,27 @@ export function createResourceForNode(
         chosen,
         resource.targetVocabularyItemId,
         choiceCount,
+        resource.seed
+      );
+    }
+    /*
+     * An authored set is checked for clashing initials here, before the draw,
+     * so the error names the two words rather than reporting how many pictures
+     * the filtered draw managed to find.
+     */
+    case "initial-letter-game": {
+      if ("vocabulary" in resource) {
+        const chosen = requireItems(defaultVocabulary, resource.vocabulary);
+        assertDistinctInitials(chosen);
+        return createInitialLetterGameResource(
+          chosen,
+          chosen.length,
+          resource.seed
+        );
+      }
+      return createInitialLetterGameResource(
+        defaultVocabulary,
+        resource.pictureCount,
         resource.seed
       );
     }
