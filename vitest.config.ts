@@ -11,12 +11,12 @@ import { defineConfig } from "vitest/config";
  * Capping the pool trades a little wall-clock for every test file actually
  * being executed.
  */
-const maxForks = Math.max(2, Math.min(4, cpus().length - 2));
+const maxWorkers = Math.max(2, Math.min(4, cpus().length - 2));
 
 export default defineConfig({
   test: {
     pool: "forks",
-    poolOptions: { forks: { maxForks } },
+    maxWorkers,
     projects: [
       "packages/*/vitest.config.ts",
       "apps/*/vitest.config.ts",
