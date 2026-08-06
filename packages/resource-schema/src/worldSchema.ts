@@ -99,6 +99,19 @@ const NodeResourceSchema = Type.Union([
     },
     { additionalProperties: false }
   ),
+  /*
+   * The target only. Its match and its distractors are drawn from the same
+   * catalogue by seed, so a node cannot name a "match" that does not open with
+   * the target's syllable — the one thing this game is about.
+   */
+  Type.Object(
+    {
+      template: Type.Literal("initial-syllable-game"),
+      seed: Type.String({ minLength: 1 }),
+      targetVocabularyItemId: Type.String({ minLength: 1 })
+    },
+    { additionalProperties: false }
+  ),
   Type.Object(
     {
       template: Type.Literal("letters-game"),

@@ -62,6 +62,31 @@ const validLettersManifest = {
   vocabulary: [casa]
 };
 
+const luna = {
+  vocabularyItemId: "luna",
+  syllables: ["lu", "na"],
+  imageUrl: "/synthetic/shape-luna.svg"
+};
+
+const caballo = {
+  vocabularyItemId: "caballo",
+  syllables: ["ca", "ba", "llo"],
+  imageUrl: "/synthetic/shape-caballo.svg"
+};
+
+const validInitialSyllableManifest = {
+  schemaVersion: 1,
+  resourceId: "initial-syllable-1",
+  template: {
+    id: "initial-syllable-game",
+    version: 1,
+    targetVocabularyItemId: "casa",
+    matchVocabularyItemId: "caballo"
+  },
+  seed: "lesson-1",
+  vocabulary: [casa, caballo, sol, luna]
+};
+
 const validSyllablesManifest = {
   schemaVersion: 1,
   resourceId: "syllables-1",
@@ -94,9 +119,32 @@ describe("parseResourceManifest", () => {
     ["pairs-game", validPairsManifest],
     ["word-picture-game", validWordPictureManifest],
     ["syllables-game", validSyllablesManifest],
+    ["initial-syllable-game", validInitialSyllableManifest],
     ["letters-game", validLettersManifest]
   ])("accepts a valid %s manifest", (_id, manifest) => {
     expect(parseResourceManifest(manifest)).toEqual(manifest);
+  });
+
+  /* Three pictures below the target, pinned by the schema and not by a caller. */
+  it("rejects an initial-syllable round with the wrong number of pictures", () => {
+    expect(() =>
+      parseResourceManifest({
+        ...validInitialSyllableManifest,
+        vocabulary: [casa, caballo, sol]
+      })
+    ).toThrow("Invalid resource manifest");
+  });
+
+  it("rejects an initial-syllable round that does not say which choice matches", () => {
+    const { matchVocabularyItemId, ...withoutMatch } =
+      validInitialSyllableManifest.template;
+    expect(matchVocabularyItemId).toBe("caballo");
+    expect(() =>
+      parseResourceManifest({
+        ...validInitialSyllableManifest,
+        template: withoutMatch
+      })
+    ).toThrow("Invalid resource manifest");
   });
 
   it("rejects a vocabulary resource that also carries slots", () => {

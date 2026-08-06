@@ -31,6 +31,17 @@ export type {
   SyllablePlacement,
   SyllablesRound
 } from "./rules/syllablesGame";
+export {
+  chooseInitialSyllable,
+  createInitialSyllableRound,
+  initialSyllable,
+  sharesInitialSyllable
+} from "./rules/initialSyllableGame";
+export type {
+  InitialSyllableAttempt,
+  InitialSyllableChoice,
+  InitialSyllableRound
+} from "./rules/initialSyllableGame";
 export { chooseWordPicture, createWordPictureRound } from "./rules/wordPictureGame";
 export type {
   WordPictureAttempt,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createIllustratedStoryResource,
+  createInitialSyllableGameResource,
   createInitialsGameResource,
   createLettersGameResource,
   createNameStoryResource,
@@ -15,6 +16,13 @@ const casa = {
   vocabularyItemId: "casa",
   syllables: ["ca", "sa"],
   imageUrl: "/vocabulary/casa.webp"
+};
+
+/* Opens with `ca`, like `casa`: the one pair the initial-syllable pin needs. */
+const caballo = {
+  vocabularyItemId: "caballo",
+  syllables: ["ca", "ba", "llo"],
+  imageUrl: "/vocabulary/caballo.webp"
 };
 
 const flor = {
@@ -248,6 +256,33 @@ describe("published versions are immutable", () => {
       template: { id: "syllables-game", version: 1 },
       seed: "immutability-seed",
       vocabulary: [mariposa]
+    });
+  });
+
+  /*
+   * Its own frozen input, because `PINNED` holds no two words that open with
+   * the same syllable and adding one would move the pairs and word-picture
+   * draws — an unrelated version break. Four items and two distractors means
+   * the whole set is used, so only the draw's order is being pinned.
+   */
+  it("pins initial-syllable-game version 1 output", () => {
+    expect(
+      createInitialSyllableGameResource(
+        [casa, caballo, luna, sol],
+        "casa",
+        "immutability-seed"
+      )
+    ).toEqual({
+      schemaVersion: 1,
+      resourceId: "initial-syllable-game-immutability-seed",
+      template: {
+        id: "initial-syllable-game",
+        version: 1,
+        targetVocabularyItemId: "casa",
+        matchVocabularyItemId: "caballo"
+      },
+      seed: "immutability-seed",
+      vocabulary: [casa, caballo, sol, luna]
     });
   });
 

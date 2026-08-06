@@ -7,6 +7,7 @@ import { createInitialsGameResource } from "../initialsGame";
 import { createMemoryAlbumResource } from "../memoryAlbum";
 import { createNameStoryResource } from "../nameStory";
 import {
+  createInitialSyllableGameResource,
   createLettersGameResource,
   createPairsGameResource,
   createSyllablesGameResource,
@@ -171,9 +172,31 @@ export const world: World = parseWorld({
       }
     },
     {
+      id: "empieza-igual",
+      title: "Empieza igual",
+      unlockedBy: ["letras"],
+      /*
+       * `GA-to` against `GA-llo` or `GA-fas`: the syllable, not the letter.
+       * It comes after the letters workshop on purpose — a child who has taken
+       * a word apart into letters is ready to hear the piece above them.
+       */
+      resource: {
+        template: "initial-syllable-game",
+        seed: "empieza-igual",
+        targetVocabularyItemId: "gato"
+      },
+      reward: {
+        choices: [
+          animal("buho", "Búho"),
+          animal("rana", "Rana"),
+          animal("flamenco", "Flamenco")
+        ]
+      }
+    },
+    {
       id: "album",
       title: "Nuestro álbum",
-      unlockedBy: ["cual-es", "letras"],
+      unlockedBy: ["cual-es", "empieza-igual"],
       resource: { template: "memory-album", seed: "album" },
       reward: {
         choices: [
@@ -246,6 +269,12 @@ export function createResourceForNode(
     }
     case "syllables-game":
       return createSyllablesGameResource(
+        defaultVocabulary,
+        resource.targetVocabularyItemId,
+        resource.seed
+      );
+    case "initial-syllable-game":
+      return createInitialSyllableGameResource(
         defaultVocabulary,
         resource.targetVocabularyItemId,
         resource.seed

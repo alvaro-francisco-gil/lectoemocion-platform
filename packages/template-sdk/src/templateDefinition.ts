@@ -32,6 +32,7 @@ export const TEMPLATE_KINDS: Record<TemplateIdentifier, ResourceKind> = {
   "pairs-game": "minigame",
   "word-picture-game": "minigame",
   "syllables-game": "minigame",
+  "initial-syllable-game": "minigame",
   "letters-game": "minigame"
 };
 

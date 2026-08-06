@@ -2,8 +2,10 @@ import type { ManifestFor, VocabularyItem } from "@lectoemocion/resource-schema"
 import {
   assertSpellable,
   seededShuffle,
+  sharesInitialSyllable,
   wordLetters
 } from "@lectoemocion/template-sdk";
+import { vocabularyWord } from "@lectoemocion/resource-schema";
 
 function requireItem(
   vocabulary: readonly VocabularyItem[],
@@ -110,6 +112,82 @@ export function createSyllablesGameResource(
     template: { id: "syllables-game", version: 1 },
     seed,
     vocabulary: [target]
+  };
+}
+
+/** One match and two distractors — the three pictures below the target. */
+const INITIAL_SYLLABLE_DISTRACTORS = 2;
+
+/**
+ * Whether one word is written inside the other from its first letter.
+ *
+ * `CARAMELO` against `CARAMELOS` is a round no child can lose fairly: the
+ * reveal emphasises `CA` in both, and the pair reads as one word twice. The
+ * catalogue would never author that on purpose, so the draw does not either.
+ */
+function oneIsWrittenInsideTheOther(
+  a: VocabularyItem,
+  b: VocabularyItem
+): boolean {
+  const first = vocabularyWord(a);
+  const second = vocabularyWord(b);
+  return first.startsWith(second) || second.startsWith(first);
+}
+
+/**
+ * Match a picture to the target by the syllable both words open with.
+ *
+ * The match and the distractors are *drawn*, not authored: a world names the
+ * target and nothing else, so a node cannot claim a match that does not
+ * actually share the syllable. The draw is seeded, so a given node produces the
+ * same round every time it is opened.
+ *
+ * A target whose syllable family is empty fails here, while the world is being
+ * built, rather than when a child opens the chapter (invariant 6).
+ */
+export function createInitialSyllableGameResource(
+  vocabulary: readonly VocabularyItem[],
+  targetVocabularyItemId: string,
+  seed: string
+): ManifestFor<"initial-syllable-game"> {
+  const target = requireItem(vocabulary, targetVocabularyItemId);
+
+  const others = vocabulary.filter(
+    (item) => item.vocabularyItemId !== targetVocabularyItemId
+  );
+  const family = others.filter(
+    (item) =>
+      sharesInitialSyllable(target, item) &&
+      !oneIsWrittenInsideTheOther(target, item)
+  );
+  const match = seededShuffle(family, `${seed}-match`)[0];
+  if (!match) {
+    throw new Error(
+      `No word shares an opening syllable with ${targetVocabularyItemId}`
+    );
+  }
+
+  const distractors = seededShuffle(
+    others.filter((item) => !sharesInitialSyllable(target, item)),
+    `${seed}-distractors`
+  ).slice(0, INITIAL_SYLLABLE_DISTRACTORS);
+  if (distractors.length < INITIAL_SYLLABLE_DISTRACTORS) {
+    throw new Error(
+      `Fewer than ${INITIAL_SYLLABLE_DISTRACTORS} words differ from ${targetVocabularyItemId} in their opening syllable`
+    );
+  }
+
+  return {
+    schemaVersion: 1,
+    resourceId: `initial-syllable-game-${seed}`,
+    template: {
+      id: "initial-syllable-game",
+      version: 1,
+      targetVocabularyItemId,
+      matchVocabularyItemId: match.vocabularyItemId
+    },
+    seed,
+    vocabulary: [target, match, ...distractors]
   };
 }
 

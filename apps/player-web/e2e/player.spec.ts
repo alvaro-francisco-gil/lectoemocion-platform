@@ -1,6 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 import { createResourceForNode, world } from "@lectoemocion/template-catalog";
-import { createLettersRound } from "@lectoemocion/template-sdk";
+import {
+  createInitialSyllableRound,
+  createLettersRound
+} from "@lectoemocion/template-sdk";
+import {
+  choiceColumnX,
+  INITIAL_SYLLABLE_LAYOUT
+} from "../src/game/templates/initialSyllableLayout";
 import {
   LETTERS_LAYOUT,
   letterColumnX
@@ -126,7 +133,8 @@ test("finishing a chapter hands out an animal for the collection", async ({
 }) => {
   await page.goto("/");
   const empty = page.locator('.collection__slot[data-filled="false"]');
-  await expect(empty).toHaveCount(8);
+  /* One slot per chapter, so this tracks the world rather than a copied count. */
+  await expect(empty).toHaveCount(world.nodes.length);
 
   await page.getByRole("button", { name: ENTRY }).click();
   await completed(page, "encuentro");
@@ -141,7 +149,7 @@ test("finishing a chapter hands out an animal for the collection", async ({
   const filled = page.locator('.collection__slot[data-filled="true"]');
   await expect(filled).toHaveCount(1);
   await expect(filled.locator("img")).toBeVisible();
-  await expect(empty).toHaveCount(7);
+  await expect(empty).toHaveCount(world.nodes.length - 1);
 });
 
 test("the collection sits below the path, and the path is centred", async ({
@@ -185,7 +193,8 @@ test("the non-interactive resource plays to its end", async ({ page }) => {
     "parejas",
     "cual-es",
     "silabas",
-    "letras"
+    "letras",
+    "empieza-igual"
   ]);
   await page.goto("/");
 
@@ -211,7 +220,8 @@ test("the world and every resource fit the viewport", async ({ page }) => {
     "parejas",
     "cual-es",
     "silabas",
-    "letras"
+    "letras",
+    "empieza-igual"
   ]);
   await page.goto("/");
 
@@ -239,6 +249,7 @@ test("the world and every resource fit the viewport", async ({ page }) => {
     "¿Cuál es?",
     "El puente de sílabas",
     "El taller de letras",
+    "Empieza igual",
     ALBUM
   ]) {
     await page.getByRole("button", { name: title, exact: true }).click();
@@ -478,5 +489,70 @@ test("the letters game is won by dragging each letter into its slot", async ({
   }
 
   await completed(page, "letras");
+  expect(failures).toEqual([]);
+});
+
+/**
+ * The initial-syllable game, won by dragging the matching picture to the top.
+ *
+ * The same reason the letters drag is played for real: the rules can be
+ * perfectly right and the child still unable to finish if nothing is wired
+ * between the pointer and `chooseInitialSyllable`. Where to press comes from the
+ * seeded round and `INITIAL_SYLLABLE_LAYOUT`, never from numbers copied here.
+ */
+test("the initial-syllable game is won by dragging the match onto the target", async ({
+  page
+}) => {
+  const failures: string[] = [];
+  page.on("pageerror", (error) => failures.push(error.message));
+
+  await withProgress(page, [
+    "encuentro",
+    "iniciales",
+    "parejas",
+    "silabas",
+    "letras"
+  ]);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Empieza igual" }).click();
+
+  const box = await canvasBox(page);
+  const node = world.nodes.find((candidate) => candidate.id === "empieza-igual")!;
+  const resource = createResourceForNode(node);
+  if (resource.template.id !== "initial-syllable-game") {
+    throw new Error("The Empieza igual chapter no longer plays this game");
+  }
+  const round = createInitialSyllableRound(resource);
+
+  const scale = Math.min(
+    box.width / INITIAL_SYLLABLE_LAYOUT.canvasWidth,
+    box.height / INITIAL_SYLLABLE_LAYOUT.canvasHeight
+  );
+  const at = (x: number, y: number) => ({
+    x:
+      box.x +
+      box.width / 2 +
+      (x - INITIAL_SYLLABLE_LAYOUT.canvasWidth / 2) * scale,
+    y:
+      box.y +
+      box.height / 2 +
+      (y - INITIAL_SYLLABLE_LAYOUT.canvasHeight / 2) * scale
+  });
+
+  const matchIndex = round.choices.findIndex(
+    (choice) => choice.vocabularyItemId === round.matchVocabularyItemId
+  );
+  expect(matchIndex).toBeGreaterThanOrEqual(0);
+
+  await dragAcrossCanvas(
+    page,
+    at(
+      choiceColumnX(matchIndex, round.choices.length),
+      INITIAL_SYLLABLE_LAYOUT.choiceRowY
+    ),
+    at(INITIAL_SYLLABLE_LAYOUT.canvasWidth / 2, INITIAL_SYLLABLE_LAYOUT.targetY)
+  );
+
+  await completed(page, "empieza-igual");
   expect(failures).toEqual([]);
 });

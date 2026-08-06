@@ -173,6 +173,7 @@ describe("the world shell", () => {
       "¿Cuál es?",
       "El puente de sílabas",
       "El taller de letras",
+      "Empieza igual",
       "Nuestro álbum"
     ]);
   });
@@ -217,6 +218,7 @@ describe("the world shell", () => {
       null,
       null,
       null,
+      null,
       null
     ]);
   });
@@ -228,6 +230,7 @@ describe("the world shell", () => {
       .map((button) => button.querySelector(".world-node__state")?.textContent);
     expect(states).toEqual([
       "Historia",
+      "Bloqueado",
       "Bloqueado",
       "Bloqueado",
       "Bloqueado",
@@ -308,6 +311,7 @@ describe("the chest a chapter is worth", () => {
         null,
         null,
         null,
+        null,
         null
       ])
     );
@@ -376,6 +380,7 @@ describe("the chest a chapter is worth", () => {
     await waitFor(() =>
       expect(collection(remounted.container)).toEqual([
         won,
+        null,
         null,
         null,
         null,

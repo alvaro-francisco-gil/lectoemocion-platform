@@ -19,11 +19,29 @@ export const CARD = {
   wrong: 0xff4d4d,
   selected: 0xffe8a3,
   inset: 10,
-  label: "#000000"
+  label: "#000000",
+  /**
+   * The part of a word the lesson is about.
+   *
+   * Used by the initial-syllable reveal to colour the syllable two words share.
+   * It has to read against white at a distance without competing with the green
+   * of a correct answer, so it is a deep magenta rather than another green or
+   * the card's own purple.
+   */
+  emphasis: "#b3005e"
 } as const;
 
 /** Godot `Color(0.2, 0.95, 0.85)` — the syllables game's turquoise. */
 export const SYLLABLE_BACKGROUND = 0x33f2d9;
+
+/**
+ * The initial-syllable game's field.
+ *
+ * A third field colour, cool where the letters game is warm and pale where the
+ * syllables game is saturated, so the three vocabulary games are told apart
+ * from across a classroom rather than by reading their banners.
+ */
+export const INITIAL_SYLLABLE_BACKGROUND = 0xa8d8ff;
 
 /**
  * The letters game's field.
@@ -233,6 +251,50 @@ export function addPicture(
   const inner = boxSize - CARD.inset * 2;
   const scale = Math.min(inner / image.width, inner / image.height, 1);
   return image.setScale(scale);
+}
+
+/**
+ * A word with its opening syllable picked out in colour.
+ *
+ * Two `Text` objects rather than one, because Phaser's `Text` carries a single
+ * fill: `MA` in magenta and `NZANA` in black is two objects laid side by side
+ * and centred as a pair. Returned as a pair so the caller can hide or move
+ * them together.
+ *
+ * This is the lesson the initial-syllable game exists to deliver — the win is
+ * only its occasion — so it lives beside the card rather than inside one
+ * renderer.
+ */
+export function addEmphasisedWord(
+  scene: Phaser.Scene,
+  syllables: readonly string[],
+  x: number,
+  y: number,
+  fontSize: number
+): readonly [Phaser.GameObjects.Text, Phaser.GameObjects.Text] {
+  const [opening, ...remainder] = syllables;
+  if (opening === undefined) {
+    throw new Error("A word with no syllables cannot be emphasised");
+  }
+
+  const style = {
+    fontFamily: "system-ui",
+    fontSize: `${fontSize}px`,
+    fontStyle: "bold"
+  } as const;
+  const upper = (text: string) => text.toLocaleUpperCase("es-ES");
+
+  const head = scene.add
+    .text(0, y, upper(opening), { ...style, color: CARD.emphasis })
+    .setOrigin(0, 0.5);
+  const tail = scene.add
+    .text(0, y, upper(remainder.join("")), { ...style, color: CARD.label })
+    .setOrigin(0, 0.5);
+
+  const left = x - (head.width + tail.width) / 2;
+  head.setX(left);
+  tail.setX(left + head.width);
+  return [head, tail];
 }
 
 /** The prototype uppercased every word and syllable label. */

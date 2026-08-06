@@ -145,6 +145,37 @@ export const SyllablesGameManifestSchema = Type.Object(
 );
 
 /**
+ * Find the picture whose word opens with the same syllable as the target's.
+ *
+ * Four items: the target and the three choices among which it is matched. The
+ * count is pinned by the schema rather than passed by a caller, so a round with
+ * two pictures below or with five is not expressible.
+ *
+ * Which choice is right is *named*, never positional — the vocabulary is
+ * shuffled by seed and its order carries no meaning. What the schema cannot
+ * state, that the match shares the target's opening syllable and the
+ * distractors do not, is asserted by the rules
+ * (`createInitialSyllableRound`), which run both while a world is authored and
+ * when a round is built.
+ */
+export const InitialSyllableGameManifestSchema = Type.Object(
+  {
+    ...envelope,
+    template: Type.Object(
+      {
+        id: Type.Literal("initial-syllable-game"),
+        version: Type.Literal(1),
+        targetVocabularyItemId: Type.String({ minLength: 1 }),
+        matchVocabularyItemId: Type.String({ minLength: 1 })
+      },
+      { additionalProperties: false }
+    ),
+    vocabulary: Type.Array(VocabularyItemSchema, { minItems: 4, maxItems: 4 })
+  },
+  { additionalProperties: false }
+);
+
+/**
  * Spell a pictured word from its letters.
  *
  * One target, like the syllables game. The letters are derived from the word,
@@ -197,6 +228,7 @@ export const ResourceManifestSchema = Type.Union([
   PairsGameManifestSchema,
   WordPictureGameManifestSchema,
   SyllablesGameManifestSchema,
+  InitialSyllableGameManifestSchema,
   LettersGameManifestSchema
 ]);
 

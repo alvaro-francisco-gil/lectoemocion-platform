@@ -5,11 +5,14 @@ import {
   type VocabularyItem
 } from "@lectoemocion/resource-schema";
 import {
+  chooseInitialSyllable,
   chooseWordPicture,
+  createInitialSyllableRound,
   createLettersRound,
   createPairsRound,
   createSyllablesRound,
   createWordPictureRound,
+  initialSyllable,
   placeLetter,
   placeSyllable,
   selectPairsCard,
@@ -19,6 +22,7 @@ import {
   ROUND_LIVES
 } from "@lectoemocion/template-sdk";
 import {
+  createInitialSyllableGameResource,
   createLettersGameResource,
   createPairsGameResource,
   createSyllablesGameResource,
@@ -46,6 +50,24 @@ const spellable = defaultVocabulary.filter((item) => {
 });
 
 const label = (item: VocabularyItem) => item.vocabularyItemId;
+
+/**
+ * The words grouped by the syllable they open with.
+ *
+ * A target for the initial-syllable game needs at least one other word in its
+ * group, and half the vocabulary has none — `flor`, `iglu`, `tren`. That is
+ * content, not a defect, so the sweep runs over the words that do have a family
+ * and checks separately that the builder refuses the words that do not.
+ */
+const syllableFamilies = new Map<string, VocabularyItem[]>();
+for (const item of defaultVocabulary) {
+  const opening = initialSyllable(item);
+  syllableFamilies.set(opening, [...(syllableFamilies.get(opening) ?? []), item]);
+}
+
+const withFamily = defaultVocabulary.filter(
+  (item) => (syllableFamilies.get(initialSyllable(item))?.length ?? 0) > 1
+);
 
 describe("the imported vocabulary", () => {
   it("is not empty and has unique identifiers", () => {
@@ -185,6 +207,68 @@ describe("every word makes a winnable word-picture round", () => {
       }
     }
   );
+});
+
+describe("every word with a syllable family makes a winnable round", () => {
+  /*
+   * Half the vocabulary opens with a syllable no other word shares, and those
+   * words are simply not targets for this game — the builder refuses them,
+   * which is checked below. Stating the family count here means a
+   * re-syllabification that quietly emptied the pool would fail this file
+   * rather than shrink the sweep to nothing and still pass.
+   */
+  it("has enough families to author from", () => {
+    expect(syllableFamilies.size).toBeGreaterThanOrEqual(20);
+    expect(withFamily.length).toBeGreaterThanOrEqual(50);
+  });
+
+  it.each(withFamily.map((item) => [label(item), item] as const))(
+    "%s",
+    (_id, item) => {
+      const resource = createInitialSyllableGameResource(
+        defaultVocabulary,
+        item.vocabularyItemId,
+        `sweep-${item.vocabularyItemId}`
+      );
+      expect(parseResourceManifest(resource)).toEqual(resource);
+      expect(resource.vocabulary).toHaveLength(4);
+
+      const ids = resource.vocabulary.map(label);
+      expect(new Set(ids).size).toBe(4);
+      expect(ids).toContain(item.vocabularyItemId);
+
+      const round = createInitialSyllableRound(resource);
+      expect(round.target.vocabularyItemId).toBe(item.vocabularyItemId);
+      expect(round.choices).toHaveLength(3);
+
+      const won = chooseInitialSyllable(round, round.matchVocabularyItemId);
+      expect(won.attempt).toEqual({ kind: "correct" });
+      expect(won.round.status).toBe("won");
+
+      /* Every distractor must be a real loss, never a second right answer. */
+      for (const choice of round.choices) {
+        if (choice.vocabularyItemId === round.matchVocabularyItemId) continue;
+        const wrong = chooseInitialSyllable(round, choice.vocabularyItemId);
+        expect(wrong.attempt, choice.vocabularyItemId).toEqual({
+          kind: "incorrect"
+        });
+      }
+    }
+  );
+
+  it("refuses a target whose opening syllable nothing else shares", () => {
+    const lonely = defaultVocabulary.find(
+      (item) => (syllableFamilies.get(initialSyllable(item))?.length ?? 0) === 1
+    );
+    expect(lonely, "the vocabulary has an unshared opening syllable").toBeDefined();
+    expect(() =>
+      createInitialSyllableGameResource(
+        defaultVocabulary,
+        lonely!.vocabularyItemId,
+        "seed"
+      )
+    ).toThrow("No word shares an opening syllable with");
+  });
 });
 
 describe("pairs rounds over the real vocabulary", () => {

@@ -10,7 +10,7 @@ they win.
 
 ## Shared vocabulary
 
-Four of these games teach vocabulary rather than the child's own name, so they
+Five of these games teach vocabulary rather than the child's own name, so they
 consume **vocabulary items** instead of roster participants. A vocabulary item
 is a picture together with the syllable sequence that spells its word.
 
@@ -25,7 +25,7 @@ validated manifest.
 
 ### Personalisation
 
-None of these four games personalise. They use product-authored default
+None of these five games personalise. They use product-authored default
 vocabulary, so they are playable with no uploads and no child data at all — the
 institutional pilot's requirement. They carry no participants, and the manifest
 makes a vocabulary resource with participants unrepresentable.
@@ -151,6 +151,64 @@ one a child can finish.
 **Layout.** The picture is at the top, where a child cannot reach; the letter
 cards and the slots below them are both inside the lower reach band.
 
+## Initial syllable (`initial-syllable-game`)
+
+**Objective.** Hear that two words begin with the same syllable, and see the
+syllable they share.
+
+The step between the initials game, which is about a letter, and the syllables
+game, which takes a whole word apart: `GA-llo` and `GA-to` open the same way,
+and hearing that is what Spanish blending is built on. It is the first game
+here with no prototype ancestor.
+
+**Rules.**
+
+1. The resource supplies exactly four vocabulary items: one target and three
+   choices. The count is pinned by the schema, not passed by a caller.
+2. Which choice is right is **named** in the template, never positional — the
+   vocabulary is shuffled by seed and its order carries no meaning.
+3. The target's picture is shown above; the three choices are shown below.
+4. Choosing is an attempt:
+   - the named match → won;
+   - any other choice → the card returns and one life is spent.
+5. The round is won on the match and lost when lives reach zero.
+6. Winning **reveals both words** with the syllable they share picked out in
+   colour. That reveal is the lesson; the win is only its occasion.
+
+**Roster fit.** No roster. Vocabulary only.
+
+**What the rules refuse, and the schema cannot.** That the named match really
+opens with the target's syllable, and that no distractor does. A round with two
+right answers is one a child is marked wrong for being right in, so
+`createInitialSyllableRound` refuses to build it — while a world is authored as
+well as when a round starts.
+
+**Where the match comes from.** A world node names its target and nothing else.
+The match and the distractors are drawn from the catalogue by seed, so a node
+cannot claim a match that does not actually share the syllable. A target whose
+opening syllable no other word shares — `flor`, `iglu`, `tren`, about half the
+shipped vocabulary — is refused when the world is built.
+
+The draw also skips a candidate written inside the target from its first letter.
+`CARAMELO` against `CARAMELOS` emphasises the same `CA` and reads as one word
+printed twice.
+
+**Accents are not folded.** `ni` and `ní` are different opening syllables here.
+Whether they are the same sound is a phonetic claim this repository has no basis
+to make, and it is a difference a Spanish reader sees.
+
+**Placement is a drag, with tap kept alongside it**, exactly as the letters game
+arranges it and for the same digitiser reason: the child carries a picture up to
+the target, or taps the picture and then the target, and both call the same
+`chooseInitialSyllable`.
+
+Keeping a plain tap *out* of the answer is also what leaves it free. When word
+recordings exist — see [audio](../plans/ideas/audio.md) — tapping a card will
+play its word, and the way a child answers will not change.
+
+**Layout.** The target is above the child reach band, because it is shown and
+never touched; the row of three choices is inside it.
+
 ## Pictures
 
 Every vocabulary item names an `imageUrl` under `/vocabulary/`, served from
@@ -185,6 +243,6 @@ spaced from the logical canvas size.
 
 ## Lives
 
-All four spend from the same three-life budget the prototype used. Lives are
+All five spend from the same three-life budget the prototype used. Lives are
 round state owned by the rules, not progress state: templates never read or
 write progress (invariant 2).
