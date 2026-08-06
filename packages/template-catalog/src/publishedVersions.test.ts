@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createIllustratedStoryResource,
+  createInitialLetterGameResource,
   createInitialsGameResource,
   createLettersGameResource,
   createNameStoryResource,
@@ -207,6 +208,34 @@ describe("published versions are immutable", () => {
     });
   });
 
+  /**
+   * The pages themselves are not pinned here — thirty-one of them would drown
+   * this file, and `illustratedStory.test.ts` pins the book's order where that
+   * order can be read. What version fixes is the envelope: the identifier a
+   * stored resource resolves through, and the shape of a page.
+   */
+  it("pins illustrated-story version 1 output", () => {
+    const story = createIllustratedStoryResource("gallo-rayo", "immutability-seed");
+
+    expect(story.schemaVersion).toBe(1);
+    expect(story.resourceId).toBe("illustrated-story-gallo-rayo-immutability-seed");
+    expect(story.template).toEqual({ id: "illustrated-story", version: 1 });
+    expect(story.pages[0]).toEqual({
+      kind: "cover",
+      pageId: "portada",
+      imageUrl: "/story/gallo-rayo/00.webp",
+      audioUrl: "/story/gallo-rayo/00.m4a"
+    });
+    expect(story.pages[1]).toEqual({
+      kind: "letter",
+      pageId: "c-k",
+      grapheme: "C",
+      sound: "K",
+      imageUrl: "/story/gallo-rayo/01.webp",
+      audioUrl: "/story/gallo-rayo/01.m4a"
+    });
+  });
+
   it("pins initials-game version 2 template parameters", () => {
     expect(createInitialsGameResource("A", "immutability-seed").template).toEqual(
       { id: "initials-game", version: 2, targetInitial: "A" }
@@ -236,6 +265,18 @@ describe("published versions are immutable", () => {
       },
       seed: "immutability-seed",
       vocabulary: [casa, mariposa, sol]
+    });
+  });
+
+  it("pins initial-letter-game version 1 output", () => {
+    expect(
+      createInitialLetterGameResource(PINNED, 3, "immutability-seed")
+    ).toEqual({
+      schemaVersion: 1,
+      resourceId: "initial-letter-game-immutability-seed",
+      template: { id: "initial-letter-game", version: 1 },
+      seed: "immutability-seed",
+      vocabulary: [casa, sol, flor]
     });
   });
 
