@@ -29,5 +29,17 @@ export type {
   TemplateIdentifier,
   VocabularyItem
 } from "./resourceManifest";
-export { WorldNodeSchema, WorldSchema, parseWorld } from "./worldSchema";
-export type { NodeResource, World, WorldNode } from "./worldSchema";
+export {
+  CHEST_COUNT,
+  CollectibleAnimalSchema,
+  WorldNodeSchema,
+  WorldSchema,
+  parseWorld
+} from "./worldSchema";
+export type {
+  CollectibleAnimal,
+  NodeResource,
+  NodeReward,
+  World,
+  WorldNode
+} from "./worldSchema";

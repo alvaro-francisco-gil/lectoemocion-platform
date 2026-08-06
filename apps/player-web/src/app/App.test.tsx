@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
@@ -23,6 +29,27 @@ function completeActiveResource(): void {
 /** Finishing a resource does not leave it: the child goes back to the map. */
 function returnToMap(): void {
   fireEvent.click(screen.getByRole("button", { name: "Volver al mapa" }));
+}
+
+/** Opens a chest and acknowledges the animal inside, landing back on the map. */
+async function openChest(which = 1): Promise<string> {
+  const chest = await screen.findByRole("button", {
+    name: `Abrir el cofre ${which}`
+  });
+  fireEvent.click(chest);
+
+  const won = (await screen.findByRole("status")).textContent ?? "";
+  fireEvent.click(screen.getByRole("button", { name: "Seguir" }));
+  return won.replace(/[¡!]/g, "");
+}
+
+/** The animals on the map, in world order — `null` for a slot still to fill. */
+function collection(container: HTMLElement): (string | null)[] {
+  return [...container.querySelectorAll(".collection__slot")].map((slot) =>
+    slot.getAttribute("data-filled") === "true"
+      ? (slot.querySelector(".collection__name")?.textContent ?? "")
+      : null
+  );
 }
 
 describe("the world shell", () => {
@@ -67,6 +94,7 @@ describe("the world shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
     completeActiveResource();
     returnToMap();
+    await openChest();
 
     await waitFor(() =>
       expect(
@@ -80,6 +108,7 @@ describe("the world shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
     completeActiveResource();
     returnToMap();
+    await openChest();
 
     await waitFor(() =>
       expect(
@@ -96,6 +125,7 @@ describe("the world shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
     completeActiveResource();
     returnToMap();
+    await openChest();
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "Las iniciales" })
@@ -156,6 +186,14 @@ describe("the world shell", () => {
     expect(container.querySelector(".map__duende")).toBeNull();
   });
 
+  it("keeps the collection out of the world's list of destinations", () => {
+    const { container } = render(<App />);
+
+    /* Slots are a record, not a route: nothing in the row is pressable. */
+    expect(container.querySelectorAll(".collection button")).toHaveLength(0);
+    expect(collection(container)).toEqual([null, null, null, null, null, null]);
+  });
+
   it("marks each node's state without relying on colour", () => {
     render(<App />);
     const states = screen
@@ -169,5 +207,118 @@ describe("the world shell", () => {
       "Bloqueado",
       "Bloqueado"
     ]);
+  });
+});
+
+describe("the chest a chapter is worth", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    createGame.mockClear();
+  });
+
+  /**
+   * Plays the entry chapter to its end.
+   *
+   * Nothing presses "back": finishing a chapter for the first time is what
+   * brings out the chests, and a ceremony a child has to go and find is a
+   * ceremony most of them will miss.
+   */
+  function finishTheFirstChapter(): void {
+    fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
+    completeActiveResource();
+  }
+
+  it("offers three chests the first time a chapter is finished", async () => {
+    render(<App />);
+    finishTheFirstChapter();
+
+    expect(
+      (await screen.findAllByRole("button", { name: /Abrir el cofre/ })).length
+    ).toBe(3);
+    /* The map is not behind the chests: the ceremony is the whole screen. */
+    expect(screen.queryByRole("navigation", { name: "Mundo" })).toBeNull();
+  });
+
+  it("puts the animal from the chest into that chapter's slot", async () => {
+    const { container } = render(<App />);
+    finishTheFirstChapter();
+
+    const won = await openChest(2);
+
+    await waitFor(() =>
+      expect(collection(container)).toEqual([won, null, null, null, null, null])
+    );
+  });
+
+  /* Three chests, three animals: which one the child gets is their choice. */
+  it("gives a different animal for a different chest", async () => {
+    render(<App />);
+    finishTheFirstChapter();
+    const first = await openChest(1);
+
+    /* A fresh start, the same chapter, a different chest. */
+    cleanup();
+    localStorage.clear();
+    createGame.mockClear();
+    render(<App />);
+    finishTheFirstChapter();
+
+    expect(await openChest(3)).not.toBe(first);
+  });
+
+  it("does not offer chests again for a chapter already rewarded", async () => {
+    render(<App />);
+    finishTheFirstChapter();
+    await openChest();
+
+    /* Replaying is allowed; being paid twice for it is not. */
+    fireEvent.click(
+      await screen.findByRole("button", { name: "El encuentro" })
+    );
+    completeActiveResource();
+    returnToMap();
+
+    await waitFor(() =>
+      expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument()
+    );
+    expect(screen.queryByRole("button", { name: /Abrir el cofre/ })).toBeNull();
+  });
+
+  /*
+   * The ceremony is derived from what is stored, not from what happened in
+   * this session, so a tab closed between the last frame and the chests still
+   * owes the child their animal.
+   */
+  it("still owes the chests after the page is reloaded", async () => {
+    render(<App />);
+    finishTheFirstChapter();
+    await screen.findByRole("button", { name: "Abrir el cofre 1" });
+
+    cleanup();
+    render(<App />);
+
+    expect(
+      await screen.findByRole("button", { name: "Abrir el cofre 1" })
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the collection after a reload", async () => {
+    render(<App />);
+    finishTheFirstChapter();
+    const won = await openChest();
+
+    cleanup();
+    const remounted = render(<App />);
+
+    await waitFor(() =>
+      expect(collection(remounted.container)).toEqual([
+        won,
+        null,
+        null,
+        null,
+        null,
+        null
+      ])
+    );
   });
 });

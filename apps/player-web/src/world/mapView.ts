@@ -1,5 +1,11 @@
-import type { World } from "@lectoemocion/resource-schema";
+import type { CollectibleAnimal, World } from "@lectoemocion/resource-schema";
 import { templateKind, type ResourceKind } from "@lectoemocion/template-sdk";
+
+/** Which animal a child chose out of a node's three chests. */
+export interface ClaimedReward {
+  readonly nodeId: string;
+  readonly animalId: string;
+}
 
 /**
  * What actually happened, and nothing else.
@@ -7,15 +13,20 @@ import { templateKind, type ResourceKind } from "@lectoemocion/template-sdk";
  * Unlock state is deliberately absent: it is derived from the world graph on
  * every read. Storing it would mean migrating every saved profile whenever a
  * content update changes the graph — and content updates change the graph.
+ *
+ * A claimed reward *is* stored, because it is not derivable: it records a
+ * choice the child made, and nothing else in the world remembers it.
  */
 export interface Progress {
   readonly completedNodes: readonly string[];
   readonly lastPlayedNode: string | null;
+  readonly rewards: readonly ClaimedReward[];
 }
 
 export const EMPTY_PROGRESS: Progress = {
   completedNodes: [],
-  lastPlayedNode: null
+  lastPlayedNode: null,
+  rewards: []
 };
 
 export type NodeState = "locked" | "unlocked" | "completed";
@@ -29,8 +40,37 @@ export interface MapNodeView {
   readonly playable: boolean;
 }
 
+/**
+ * One place in the collection, in world order.
+ *
+ * Every node has a slot from the very first screen, including locked ones: the
+ * empty row is the promise, and a collection that grew a new slot each time
+ * would show a child nothing to fill.
+ */
+export interface CollectionSlotView {
+  readonly nodeId: string;
+  readonly title: string;
+  /** `null` until the child has opened a chest for this node. */
+  readonly animal: CollectibleAnimal | null;
+}
+
+/** A finished node whose chests are still closed. */
+export interface PendingRewardView {
+  readonly nodeId: string;
+  readonly title: string;
+  readonly choices: readonly CollectibleAnimal[];
+}
+
 export interface MapView {
   readonly nodes: readonly MapNodeView[];
+  readonly collection: readonly CollectionSlotView[];
+  /**
+   * The ceremony owed to the child, if any.
+   *
+   * Derived rather than remembered in the session, so closing the tab between
+   * the last frame of a game and the chests does not quietly cost a reward.
+   */
+  readonly pendingReward: PendingRewardView | null;
 }
 
 export interface MapViewOptions {
@@ -57,8 +97,39 @@ export function deriveMapView(
   const completed = new Set(
     progress.completedNodes.filter((id) => known.has(id))
   );
+  const claimed = new Map(
+    progress.rewards.map((reward) => [reward.nodeId, reward.animalId])
+  );
+
+  /*
+   * A stored animal the node no longer offers resolves to nothing, which puts
+   * the node back in the queue for a chest. Same reasoning as an unknown node
+   * id: stored client state outlives a content update, and the honest recovery
+   * is to hand the reward out again rather than to leave a hole in the row.
+   */
+  const earned = (node: World["nodes"][number]): CollectibleAnimal | null =>
+    node.reward.choices.find(
+      (choice) => choice.animalId === claimed.get(node.id)
+    ) ?? null;
+
+  const owed = world.nodes.find(
+    (node) => completed.has(node.id) && earned(node) === null
+  );
 
   return {
+    collection: world.nodes.map((node) => ({
+      nodeId: node.id,
+      title: node.title,
+      animal: earned(node)
+    })),
+    pendingReward:
+      owed === undefined
+        ? null
+        : {
+            nodeId: owed.id,
+            title: owed.title,
+            choices: owed.reward.choices
+          },
     nodes: world.nodes.map((node) => {
       const unlocked =
         options.unlockAll === true ||

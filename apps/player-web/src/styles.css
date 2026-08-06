@@ -57,15 +57,18 @@ main { height: 100dvh; }
 
 /*
  * The world reads left to right as one path, so progress is a place you have
- * reached rather than a number. It sits low: a child aged 3–5 cannot reach the
- * top of an 86-inch display.
+ * reached rather than a number.
+ *
+ * Two bands: the path, centred in what is left of the screen, and the
+ * collection pinned to the bottom. The path keeps the middle of the display —
+ * the reachable band on a panel and the comfortable one on a tablet — while
+ * the row of animals sits under it as a footer a child looks at rather than
+ * touches.
  */
 .map {
   display: grid;
-  align-content: end;
-  padding-bottom: clamp(2rem, 12vh, 8rem);
-  overflow-x: auto;
-  overflow-y: hidden;
+  grid-template-rows: 1fr auto;
+  overflow: hidden;
 }
 
 /*
@@ -84,6 +87,18 @@ main { height: 100dvh; }
   width: auto;
   pointer-events: none;
   user-select: none;
+}
+
+/*
+ * The path itself scrolls, not the page. `.map` is a fixed two-band layout, so
+ * a path wider than the screen has to take its overflow here or it would push
+ * the collection off the bottom.
+ */
+.map__world {
+  align-self: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: clamp(0.75rem, 4vh, 3rem);
 }
 
 .world-path {
@@ -159,4 +174,156 @@ main { height: 100dvh; }
 
 @media (prefers-reduced-motion: no-preference) {
   .world-node__marker { transition: transform 120ms ease-out; }
+}
+
+/* ------------------------------------------------------------ collection */
+
+/*
+ * The animals, one slot per chapter. Display only — nothing here is a button,
+ * so it may sit at the very bottom edge where a stray hand rests.
+ */
+.collection {
+  padding: clamp(0.5rem, 1.5vh, 1.25rem) clamp(0.5rem, 3vw, 2rem)
+    clamp(0.75rem, 2.5vh, 2rem);
+  border-top: 3px solid #e2d8f0;
+  background: rgb(255 255 255 / 0.6);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.collection__slots {
+  display: flex;
+  align-items: start;
+  justify-content: center;
+  gap: clamp(0.4rem, 2vw, 1.5rem);
+  min-width: max-content;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.collection__slot {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+}
+
+/*
+ * The empty slot and the filled one are the same square, so filling one moves
+ * nothing: a child looking for the animal they just won finds it exactly where
+ * the grey slot was.
+ */
+.collection__slot > img,
+.collection__empty {
+  width: clamp(48px, 7vw, 92px);
+  height: clamp(48px, 7vw, 92px);
+  border-radius: 24%;
+  border: 3px dashed #c3b3d6;
+  background: #e7e1ef;
+}
+
+.collection__empty {
+  display: grid;
+  place-items: center;
+  font-size: clamp(1.1rem, 2.5vw, 2rem);
+  font-weight: 800;
+  color: #a394b6;
+}
+
+.collection__slot[data-filled="true"] > img {
+  border: 3px solid #95d5b2;
+  background: #fff;
+  object-fit: contain;
+  padding: 6%;
+}
+
+.collection__name {
+  font-size: clamp(0.65rem, 1.2vw, 0.9rem);
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------- reward */
+
+/*
+ * The ceremony. Both screens put what a child touches in the lower band and
+ * everything they only read above it.
+ */
+.reward,
+.reveal {
+  display: grid;
+  align-content: end;
+  justify-items: center;
+  gap: clamp(1rem, 4vh, 3rem);
+  padding: 1rem 1rem clamp(2rem, 10vh, 7rem);
+}
+
+.reward__prompt {
+  margin: 0;
+  font-size: clamp(1.25rem, 4vw, 2.75rem);
+  font-weight: 800;
+}
+
+.chests {
+  display: flex;
+  gap: clamp(0.75rem, 5vw, 4rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Big targets: a three-year-old chooses with a whole hand, not a fingertip. */
+.chest {
+  width: clamp(96px, 22vw, 260px);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.chest:focus-visible { outline: 4px solid #402060; outline-offset: 6px; }
+
+.reveal__prize {
+  display: grid;
+  justify-items: center;
+  gap: clamp(0.5rem, 2vh, 1.5rem);
+}
+.reveal__prize img {
+  width: clamp(140px, 34vw, 360px);
+  height: auto;
+}
+.reveal__name {
+  margin: 0;
+  font-size: clamp(1.5rem, 5vw, 3.5rem);
+  font-weight: 800;
+}
+
+.reveal__continue {
+  min-width: clamp(140px, 30vw, 280px);
+  padding: 0.8rem 2rem;
+  border: 0;
+  border-radius: 999px;
+  background: #7b2cbf;
+  color: #fff;
+  font: inherit;
+  font-size: clamp(1.1rem, 2.5vw, 1.75rem);
+  font-weight: 800;
+  cursor: pointer;
+}
+.reveal__continue:focus-visible { outline: 4px solid #402060; outline-offset: 4px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .chest { transition: transform 140ms ease-out; }
+  .chest:hover { transform: translateY(-8px); }
+}
+
+/* Announced, never drawn. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

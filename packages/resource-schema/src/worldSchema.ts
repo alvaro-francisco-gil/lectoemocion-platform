@@ -58,13 +58,50 @@ const NodeResourceSchema = Type.Union([
   )
 ]);
 
+/** One animal a child can collect. Engine-neutral: a picture and a name. */
+export const CollectibleAnimalSchema = Type.Object(
+  {
+    animalId: Type.String({ minLength: 1 }),
+    label: Type.String({ minLength: 1, maxLength: 40 }),
+    imageUrl: Type.String({ minLength: 1 })
+  },
+  { additionalProperties: false }
+);
+
+/**
+ * How many chests a node offers.
+ *
+ * Fixed rather than per-node: three is a choice a child aged 3–5 can hold in
+ * mind at once, and a node that offered a different number would make the
+ * ceremony a thing to learn again each time.
+ */
+export const CHEST_COUNT = 3;
+
+/**
+ * What a node gives the first time it is finished.
+ *
+ * The choices are authored, not derived, so a content review can see every
+ * animal a child can be handed. Which of the three they get is decided by the
+ * chest they open and by nothing else.
+ */
+const NodeRewardSchema = Type.Object(
+  {
+    choices: Type.Array(CollectibleAnimalSchema, {
+      minItems: CHEST_COUNT,
+      maxItems: CHEST_COUNT
+    })
+  },
+  { additionalProperties: false }
+);
+
 export const WorldNodeSchema = Type.Object(
   {
     id: Type.String({ minLength: 1 }),
     title: Type.String({ minLength: 1, maxLength: 60 }),
     /** Every listed node must be completed before this one opens. */
     unlockedBy: Type.Array(Type.String({ minLength: 1 })),
-    resource: NodeResourceSchema
+    resource: NodeResourceSchema,
+    reward: NodeRewardSchema
   },
   { additionalProperties: false }
 );
@@ -76,6 +113,8 @@ export const WorldSchema = Type.Object(
   { additionalProperties: false }
 );
 
+export type CollectibleAnimal = Static<typeof CollectibleAnimalSchema>;
+export type NodeReward = Static<typeof NodeRewardSchema>;
 export type NodeResource = Static<typeof NodeResourceSchema>;
 export type WorldNode = Static<typeof WorldNodeSchema>;
 export type World = Static<typeof WorldSchema>;
@@ -101,6 +140,18 @@ export function parseWorld(value: unknown): World {
       throw new Error(`Duplicate world node id: ${node.id}`);
     }
     ids.add(node.id);
+  }
+
+  /*
+   * Three chests must hold three different animals. Two chests hiding the same
+   * one turns a choice into a trick: the child weighs three doors and two of
+   * them were never distinct.
+   */
+  for (const node of world.nodes) {
+    const animals = new Set(node.reward.choices.map((choice) => choice.animalId));
+    if (animals.size !== node.reward.choices.length) {
+      throw new Error(`Node ${node.id} offers the same animal in two chests`);
+    }
   }
 
   for (const node of world.nodes) {

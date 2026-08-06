@@ -11,9 +11,26 @@ import {
 } from "../vocabularyGames";
 import {
   parseWorld,
+  type CollectibleAnimal,
   type World,
   type WorldNode
 } from "@lectoemocion/resource-schema";
+
+/**
+ * A collectible animal.
+ *
+ * The pictures are the shared vocabulary pictures rather than a second set:
+ * one library, one provenance record
+ * (apps/player-web/public/vocabulary/PROVENANCE.md). Bespoke reward art
+ * replaces these by changing this list and nothing else.
+ */
+function animal(animalId: string, label: string): CollectibleAnimal {
+  return {
+    animalId,
+    label,
+    imageUrl: `/vocabulary/${encodeURIComponent(animalId)}.webp`
+  };
+}
 
 /**
  * The authored world.
@@ -31,7 +48,10 @@ export const world: World = parseWorld({
       id: "encuentro",
       title: "El encuentro",
       unlockedBy: [],
-      resource: { template: "name-story", seed: "encuentro" }
+      resource: { template: "name-story", seed: "encuentro" },
+      reward: {
+        choices: [animal("gato", "Gato"), animal("perro", "Perro"), animal("conejo", "Conejo")]
+      }
     },
     {
       id: "iniciales",
@@ -41,13 +61,27 @@ export const world: World = parseWorld({
         template: "initials-game",
         seed: "iniciales",
         targetInitial: "A"
+      },
+      reward: {
+        choices: [
+          animal("koala", "Koala"),
+          animal("jirafa", "Jirafa"),
+          animal("elefante", "Elefante")
+        ]
       }
     },
     {
       id: "parejas",
       title: "El bosque de parejas",
       unlockedBy: ["iniciales"],
-      resource: { template: "pairs-game", seed: "parejas", pairCount: 3 }
+      resource: { template: "pairs-game", seed: "parejas", pairCount: 3 },
+      reward: {
+        choices: [
+          animal("mariposa", "Mariposa"),
+          animal("abeja", "Abeja"),
+          animal("mariquita", "Mariquita")
+        ]
+      }
     },
     {
       id: "cual-es",
@@ -58,6 +92,13 @@ export const world: World = parseWorld({
         seed: "cual-es",
         targetVocabularyItemId: "manzana",
         choiceCount: 3
+      },
+      reward: {
+        choices: [
+          animal("delfin", "Delfín"),
+          animal("ballena", "Ballena"),
+          animal("pulpo", "Pulpo")
+        ]
       }
     },
     {
@@ -68,13 +109,27 @@ export const world: World = parseWorld({
         template: "syllables-game",
         seed: "silabas",
         targetVocabularyItemId: "mariposa"
+      },
+      reward: {
+        choices: [
+          animal("tigre", "Tigre"),
+          animal("leon", "León"),
+          animal("mono", "Mono")
+        ]
       }
     },
     {
       id: "album",
       title: "Nuestro álbum",
       unlockedBy: ["cual-es", "silabas"],
-      resource: { template: "memory-album", seed: "album" }
+      resource: { template: "memory-album", seed: "album" },
+      reward: {
+        choices: [
+          animal("pinguino", "Pingüino"),
+          animal("foca", "Foca"),
+          animal("tucan", "Tucán")
+        ]
+      }
     }
   ]
 });

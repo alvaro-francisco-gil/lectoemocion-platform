@@ -1,17 +1,43 @@
 import { expect, test, type Page } from "@playwright/test";
+import { world } from "@lectoemocion/template-catalog";
 
 const ENTRY = "El encuentro";
 const SECOND = "Las iniciales";
 const ALBUM = "Nuestro álbum";
 
-/** Seeds a previous session's progress, through the same key the app reads. */
+/**
+ * Seeds a previous session's progress, through the same key the app reads.
+ *
+ * Each completed chapter is seeded with its chest already opened. A completed
+ * chapter with no animal is a chapter that owes a ceremony, and these tests
+ * are about the world and the resources rather than the reward.
+ */
 async function withProgress(page: Page, completedNodes: string[]) {
-  await page.addInitScript((nodes) => {
-    localStorage.setItem(
-      "lectoemocion.progress.local",
-      JSON.stringify({ completedNodes: nodes, lastPlayedNode: nodes.at(-1) })
-    );
-  }, completedNodes);
+  const rewards = completedNodes.map((nodeId) => {
+    const node = world.nodes.find((candidate) => candidate.id === nodeId);
+    if (!node) throw new Error(`No such world node: ${nodeId}`);
+    return { nodeId, animalId: node.reward.choices[0]!.animalId };
+  });
+
+  await page.addInitScript(
+    ({ nodes, rewards: claimed }) => {
+      localStorage.setItem(
+        "lectoemocion.progress.local",
+        JSON.stringify({
+          completedNodes: nodes,
+          lastPlayedNode: nodes.at(-1),
+          rewards: claimed
+        })
+      );
+    },
+    { nodes: completedNodes, rewards }
+  );
+}
+
+/** Takes the reward a freshly finished chapter owes, landing back on the map. */
+async function takeTheReward(page: Page) {
+  await page.getByRole("button", { name: "Abrir el cofre 1" }).click();
+  await page.getByRole("button", { name: "Seguir" }).click();
 }
 
 /**
@@ -64,11 +90,55 @@ test("playing the first chapter unlocks the next node and persists", async ({
   /* The cinematic completes when its choreography ends; nothing to win. */
   await completed(page, "encuentro");
 
-  await page.getByRole("button", { name: "Volver al mapa" }).click();
+  /* Finishing it hands the screen straight to the chests, unasked. */
+  await takeTheReward(page);
   await expect(page.getByRole("button", { name: SECOND })).toBeEnabled();
 
   await page.reload();
   await expect(page.getByRole("button", { name: SECOND })).toBeEnabled();
+});
+
+test("finishing a chapter hands out an animal for the collection", async ({
+  page
+}) => {
+  await page.goto("/");
+  const empty = page.locator('.collection__slot[data-filled="false"]');
+  await expect(empty).toHaveCount(6);
+
+  await page.getByRole("button", { name: ENTRY }).click();
+  await completed(page, "encuentro");
+
+  const chests = page.getByRole("button", { name: /Abrir el cofre/ });
+  await expect(chests).toHaveCount(3);
+  await chests.nth(1).click();
+  await page.getByRole("button", { name: "Seguir" }).click();
+
+  const filled = page.locator('.collection__slot[data-filled="true"]');
+  await expect(filled).toHaveCount(1);
+  await expect(filled.locator("img")).toBeVisible();
+  await expect(empty).toHaveCount(5);
+});
+
+test("the collection sits below the path, and the path is centred", async ({
+  page
+}) => {
+  await withProgress(page, ["encuentro"]);
+  await page.goto("/");
+
+  const path = (await page.locator(".world-path").boundingBox())!;
+  const collection = (await page.locator(".collection").boundingBox())!;
+  const viewport = await page.evaluate(() => ({ height: innerHeight }));
+
+  /* Below, and not overlapping: the row is a footer, not a second path. */
+  expect(collection.y).toBeGreaterThanOrEqual(path.y + path.height);
+
+  /*
+   * The path holds the middle band rather than the bottom edge it used to sit
+   * on, with the collection taking the space underneath it.
+   */
+  const centre = path.y + path.height / 2;
+  expect(centre).toBeGreaterThan(viewport.height * 0.2);
+  expect(centre).toBeLessThan(viewport.height * 0.7);
 });
 
 test("a completed chapter stays replayable", async ({ page }) => {
@@ -101,7 +171,7 @@ test("the non-interactive resource plays to its end", async ({ page }) => {
   /* It is a fixed timeline: it finishes on its own, with nothing to press. */
   await completed(page, "album");
 
-  await page.getByRole("button", { name: "Volver al mapa" }).click();
+  await takeTheReward(page);
   await expect(page.getByRole("button", { name: ALBUM })).toHaveAttribute(
     "data-state",
     "completed"
@@ -181,6 +251,12 @@ async function holdsStill(page: Page) {
 test("a playing resource holds still and the page never scrolls", async ({
   page
 }) => {
+  /*
+   * Replayed, not played for the first time. The measurement has to outlast
+   * the chapter itself, and a first run would end mid-measurement and hand the
+   * screen to the chests — the canvas this checks would be gone.
+   */
+  await withProgress(page, ["encuentro"]);
   await page.goto("/");
   await page.getByRole("button", { name: ENTRY }).click();
   await expect(page.locator("canvas")).toBeVisible();
@@ -208,6 +284,8 @@ test("a minigame survives taps in the child reach band", async ({ page }) => {
 });
 
 test("the world list is gone while a resource plays", async ({ page }) => {
+  /* Replayed, so the chapter ending cannot pull the screen to the chests. */
+  await withProgress(page, ["encuentro"]);
   await page.goto("/");
   const worldList = page.getByRole("navigation", { name: "Mundo" });
   await expect(worldList).toBeVisible();
@@ -249,6 +327,8 @@ test("the world reads as one horizontal path, with no page header", async ({
 });
 
 test("playing shows only the way back", async ({ page }) => {
+  /* Replayed, for the same reason: a first run ends in a screen of chests. */
+  await withProgress(page, ["encuentro"]);
   await page.goto("/");
   await page.getByRole("button", { name: ENTRY }).click();
   await expect(page.locator("canvas")).toBeVisible();

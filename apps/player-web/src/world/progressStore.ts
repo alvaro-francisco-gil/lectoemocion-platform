@@ -1,4 +1,4 @@
-import { EMPTY_PROGRESS, type Progress } from "./mapView";
+import { EMPTY_PROGRESS, type ClaimedReward, type Progress } from "./mapView";
 
 /**
  * Where progress lives.
@@ -11,6 +11,8 @@ import { EMPTY_PROGRESS, type Progress } from "./mapView";
 export interface ProgressStore {
   read(): Promise<Progress>;
   recordCompletion(nodeId: string): Promise<Progress>;
+  /** Records the animal the child chose. The first claim for a node wins. */
+  claimReward(nodeId: string, animalId: string): Promise<Progress>;
 }
 
 /** The single implicit profile that exists before accounts do. */
@@ -52,8 +54,31 @@ function parseProgress(raw: string | null): Progress {
     completedNodes: completed.filter(
       (entry): entry is string => typeof entry === "string"
     ),
-    lastPlayedNode: typeof lastPlayed === "string" ? lastPlayed : null
+    lastPlayedNode: typeof lastPlayed === "string" ? lastPlayed : null,
+    rewards: parseRewards(candidate["rewards"])
   };
+}
+
+/**
+ * Same defensive stance as the rest of this file, one level deeper.
+ *
+ * A malformed entry is dropped rather than throwing, and dropping it simply
+ * means the node's chests are offered again — the recoverable outcome.
+ */
+function parseRewards(value: unknown): readonly ClaimedReward[] {
+  if (!Array.isArray(value)) return [];
+
+  const rewards: ClaimedReward[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const record = entry as Record<string, unknown>;
+    const nodeId = record["nodeId"];
+    const animalId = record["animalId"];
+    if (typeof nodeId !== "string" || typeof animalId !== "string") continue;
+    if (rewards.some((claimed) => claimed.nodeId === nodeId)) continue;
+    rewards.push({ nodeId, animalId });
+  }
+  return rewards;
 }
 
 export class LocalProgressStore implements ProgressStore {
@@ -78,13 +103,34 @@ export class LocalProgressStore implements ProgressStore {
 
   async recordCompletion(nodeId: string): Promise<Progress> {
     const current = await this.read();
-    const next: Progress = {
+    return this.write({
+      ...current,
       completedNodes: current.completedNodes.includes(nodeId)
         ? current.completedNodes
         : [...current.completedNodes, nodeId],
       lastPlayedNode: nodeId
-    };
+    });
+  }
 
+  /**
+   * The first claim for a node wins.
+   *
+   * Opening a chest is a one-off: a second claim — a double tap, a stale tab —
+   * must not swap the animal a child has already been shown and already sees
+   * in their collection.
+   */
+  async claimReward(nodeId: string, animalId: string): Promise<Progress> {
+    const current = await this.read();
+    if (current.rewards.some((reward) => reward.nodeId === nodeId)) {
+      return current;
+    }
+    return this.write({
+      ...current,
+      rewards: [...current.rewards, { nodeId, animalId }]
+    });
+  }
+
+  private write(next: Progress): Progress {
     this.fallback = next;
     try {
       this.storage.setItem(storageKey(this.owner), JSON.stringify(next));

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  CHEST_COUNT,
   parseResourceManifest,
   parseWorld
 } from "@lectoemocion/resource-schema";
 import { templateKind } from "@lectoemocion/template-sdk";
+import { defaultVocabulary } from "../fixtures/defaultVocabulary";
 import { createResourceForNode, world } from ".";
 
 describe("the authored world", () => {
@@ -58,14 +60,65 @@ describe("the authored world", () => {
     const ids = world.nodes.map((node) => createResourceForNode(node).resourceId);
     expect(new Set(ids).size).toBe(ids.length);
   });
+
+  it("offers a chest for every node, each hiding a different animal", () => {
+    for (const node of world.nodes) {
+      expect(node.reward.choices, node.id).toHaveLength(CHEST_COUNT);
+      const animals = node.reward.choices.map((choice) => choice.animalId);
+      expect(new Set(animals).size, node.id).toBe(animals.length);
+    }
+  });
+
+  /*
+   * A collection with the same animal in two slots reads as a bug to a child
+   * who has just been told they found something new.
+   */
+  it("never offers the same animal in two nodes", () => {
+    const animals = world.nodes.flatMap((node) =>
+      node.reward.choices.map((choice) => choice.animalId)
+    );
+    expect(new Set(animals).size).toBe(animals.length);
+  });
+
+  /*
+   * `defaultVocabulary` is generated from the picture files themselves, so an
+   * animal that appears there is an animal whose picture ships. This is the
+   * check that a reward slot cannot render a broken image.
+   */
+  it("draws every reward picture from the shipped library", () => {
+    const known = new Map(
+      defaultVocabulary.map((item) => [
+        String(item.vocabularyItemId),
+        item.imageUrl
+      ])
+    );
+
+    for (const node of world.nodes) {
+      for (const choice of node.reward.choices) {
+        expect(known.get(choice.animalId), choice.animalId).toBe(
+          choice.imageUrl
+        );
+      }
+    }
+  });
 });
 
 describe("world validation", () => {
+  /** Three animals, so a fixture exercises the graph rules and not the reward. */
+  const reward = {
+    choices: [
+      { animalId: "gato", label: "Gato", imageUrl: "/vocabulary/gato.webp" },
+      { animalId: "perro", label: "Perro", imageUrl: "/vocabulary/perro.webp" },
+      { animalId: "pato", label: "Pato", imageUrl: "/vocabulary/pato.webp" }
+    ]
+  };
+
   const entry = {
     id: "start",
     title: "Comienzo",
     unlockedBy: [],
-    resource: { template: "name-story", seed: "start" }
+    resource: { template: "name-story", seed: "start" },
+    reward
   };
 
   it("rejects an unlock pointing at a node that does not exist", () => {
@@ -77,7 +130,8 @@ describe("world validation", () => {
             id: "second",
             title: "Segundo",
             unlockedBy: ["nowhere"],
-            resource: { template: "pairs-game", seed: "second", pairCount: 3 }
+            resource: { template: "pairs-game", seed: "second", pairCount: 3 },
+            reward
           }
         ]
       })
@@ -105,17 +159,47 @@ describe("world validation", () => {
             id: "a",
             title: "A",
             unlockedBy: ["b"],
-            resource: { template: "pairs-game", seed: "a", pairCount: 3 }
+            resource: { template: "pairs-game", seed: "a", pairCount: 3 },
+            reward
           },
           {
             id: "b",
             title: "B",
             unlockedBy: ["a"],
-            resource: { template: "pairs-game", seed: "b", pairCount: 3 }
+            resource: { template: "pairs-game", seed: "b", pairCount: 3 },
+            reward
           }
         ]
       })
     ).toThrow("Unreachable world nodes: a, b");
+  });
+
+  it("rejects a node with no reward to give", () => {
+    const { reward: _dropped, ...rewardless } = entry;
+    expect(() => parseWorld({ nodes: [rewardless] })).toThrow("Invalid world");
+  });
+
+  it("rejects a number of chests other than three", () => {
+    expect(() =>
+      parseWorld({
+        nodes: [{ ...entry, reward: { choices: reward.choices.slice(0, 2) } }]
+      })
+    ).toThrow("Invalid world");
+  });
+
+  it("rejects the same animal hidden in two chests", () => {
+    expect(() =>
+      parseWorld({
+        nodes: [
+          {
+            ...entry,
+            reward: {
+              choices: [reward.choices[0], reward.choices[0], reward.choices[1]]
+            }
+          }
+        ]
+      })
+    ).toThrow("the same animal in two chests");
   });
 
   it("rejects an unknown template", () => {
