@@ -8,7 +8,18 @@ import { defineConfig } from "vite";
  */
 const port = Number(process.env["PLAYER_PORT"] ?? 4173);
 
+/**
+ * Loopback by default, because that is the safe binding and it is what the
+ * end-to-end suite expects.
+ *
+ * A physical phone running the native shell cannot reach loopback, so
+ * developing `apps/mobile` against this server needs `PLAYER_HOST=0.0.0.0`.
+ * That is opt-in: exposing a dev server to the local network is a deliberate
+ * act, not a default.
+ */
+const host = process.env["PLAYER_HOST"] ?? "127.0.0.1";
+
 export default defineConfig({
   plugins: [react()],
-  server: { host: "127.0.0.1", port, strictPort: true }
+  server: { host, port, strictPort: true }
 });

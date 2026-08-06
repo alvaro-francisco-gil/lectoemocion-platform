@@ -1,0 +1,23 @@
+{
+  "name": "@lectoemocion/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "start": "expo start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "expo": "~57.0.10",
+    "react": "^19.2.7",
+    "react-native": "0.86.2",
+    "react-native-webview": "14.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}

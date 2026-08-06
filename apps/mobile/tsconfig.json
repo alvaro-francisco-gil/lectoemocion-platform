@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "module": "Preserve",
+    "moduleDetection": "force",
+    /*
+     * No ambient type packages. `src/env.d.ts` declares `process` itself, and
+     * an accidentally hoisted `@types/node` would collide with it — silently, in
+     * whichever direction the resolver happened to look first.
+     */
+    "types": []
+  },
+  "include": ["src", "index.ts", "vitest.config.ts"]
+}

@@ -16,6 +16,7 @@ where you are working rather than only this file:
 
 - [`packages/AGENTS.md`](packages/AGENTS.md) — shared contracts
 - [`apps/player-web/AGENTS.md`](apps/player-web/AGENTS.md) — the player
+- [`apps/mobile/AGENTS.md`](apps/mobile/AGENTS.md) — the native shell
 - [`scripts/AGENTS.md`](scripts/AGENTS.md) — guardrails
 
 ## Product

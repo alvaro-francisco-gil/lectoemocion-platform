@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "LectoEmoción",
+    "slug": "lectoemocion",
+    "version": "0.0.0",
+    "orientation": "landscape",
+    "scheme": "lectoemocion",
+    "platforms": ["ios", "android"],
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#0f1020",
+    "ios": {
+      "bundleIdentifier": "com.lectoemocion.app",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.lectoemocion.app",
+      "edgeToEdgeEnabled": true
+    },
+    "extra": {
+      "//": "No icon or splash asset yet. scripts/check-privacy.mjs requires a PROVENANCE.md beside any image, and inventing one for placeholder art would make that guardrail meaningless."
+    }
+  }
+}
