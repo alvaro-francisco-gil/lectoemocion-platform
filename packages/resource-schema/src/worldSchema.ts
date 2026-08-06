@@ -16,6 +16,19 @@ const NodeResourceSchema = Type.Union([
     },
     { additionalProperties: false }
   ),
+  /*
+   * A story is named, not inlined. Thirty-one pages written out here would
+   * bury the shape of the world in content, and the catalogue is where
+   * authored content lives.
+   */
+  Type.Object(
+    {
+      template: Type.Literal("illustrated-story"),
+      seed: Type.String({ minLength: 1 }),
+      storyId: Type.String({ minLength: 1 })
+    },
+    { additionalProperties: false }
+  ),
   Type.Object(
     {
       template: Type.Literal("initials-game"),

@@ -13,9 +13,10 @@ const ALBUM = "Nuestro álbum";
 /**
  * Seeds a previous session's progress, through the same key the app reads.
  *
- * Each completed chapter is seeded with its chest already opened. A completed
- * chapter with no animal is a chapter that owes a ceremony, and these tests
- * are about the world and the resources rather than the reward.
+ * Each completed chapter is seeded with its chest already opened and its
+ * letriestrellas already paid. A completed chapter with no animal is a chapter
+ * that owes a ceremony, and these tests are about the world and the resources
+ * rather than the reward.
  */
 async function withProgress(page: Page, completedNodes: string[]) {
   const rewards = completedNodes.map((nodeId) => {
@@ -31,7 +32,8 @@ async function withProgress(page: Page, completedNodes: string[]) {
         JSON.stringify({
           completedNodes: nodes,
           lastPlayedNode: nodes.at(-1),
-          rewards: claimed
+          rewards: claimed,
+          stars: nodes.length * 3
         })
       );
     },
@@ -99,18 +101,24 @@ test("playing the first chapter unlocks the next node and persists", async ({
   page
 }) => {
   await page.goto("/");
+  const stars = page.getByRole("region", { name: "Letriestrellas" });
+  await expect(stars).toHaveText("0");
+
   await page.getByRole("button", { name: ENTRY }).click();
   await expect(page.locator("canvas")).toBeVisible();
 
   /* The cinematic completes when its choreography ends; nothing to win. */
   await completed(page, "encuentro");
 
-  /* Finishing it hands the screen straight to the chests, unasked. */
+  /* Finishing it hands the screen straight to the rewards, unasked: the
+     letriestrellas it paid, and then the chests it owes. */
   await takeTheReward(page);
   await expect(page.getByRole("button", { name: SECOND })).toBeEnabled();
+  await expect(stars).toHaveText("3");
 
   await page.reload();
   await expect(page.getByRole("button", { name: SECOND })).toBeEnabled();
+  await expect(stars).toHaveText("3");
 });
 
 test("finishing a chapter hands out an animal for the collection", async ({
@@ -118,7 +126,7 @@ test("finishing a chapter hands out an animal for the collection", async ({
 }) => {
   await page.goto("/");
   const empty = page.locator('.collection__slot[data-filled="false"]');
-  await expect(empty).toHaveCount(7);
+  await expect(empty).toHaveCount(8);
 
   await page.getByRole("button", { name: ENTRY }).click();
   await completed(page, "encuentro");
@@ -133,7 +141,7 @@ test("finishing a chapter hands out an animal for the collection", async ({
   const filled = page.locator('.collection__slot[data-filled="true"]');
   await expect(filled).toHaveCount(1);
   await expect(filled.locator("img")).toBeVisible();
-  await expect(empty).toHaveCount(6);
+  await expect(empty).toHaveCount(7);
 });
 
 test("the collection sits below the path, and the path is centred", async ({
@@ -272,13 +280,14 @@ test("a playing resource holds still and the page never scrolls", async ({
   page
 }) => {
   /*
-   * Replayed, not played for the first time. The measurement has to outlast
-   * the chapter itself, and a first run would end mid-measurement and hand the
-   * screen to the chests — the canvas this checks would be gone.
+   * A minigame, not the cinematic. Every finish now hands the screen to the
+   * letriestrellas, so a fixed timeline would end mid-measurement and take
+   * away the canvas this checks; a minigame ends when the child solves it, and
+   * this test never touches it.
    */
-  await withProgress(page, ["encuentro"]);
+  await withProgress(page, ["encuentro", "iniciales"]);
   await page.goto("/");
-  await page.getByRole("button", { name: ENTRY }).click();
+  await page.getByRole("button", { name: "El bosque de parejas" }).click();
   await expect(page.locator("canvas")).toBeVisible();
 
   await holdsStill(page);
@@ -304,16 +313,22 @@ test("a minigame survives taps in the child reach band", async ({ page }) => {
 });
 
 test("the world list is gone while a resource plays", async ({ page }) => {
-  /* Replayed, so the chapter ending cannot pull the screen to the chests. */
-  await withProgress(page, ["encuentro"]);
+  /* A minigame, so nothing can finish under this test and pull the screen to
+     the rewards. */
+  await withProgress(page, ["encuentro", "iniciales"]);
   await page.goto("/");
   const worldList = page.getByRole("navigation", { name: "Mundo" });
   await expect(worldList).toBeVisible();
 
-  await page.getByRole("button", { name: ENTRY }).click();
+  await page.getByRole("button", { name: "El bosque de parejas" }).click();
   await expect(page.locator("canvas")).toBeVisible();
   await expect(worldList).toBeHidden();
   await expect(page.getByRole("button", { name: SECOND })).toHaveCount(0);
+  /* The star counter belongs to the map too: nothing counts up beside a
+     running game. */
+  await expect(page.getByRole("region", { name: "Letriestrellas" })).toHaveCount(
+    0
+  );
 
   await page.getByRole("button", { name: "Volver al mapa" }).click();
   await expect(worldList).toBeVisible();
@@ -379,6 +394,36 @@ test("a locked node cannot be opened from the map", async ({ page }) => {
 });
 
 /**
+ * One drag, paced so the game sees it as a drag.
+ *
+ * Phaser reads its pointer queue once per frame. A press, a move, and a
+ * release delivered inside a single frame collapse into something that is not
+ * a drag at all, so the letter lands nowhere — and three of those lose the
+ * round, after which the chapter can never be finished and the test can only
+ * time out. Delivered fast enough, that is exactly what happens: this passed
+ * run alone and timed out under a loaded three-project run.
+ *
+ * The waits buy a frame at each stage on a machine that is rendering two other
+ * viewports at the same time. They are not a guess at how long the app takes:
+ * every assertion after this still polls.
+ */
+async function dragAcrossCanvas(
+  page: Page,
+  from: { x: number; y: number },
+  to: { x: number; y: number }
+) {
+  const frames = 100;
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.waitForTimeout(frames);
+  /* Stepped, because a single jump can be read as a click rather than a drag. */
+  await page.mouse.move(to.x, to.y, { steps: 12 });
+  await page.waitForTimeout(frames);
+  await page.mouse.up();
+  await page.waitForTimeout(frames);
+}
+
+/**
  * The letters game, won by dragging.
  *
  * The other minigames are proved by their rules tests; a drag cannot be. It is
@@ -429,12 +474,7 @@ test("the letters game is won by dragging each letter into its slot", async ({
       LETTERS_LAYOUT.slotRowY
     );
 
-    await page.mouse.move(from.x, from.y);
-    await page.mouse.down();
-    /* Two steps: one move is a click to the input plugin, not a drag. */
-    await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2);
-    await page.mouse.move(to.x, to.y);
-    await page.mouse.up();
+    await dragAcrossCanvas(page, from, to);
   }
 
   await completed(page, "letras");

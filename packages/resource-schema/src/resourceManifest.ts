@@ -1,6 +1,7 @@
 import { Type, type Static } from "@sinclair/typebox";
 import Ajv from "ajv";
 import { ParticipantSlotSchema } from "./participantSlot";
+import { StoryPageSchema } from "./storyPage";
 
 /**
  * A picture and the syllable sequence that spells its word.
@@ -164,8 +165,33 @@ export const LettersGameManifestSchema = Type.Object(
   { additionalProperties: false }
 );
 
+/**
+ * An illustrated story, read aloud page by page.
+ *
+ * The cinematic kind, and the first template whose content is a *book* rather
+ * than a cast or a word list: it carries neither slots nor vocabulary, because
+ * its pages are the whole resource. `El gallo Rayo` is the one that ships
+ * (docs/migration/gallo-rayo-app.md), but nothing here is about that book —
+ * a second title is another manifest, not another template.
+ *
+ * Deliberately not exportable, downloadable, or shareable: like the memory
+ * album, it plays inside the application only.
+ */
+export const IllustratedStoryManifestSchema = Type.Object(
+  {
+    ...envelope,
+    template: Type.Object(
+      { id: Type.Literal("illustrated-story"), version: Type.Literal(1) },
+      { additionalProperties: false }
+    ),
+    pages: Type.Array(StoryPageSchema, { minItems: 1, maxItems: 60 })
+  },
+  { additionalProperties: false }
+);
+
 export const ResourceManifestSchema = Type.Union([
   NameStoryManifestSchema,
+  IllustratedStoryManifestSchema,
   InitialsGameManifestSchema,
   MemoryAlbumManifestSchema,
   PairsGameManifestSchema,

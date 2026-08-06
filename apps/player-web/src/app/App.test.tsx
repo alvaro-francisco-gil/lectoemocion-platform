@@ -167,6 +167,7 @@ describe("the world shell", () => {
       .map((button) => button.querySelector(".world-node__title")?.textContent);
     expect(titles).toEqual([
       "El encuentro",
+      "El gallo Rayo",
       "Las iniciales",
       "El bosque de parejas",
       "¿Cuál es?",
@@ -208,7 +209,16 @@ describe("the world shell", () => {
 
     /* Slots are a record, not a route: nothing in the row is pressable. */
     expect(container.querySelectorAll(".collection button")).toHaveLength(0);
-    expect(collection(container)).toEqual([null, null, null, null, null, null, null]);
+    expect(collection(container)).toEqual([
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]);
   });
 
   it("marks each node's state without relying on colour", () => {
@@ -218,6 +228,7 @@ describe("the world shell", () => {
       .map((button) => button.querySelector(".world-node__state")?.textContent);
     expect(states).toEqual([
       "Historia",
+      "Bloqueado",
       "Bloqueado",
       "Bloqueado",
       "Bloqueado",
@@ -289,7 +300,16 @@ describe("the chest a chapter is worth", () => {
     const won = await openChest(2);
 
     await waitFor(() =>
-      expect(collection(container)).toEqual([won, null, null, null, null, null, null])
+      expect(collection(container)).toEqual([
+        won,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ])
     );
   });
 
@@ -356,6 +376,7 @@ describe("the chest a chapter is worth", () => {
     await waitFor(() =>
       expect(collection(remounted.container)).toEqual([
         won,
+        null,
         null,
         null,
         null,

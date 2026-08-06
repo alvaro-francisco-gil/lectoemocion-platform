@@ -1,6 +1,8 @@
 import { assertNever, type ChildRecord } from "@lectoemocion/domain";
 import type { ResourceManifest } from "@lectoemocion/resource-schema";
 import { defaultVocabulary } from "../fixtures/defaultVocabulary";
+import { GALLO_RAYO_STORY_ID } from "../fixtures/galloRayo";
+import { createIllustratedStoryResource } from "../illustratedStory";
 import { createInitialsGameResource } from "../initialsGame";
 import { createMemoryAlbumResource } from "../memoryAlbum";
 import { createNameStoryResource } from "../nameStory";
@@ -53,6 +55,30 @@ export const world: World = parseWorld({
       resource: { template: "name-story", seed: "encuentro" },
       reward: {
         choices: [animal("gato", "Gato"), animal("perro", "Perro"), animal("conejo", "Conejo")]
+      }
+    },
+    /*
+     * The book sits beside the first minigame rather than in front of it, on
+     * the branch the world already allows. It is thirty-one pages long — far
+     * the longest thing here — and putting it across the only path would make
+     * every child read all of it before they could play anything.
+     */
+    {
+      id: "gallo-rayo",
+      title: "El gallo Rayo",
+      unlockedBy: ["encuentro"],
+      resource: {
+        template: "illustrated-story",
+        seed: "gallo-rayo",
+        storyId: "gallo-rayo"
+      },
+      /* The three the book itself opens on: the rooster and his two mice. */
+      reward: {
+        choices: [
+          animal("gallo", "Gallo"),
+          animal("pollito", "Pollito"),
+          animal("raton", "Ratón")
+        ]
       }
     },
     {
@@ -177,6 +203,8 @@ export function createResourceForNode(
   switch (resource.template) {
     case "name-story":
       return createNameStoryResource(resource.seed, roster);
+    case "illustrated-story":
+      return createIllustratedStoryResource(resource.storyId, resource.seed);
     case "initials-game":
       return createInitialsGameResource(
         resource.targetInitial,

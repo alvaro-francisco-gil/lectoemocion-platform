@@ -1,6 +1,7 @@
 import * as Phaser from "phaser";
 import { assertNever } from "@lectoemocion/domain";
 import { isTemplate, type ResourceManifest } from "@lectoemocion/resource-schema";
+import { renderIllustratedStory } from "../templates/renderIllustratedStory";
 import { renderInitialsGame } from "../templates/renderInitialsGame";
 import { renderLettersGame } from "../templates/renderLettersGame";
 import { renderMemoryAlbum } from "../templates/renderMemoryAlbum";
@@ -8,10 +9,11 @@ import { renderNameStory } from "../templates/renderNameStory";
 import { renderPairsGame } from "../templates/renderPairsGame";
 import { renderSyllablesGame } from "../templates/renderSyllablesGame";
 import { renderWordPictureGame } from "../templates/renderWordPictureGame";
+import { queueStoryPictures } from "../templates/storyPageFrame";
 import { queueVocabularyPictures } from "../templates/vocabularyCard";
 
 export class ResourceScene extends Phaser.Scene {
-  private missingPictures = 0;
+  private missingAssets = 0;
 
   constructor(
     private readonly resource: ResourceManifest,
@@ -21,18 +23,25 @@ export class ResourceScene extends Phaser.Scene {
   }
 
   /**
-   * A vocabulary resource's pictures are *default* content, so a picture that
-   * fails to load is invariant 6's fail-closed case, not its personalised-media
-   * exception. Count the failures here and refuse to render the game.
+   * A resource's own pictures are *default* content, so one that fails to load
+   * is invariant 6's fail-closed case, not its personalised-media exception.
+   * Count the failures here and refuse to render the resource.
+   *
+   * A story's recordings are deliberately not queued here: they are fetched a
+   * page at a time while the book plays, and the renderer fails closed on its
+   * own when one does not arrive.
    */
   preload(): void {
     const resource = this.resource;
     if ("vocabulary" in resource) {
       queueVocabularyPictures(this, resource.vocabulary);
-      this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, () => {
-        this.missingPictures += 1;
-      });
     }
+    if ("pages" in resource) {
+      queueStoryPictures(this, resource.pages);
+    }
+    this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, () => {
+      this.missingAssets += 1;
+    });
   }
 
   /**
@@ -49,7 +58,7 @@ export class ResourceScene extends Phaser.Scene {
    * keeps invariant 2 true while the world still learns what was played.
    */
   create(): void {
-    if (this.missingPictures > 0) {
+    if (this.missingAssets > 0) {
       this.reportMissingContent();
       return;
     }
@@ -59,6 +68,10 @@ export class ResourceScene extends Phaser.Scene {
 
     if (isTemplate(resource, "name-story")) {
       renderNameStory(this, resource, done);
+      return;
+    }
+    if (isTemplate(resource, "illustrated-story")) {
+      renderIllustratedStory(this, resource, done);
       return;
     }
     if (isTemplate(resource, "initials-game")) {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createIllustratedStoryResource,
   createInitialsGameResource,
   createLettersGameResource,
   createNameStoryResource,
@@ -174,6 +175,35 @@ describe("published versions are immutable", () => {
         photoUrl: "/synthetic/avatar-ana.svg",
         pronunciationUrl: "/synthetic/silent-ana.mp3"
       }
+    });
+  });
+
+  /**
+   * The pages are the book, and the book is content — pinning all thirty-one
+   * here would make this test a second copy of the fixture, so that a
+   * transcription fix would read as a breaking version change. Same reasoning
+   * as `PINNED` above. What version 1 owes is the shape: an envelope, and pages
+   * that each carry a picture, a recording, and what they teach.
+   */
+  it("pins illustrated-story version 1 output shape", () => {
+    const resource = createIllustratedStoryResource("gallo-rayo", "immutability-seed");
+
+    expect(resource.schemaVersion).toBe(1);
+    expect(resource.resourceId).toBe("illustrated-story-gallo-rayo-immutability-seed");
+    expect(resource.template).toEqual({ id: "illustrated-story", version: 1 });
+    expect(resource.pages[0]).toEqual({
+      kind: "cover",
+      pageId: "portada",
+      imageUrl: "/story/gallo-rayo/00.webp",
+      audioUrl: "/story/gallo-rayo/00.m4a"
+    });
+    expect(resource.pages[1]).toEqual({
+      kind: "letter",
+      pageId: "c-k",
+      grapheme: "C",
+      sound: "K",
+      imageUrl: "/story/gallo-rayo/01.webp",
+      audioUrl: "/story/gallo-rayo/01.m4a"
     });
   });
 

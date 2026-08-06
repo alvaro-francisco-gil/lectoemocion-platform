@@ -9,7 +9,10 @@ export type {
   ParticipantSlot,
   PersonalisedCharacter
 } from "./participantSlot";
+export { StoryPageSchema, pageLabel } from "./storyPage";
+export type { StoryPage } from "./storyPage";
 export {
+  IllustratedStoryManifestSchema,
   InitialsGameManifestSchema,
   LettersGameManifestSchema,
   MemoryAlbumManifestSchema,

@@ -26,6 +26,7 @@ export type SelectionStrategy =
  */
 export const TEMPLATE_KINDS: Record<TemplateIdentifier, ResourceKind> = {
   "name-story": "cinematic",
+  "illustrated-story": "cinematic",
   "initials-game": "minigame",
   "memory-album": "non-interactive",
   "pairs-game": "minigame",
