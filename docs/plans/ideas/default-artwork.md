@@ -35,9 +35,10 @@ Vocabulary pictures, for `pairs-game`, `word-picture-game`, and
    it for audio as well as images.
 3. Load `photoUrl` and `pronunciationUrl` in the roster renderers, failing
    closed on a missing default exactly as the vocabulary path does.
-4. Unlock audio on first gesture — every browser blocks autoplay, and the
-   unlock has to survive an aged WebView
-   ([player AGENTS.md](../../../apps/player-web/AGENTS.md)).
+
+Recording those pronunciations, the format they are delivered in, and unlocking
+audio on first gesture belong to [audio](audio.md), which owns all three across
+the platform rather than for characters alone.
 
 ## Not in scope
 
