@@ -54,17 +54,18 @@ export function removeWhiteBackground(raw, { width, height }) {
   const consider = (index, from) => {
     if (state[index] !== 0) return;
     const at = index * 4;
-    const distance = Math.max(
-      Math.abs(raw[at] - from[0]),
-      Math.abs(raw[at + 1] - from[1]),
-      Math.abs(raw[at + 2] - from[2])
-    );
-    if (distance >= SUBJECT_BEYOND) return;
-
-    if (distance <= BACKDROP_WITHIN && isPale(at)) {
+    if (isPale(at)) {
+      /* Pale is pale: a white margin and the faint vignette it surrounds are
+         one backdrop, even though the step between them is not a gradient. */
       state[index] = 1;
       queue[tail++] = index;
     } else {
+      const distance = Math.max(
+        Math.abs(raw[at] - from[0]),
+        Math.abs(raw[at + 1] - from[1]),
+        Math.abs(raw[at + 2] - from[2])
+      );
+      if (distance >= SUBJECT_BEYOND) return;
       state[index] = 2;
     }
     cameFrom[index * 3] = from[0];
@@ -107,15 +108,18 @@ export function removeWhiteBackground(raw, { width, height }) {
     if (state[index] === 0) continue;
     const at = index * 4;
     const from = cameFrom.subarray(index * 3, index * 3 + 3);
-    const distance = Math.max(
-      Math.abs(raw[at] - from[0]),
-      Math.abs(raw[at + 1] - from[1]),
-      Math.abs(raw[at + 2] - from[2])
-    );
-    const backdropness =
-      distance <= BACKDROP_WITHIN
-        ? 1
-        : (SUBJECT_BEYOND - distance) / (SUBJECT_BEYOND - BACKDROP_WITHIN);
+    let backdropness = 1;
+    if (state[index] === 2) {
+      const distance = Math.max(
+        Math.abs(raw[at] - from[0]),
+        Math.abs(raw[at + 1] - from[1]),
+        Math.abs(raw[at + 2] - from[2])
+      );
+      backdropness =
+        distance <= BACKDROP_WITHIN
+          ? 1
+          : (SUBJECT_BEYOND - distance) / (SUBJECT_BEYOND - BACKDROP_WITHIN);
+    }
     const alpha = Math.round(255 * (1 - backdropness));
     raw[at + 3] = alpha;
     cleared++;

@@ -29,6 +29,16 @@ enlargement and re-encoded as WebP at quality 82, preserving
 transparency. Where the prototype shipped the same word in two formats, one was
 chosen by the preference .png > .webp > .jpg > .jpeg.
 
+A source with no alpha channel was shot on a flat white card, which the player
+would composite over painted scenery as an opaque square. Those are matted by
+`scripts/lib/remove-white-background.mjs`, which grows a transparent region
+inward from the border and so removes the card without touching white *inside*
+the silhouette. Sources that already carry alpha are not matted at all.
+
+Every picture is then trimmed to its subject, so that the surfaces which draw
+these — both of which scale to fit — put a chick and a whale in a box at the
+same size instead of at whatever margin each stock picture happened to carry.
+
 ## Held back
 
 Present in the prototype, deliberately not imported:
@@ -41,110 +51,110 @@ Present in the prototype, deliberately not imported:
 |---|---|---|
 | `abeja.webp` | `a-be-ja.png` | 10 kB |
 | `araña.webp` | `a-ra-ña.png` | 20 kB |
-| `arcoiris.webp` | `ar-co-i-ris.png` | 23 kB |
-| `astronauta.webp` | `as-tro-nau-ta.png` | 29 kB |
-| `ballena.webp` | `ba-lle-na.jpg` | 11 kB |
-| `barco.webp` | `bar-co.jpeg` | 14 kB |
-| `biberon.webp` | `bi-be-ron.jpg` | 7 kB |
-| `buho.webp` | `bu-ho.png` | 44 kB |
-| `burro.webp` | `bu-rro.jpg` | 17 kB |
-| `caballo.webp` | `ca-ba-llo.jpg` | 20 kB |
-| `caca.webp` | `ca-ca.jpg` | 8 kB |
-| `calabaza.webp` | `ca-la-ba-za.png` | 14 kB |
-| `camara.webp` | `ca-ma-ra.jpg` | 14 kB |
-| `camion.webp` | `ca-mion.jpeg` | 15 kB |
-| `camiseta.webp` | `ca-mi-se-ta.jpg` | 12 kB |
+| `arcoiris.webp` | `ar-co-i-ris.png` | 22 kB |
+| `astronauta.webp` | `as-tro-nau-ta.png` | 30 kB |
+| `ballena.webp` | `ba-lle-na.jpg` | 13 kB |
+| `barco.webp` | `bar-co.jpeg` | 15 kB |
+| `biberon.webp` | `bi-be-ron.jpg` | 8 kB |
+| `buho.webp` | `bu-ho.png` | 43 kB |
+| `burro.webp` | `bu-rro.jpg` | 20 kB |
+| `caballo.webp` | `ca-ba-llo.jpg` | 23 kB |
+| `caca.webp` | `ca-ca.jpg` | 9 kB |
+| `calabaza.webp` | `ca-la-ba-za.png` | 13 kB |
+| `camara.webp` | `ca-ma-ra.jpg` | 17 kB |
+| `camion.webp` | `ca-mion.jpeg` | 16 kB |
+| `camiseta.webp` | `ca-mi-se-ta.jpg` | 14 kB |
 | `cangrejo.webp` | `can-gre-jo.png` | 40 kB |
-| `caramelo.webp` | `ca-ra-me-lo.jpeg` | 9 kB |
+| `caramelo.webp` | `ca-ra-me-lo.jpeg` | 10 kB |
 | `caramelos.webp` | `ca-ra-me-los.png` | 28 kB |
-| `cascos.webp` | `cas-cos.jpg` | 14 kB |
-| `cerdo.webp` | `cer-do.jpg` | 14 kB |
-| `cerezas.webp` | `ce-re-zas.jpeg` | 8 kB |
-| `coche.webp` | `co-che.jpeg` | 14 kB |
+| `cascos.webp` | `cas-cos.jpg` | 18 kB |
+| `cerdo.webp` | `cer-do.jpg` | 15 kB |
+| `cerezas.webp` | `ce-re-zas.jpeg` | 10 kB |
+| `coche.webp` | `co-che.jpeg` | 15 kB |
 | `cohete.webp` | `co-he-te.png` | 30 kB |
 | `cometa.webp` | `co-me-ta.png` | 21 kB |
 | `conejo.webp` | `co-ne-jo.png` | 23 kB |
 | `corazon.webp` | `co-ra-zon.png` | 13 kB |
-| `corona.webp` | `co-ro-na.jpeg` | 11 kB |
+| `corona.webp` | `co-ro-na.jpeg` | 13 kB |
 | `dados.webp` | `da-dos.png` | 21 kB |
-| `delfin.webp` | `del-fin.jpg` | 9 kB |
+| `delfin.webp` | `del-fin.jpg` | 12 kB |
 | `dinosaurio.webp` | `di-no-sau-rio.png` | 19 kB |
-| `dos.webp` | `dos.jpg` | 9 kB |
+| `dos.webp` | `dos.jpg` | 11 kB |
 | `elefante.webp` | `e-le-fan-te.png` | 32 kB |
 | `erizo.webp` | `e-ri-zo.png` | 37 kB |
-| `estrella.webp` | `es-tre-lla.jpg` | 5 kB |
+| `estrella.webp` | `es-tre-lla.jpg` | 6 kB |
 | `fantasma.webp` | `fan-tas-ma.png` | 18 kB |
-| `flamenco.webp` | `fla-men-co.jpg` | 9 kB |
-| `flor.webp` | `flor.jpg` | 11 kB |
-| `flores.webp` | `flo-res.png` | 69 kB |
-| `foca.webp` | `fo-ca.jpeg` | 8 kB |
-| `fresa.webp` | `fre-sa.jpg` | 6 kB |
-| `gafas.webp` | `ga-fas.jpg` | 7 kB |
-| `gallo.webp` | `ga-llo.png` | 11 kB |
+| `flamenco.webp` | `fla-men-co.jpg` | 11 kB |
+| `flor.webp` | `flor.jpg` | 13 kB |
+| `flores.webp` | `flo-res.png` | 68 kB |
+| `foca.webp` | `fo-ca.jpeg` | 10 kB |
+| `fresa.webp` | `fre-sa.jpg` | 7 kB |
+| `gafas.webp` | `ga-fas.jpg` | 8 kB |
+| `gallo.webp` | `ga-llo.png` | 10 kB |
 | `gato.webp` | `ga-to.png` | 27 kB |
-| `globo.webp` | `glo-bo.jpg` | 6 kB |
+| `globo.webp` | `glo-bo.jpg` | 7 kB |
 | `gorra.webp` | `go-rra.jpg` | 8 kB |
-| `hormiga.webp` | `hor-mi-ga.jpg` | 9 kB |
+| `hormiga.webp` | `hor-mi-ga.jpg` | 12 kB |
 | `hueso.webp` | `hue-so.png` | 7 kB |
-| `huevo.webp` | `hue-vo.jpg` | 8 kB |
-| `iglu.webp` | `i-glu.jpg` | 11 kB |
-| `jirafa.webp` | `ji-ra-fa.jpg` | 11 kB |
+| `huevo.webp` | `hue-vo.jpg` | 9 kB |
+| `iglu.webp` | `i-glu.jpg` | 12 kB |
+| `jirafa.webp` | `ji-ra-fa.jpg` | 13 kB |
 | `koala.webp` | `ko-a-la.PNG` | 30 kB |
 | `ladron.webp` | `la-dron.png` | 26 kB |
 | `lampara.webp` | `lam-pa-ra.png` | 21 kB |
 | `lapiz.webp` | `la-piz.png` | 5 kB |
-| `lazo.webp` | `la-zo.jpeg` | 10 kB |
+| `lazo.webp` | `la-zo.jpeg` | 12 kB |
 | `leon.webp` | `le-on.png` | 34 kB |
-| `llama.webp` | `lla-ma.png` | 31 kB |
-| `luna.webp` | `lu-na.PNG` | 20 kB |
+| `llama.webp` | `lla-ma.png` | 30 kB |
+| `luna.webp` | `lu-na.PNG` | 21 kB |
 | `lupa.webp` | `lu-pa.png` | 14 kB |
-| `manzana.webp` | `man-za-na.jpeg` | 11 kB |
+| `manzana.webp` | `man-za-na.jpeg` | 13 kB |
 | `mariposa.webp` | `ma-ri-po-sa.png` | 17 kB |
-| `mariquita.webp` | `ma-ri-qui-ta.jpg` | 12 kB |
-| `melocoton.webp` | `me-lo-co-ton.jpeg` | 13 kB |
-| `mesa.webp` | `me-sa.png` | 17 kB |
+| `mariquita.webp` | `ma-ri-qui-ta.jpg` | 14 kB |
+| `melocoton.webp` | `me-lo-co-ton.jpeg` | 14 kB |
+| `mesa.webp` | `me-sa.png` | 16 kB |
 | `microfono.webp` | `mi-cro-fo-no.png` | 21 kB |
 | `mono.webp` | `mo-no.png` | 43 kB |
-| `mora.webp` | `mo-ra.jpg` | 20 kB |
-| `moto.webp` | `mo-to.jpeg` | 13 kB |
-| `niña.webp` | `ni-ña.jpg` | 21 kB |
+| `mora.webp` | `mo-ra.jpg` | 22 kB |
+| `moto.webp` | `mo-to.jpeg` | 16 kB |
+| `niña.webp` | `ni-ña.jpg` | 24 kB |
 | `niño.webp` | `ni-ño.png` | 22 kB |
-| `nube.webp` | `nu-be.jpg` | 9 kB |
+| `nube.webp` | `nu-be.jpg` | 11 kB |
 | `osito.webp` | `o-si-to.png` | 24 kB |
 | `oveja.webp` | `o-ve-ja.png` | 28 kB |
 | `pajaro.webp` | `pa-ja-ro.png` | 23 kB |
-| `paraguas.webp` | `pa-ra-guas.jpg` | 12 kB |
-| `pastel.webp` | `pas-tel.jpg` | 16 kB |
-| `pato.webp` | `pa-to.jpg` | 15 kB |
-| `pelota.webp` | `pe-lo-ta.jpg` | 13 kB |
-| `pera.webp` | `pe-ra.jpg` | 9 kB |
+| `paraguas.webp` | `pa-ra-guas.jpg` | 14 kB |
+| `pastel.webp` | `pas-tel.jpg` | 19 kB |
+| `pato.webp` | `pa-to.jpg` | 17 kB |
+| `pelota.webp` | `pe-lo-ta.jpg` | 15 kB |
+| `pera.webp` | `pe-ra.jpg` | 10 kB |
 | `perro.webp` | `pe-rro.PNG` | 27 kB |
-| `pez.webp` | `pez.jpeg` | 17 kB |
+| `pez.webp` | `pez.jpeg` | 19 kB |
 | `pinguino.webp` | `pin-gui-no.png` | 11 kB |
-| `piña.webp` | `pi-ña.png` | 32 kB |
-| `piruleta.webp` | `pi-ru-le-ta.png` | 13 kB |
+| `piña.webp` | `pi-ña.png` | 33 kB |
+| `piruleta.webp` | `pi-ru-le-ta.png` | 12 kB |
 | `pluma.webp` | `plu-ma.png` | 9 kB |
 | `policia.webp` | `po-li-ci-a.png` | 22 kB |
-| `pollito.webp` | `po-lli-to.jpg` | 16 kB |
-| `pulpo.webp` | `pul-po.jpg` | 14 kB |
-| `rana.webp` | `ra-na.png` | 29 kB |
+| `pollito.webp` | `po-lli-to.jpg` | 17 kB |
+| `pulpo.webp` | `pul-po.jpg` | 18 kB |
+| `rana.webp` | `ra-na.png` | 28 kB |
 | `raton.webp` | `ra-ton.png` | 31 kB |
-| `regalo.webp` | `re-ga-lo.jpg` | 20 kB |
-| `reloj.webp` | `re-loj.jpg` | 10 kB |
+| `regalo.webp` | `re-ga-lo.jpg` | 24 kB |
+| `reloj.webp` | `re-loj.jpg` | 12 kB |
 | `robot.webp` | `ro-bot.png` | 42 kB |
-| `sandia.webp` | `san-di-a.jpg` | 10 kB |
+| `sandia.webp` | `san-di-a.jpg` | 12 kB |
 | `serpiente.webp` | `ser-pien-te.png` | 33 kB |
 | `seta.webp` | `se-ta.png` | 24 kB |
-| `sol.webp` | `sol.jpg` | 19 kB |
-| `tesoro.webp` | `te-so-ro.png` | 24 kB |
-| `tigre.webp` | `ti-gre.jpg` | 24 kB |
+| `sol.webp` | `sol.jpg` | 21 kB |
+| `tesoro.webp` | `te-so-ro.png` | 23 kB |
+| `tigre.webp` | `ti-gre.jpg` | 27 kB |
 | `tortuga.webp` | `tor-tu-ga.png` | 14 kB |
-| `tren.webp` | `tren.jpeg` | 16 kB |
+| `tren.webp` | `tren.jpeg` | 17 kB |
 | `tucan.webp` | `tu-can.png` | 25 kB |
-| `unicornio.webp` | `u-ni-cor-nio.jpg` | 19 kB |
-| `uvas.webp` | `u-vas.jpeg` | 14 kB |
-| `vaca.webp` | `va-ca.png` | 25 kB |
+| `unicornio.webp` | `u-ni-cor-nio.jpg` | 21 kB |
+| `uvas.webp` | `u-vas.jpeg` | 17 kB |
+| `vaca.webp` | `va-ca.png` | 26 kB |
 | `vela.webp` | `ve-la.jpg` | 3 kB |
-| `zanahoria.webp` | `za-na-ho-ria.jpg` | 10 kB |
-| `zapato.webp` | `za-pa-to.jpg` | 18 kB |
-| `zorro.webp` | `zo-rro.jpg` | 21 kB |
+| `zanahoria.webp` | `za-na-ho-ria.jpg` | 12 kB |
+| `zapato.webp` | `za-pa-to.jpg` | 19 kB |
+| `zorro.webp` | `zo-rro.jpg` | 23 kB |

@@ -122,6 +122,12 @@ async function main() {
  * are matted here — once, at import — rather than every surface working around
  * an opaque square. A picture that already carries alpha was cut out by its
  * author and is left exactly as it is.
+ *
+ * Every picture is then trimmed to its subject. Both surfaces that draw these
+ * scale to fit — `object-fit: contain` in the collection, `Math.min(inner / w,
+ * inner / h, 1)` on a card — so whatever margin a picture carries becomes empty
+ * space around it, and every stock picture carries a different one. Trimming is
+ * what makes a chick and a whale come out the same size in the same box.
  */
 async function encode(source) {
   const resized = sharp(source).resize(EDGE, EDGE, {
@@ -130,7 +136,7 @@ async function encode(source) {
     background: { r: 255, g: 255, b: 255, alpha: 0 }
   });
   if ((await sharp(source).metadata()).hasAlpha) {
-    return resized.webp({ quality: QUALITY }).toBuffer();
+    return trimmed(resized).webp({ quality: QUALITY }).toBuffer();
   }
 
   const { data, info } = await resized
@@ -138,11 +144,20 @@ async function encode(source) {
     .raw()
     .toBuffer({ resolveWithObject: true });
   removeWhiteBackground(data, info);
-  return sharp(data, {
-    raw: { width: info.width, height: info.height, channels: 4 }
-  })
+  return trimmed(
+    sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
+  )
     .webp({ quality: QUALITY })
     .toBuffer();
+}
+
+/**
+ * Cuts the transparent margin away. The threshold is above zero because lossy
+ * alpha leaves a few almost-invisible pixels out in the margin, and trimming at
+ * exactly zero would keep the whole of it for their sake.
+ */
+function trimmed(image) {
+  return image.trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 12 });
 }
 
 function renderFixture(items) {
@@ -228,7 +243,11 @@ A source with no alpha channel was shot on a flat white card, which the player
 would composite over painted scenery as an opaque square. Those are matted by
 \`scripts/lib/remove-white-background.mjs\`, which grows a transparent region
 inward from the border and so removes the card without touching white *inside*
-the silhouette. Sources that already carry alpha are left untouched.
+the silhouette. Sources that already carry alpha are not matted at all.
+
+Every picture is then trimmed to its subject, so that the surfaces which draw
+these — both of which scale to fit — put a chick and a whale in a box at the
+same size instead of at whatever margin each stock picture happened to carry.
 
 ## Held back
 
