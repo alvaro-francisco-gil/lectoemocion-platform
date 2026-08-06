@@ -11,6 +11,7 @@ export type {
 } from "./participantSlot";
 export {
   InitialsGameManifestSchema,
+  LettersGameManifestSchema,
   MemoryAlbumManifestSchema,
   MultiSyllableVocabularyItemSchema,
   NameStoryManifestSchema,

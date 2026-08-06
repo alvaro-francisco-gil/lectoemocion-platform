@@ -30,7 +30,8 @@ export const TEMPLATE_KINDS: Record<TemplateIdentifier, ResourceKind> = {
   "memory-album": "non-interactive",
   "pairs-game": "minigame",
   "word-picture-game": "minigame",
-  "syllables-game": "minigame"
+  "syllables-game": "minigame",
+  "letters-game": "minigame"
 };
 
 export function templateKind(id: TemplateIdentifier): ResourceKind {

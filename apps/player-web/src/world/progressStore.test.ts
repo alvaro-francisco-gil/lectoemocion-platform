@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { EMPTY_PROGRESS } from "./mapView";
+import { EMPTY_PROGRESS, STARS_PER_COMPLETION } from "./mapView";
 import { LOCAL_OWNER, LocalProgressStore, storageKey } from "./progressStore";
 
 const store = () => new LocalProgressStore(localStorage, LOCAL_OWNER);
@@ -28,6 +28,39 @@ describe("local progress", () => {
 
     expect(replayed.completedNodes).toEqual(["encuentro", "iniciales"]);
     expect(replayed.lastPlayedNode).toBe("encuentro");
+  });
+
+  it("pays letriestrellas for every finish, replays included", async () => {
+    const subject = store();
+    expect((await subject.recordCompletion("encuentro")).stars).toBe(
+      STARS_PER_COMPLETION
+    );
+    expect((await subject.recordCompletion("iniciales")).stars).toBe(
+      2 * STARS_PER_COMPLETION
+    );
+
+    /* The same chapter again: one node, three more stars. */
+    const replayed = await subject.recordCompletion("encuentro");
+    expect(replayed.completedNodes).toEqual(["encuentro", "iniciales"]);
+    expect(replayed.stars).toBe(3 * STARS_PER_COMPLETION);
+    expect((await store().read()).stars).toBe(3 * STARS_PER_COMPLETION);
+  });
+
+  it("keeps stars out of another owner's total", async () => {
+    await new LocalProgressStore(localStorage, "owner-a").recordCompletion("x");
+    expect((await new LocalProgressStore(localStorage, "owner-b").read()).stars)
+      .toBe(0);
+  });
+
+  /* A total nobody can explain to a child is worse than starting again. */
+  it("starts the star total at zero when the stored one is nonsense", async () => {
+    for (const stars of [-3, 1.5, "seven", Number.NaN, null]) {
+      localStorage.setItem(
+        storageKey(LOCAL_OWNER),
+        JSON.stringify({ completedNodes: ["x"], lastPlayedNode: "x", stars })
+      );
+      expect((await store().read()).stars).toBe(0);
+    }
   });
 
   it("resets to empty when the stored value is corrupt", async () => {
@@ -91,7 +124,7 @@ describe("local progress", () => {
     ]);
   });
 
-  /* Progress written before rewards existed still reads back as progress. */
+  /* Progress written before rewards or stars existed still reads back. */
   it("reads a profile saved before the collection existed", async () => {
     localStorage.setItem(
       storageKey(LOCAL_OWNER),
@@ -103,7 +136,8 @@ describe("local progress", () => {
     expect(await store().read()).toEqual({
       completedNodes: ["encuentro"],
       lastPlayedNode: "encuentro",
-      rewards: []
+      rewards: [],
+      stars: 0
     });
   });
 

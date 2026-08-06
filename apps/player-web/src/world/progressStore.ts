@@ -1,4 +1,9 @@
-import { EMPTY_PROGRESS, type ClaimedReward, type Progress } from "./mapView";
+import {
+  EMPTY_PROGRESS,
+  STARS_PER_COMPLETION,
+  type ClaimedReward,
+  type Progress
+} from "./mapView";
 
 /**
  * Where progress lives.
@@ -10,6 +15,7 @@ import { EMPTY_PROGRESS, type ClaimedReward, type Progress } from "./mapView";
  */
 export interface ProgressStore {
   read(): Promise<Progress>;
+  /** Records a finish and pays its letriestrellas. Every finish is paid. */
   recordCompletion(nodeId: string): Promise<Progress>;
   /** Records the animal the child chose. The first claim for a node wins. */
   claimReward(nodeId: string, animalId: string): Promise<Progress>;
@@ -55,8 +61,24 @@ function parseProgress(raw: string | null): Progress {
       (entry): entry is string => typeof entry === "string"
     ),
     lastPlayedNode: typeof lastPlayed === "string" ? lastPlayed : null,
-    rewards: parseRewards(candidate["rewards"])
+    rewards: parseRewards(candidate["rewards"]),
+    stars: parseStars(candidate["stars"])
   };
+}
+
+/**
+ * A count, or none.
+ *
+ * Anything else — a fraction, a negative, a number written by a tampered tab —
+ * reads as no stars rather than as a total nobody can explain to a child. A
+ * profile saved before letriestrellas existed lands here too, and starts at
+ * zero.
+ */
+function parseStars(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    return 0;
+  }
+  return value;
 }
 
 /**
@@ -108,7 +130,13 @@ export class LocalProgressStore implements ProgressStore {
       completedNodes: current.completedNodes.includes(nodeId)
         ? current.completedNodes
         : [...current.completedNodes, nodeId],
-      lastPlayedNode: nodeId
+      lastPlayedNode: nodeId,
+      /*
+       * Paid on the replay too. The node list stays a set — where a child has
+       * been is not the same fact as how much they have played — so this
+       * counter is the only place a second finish is recorded at all.
+       */
+      stars: current.stars + STARS_PER_COMPLETION
     });
   }
 

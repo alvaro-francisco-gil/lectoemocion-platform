@@ -28,9 +28,12 @@ jobs:
       # The same gate an agent must run locally before claiming completion.
       - run: pnpm check
 
+  # Three viewport projects plus the build-based bypass spec, several of them
+  # watching fixed timelines play out. It is minutes of wall-clock by design,
+  # so the budget is generous enough that a slow runner is not a red build.
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
 

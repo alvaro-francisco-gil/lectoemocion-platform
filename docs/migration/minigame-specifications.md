@@ -10,7 +10,7 @@ they win.
 
 ## Shared vocabulary
 
-Three of these games teach vocabulary rather than the child's own name, so they
+Four of these games teach vocabulary rather than the child's own name, so they
 consume **vocabulary items** instead of roster participants. A vocabulary item
 is a picture together with the syllable sequence that spells its word.
 
@@ -25,7 +25,7 @@ validated manifest.
 
 ### Personalisation
 
-None of these three games personalise. They use product-authored default
+None of these four games personalise. They use product-authored default
 vocabulary, so they are playable with no uploads and no child data at all — the
 institutional pilot's requirement. They carry no participants, and the manifest
 makes a vocabulary resource with participants unrepresentable.
@@ -105,6 +105,52 @@ repeat — `ca-ca` — no such arrangement exists and the loop never terminates.
 The rule here deranges **positions**, which always exists for two or more
 slots and always terminates.
 
+## Letters (`letters-game`)
+
+**Objective.** Spell a pictured word by putting its letters in order.
+
+The next step after segmentation: syllables teaches that a word is made of
+parts, and this teaches that those parts are made of letters. It is the same
+ordering task at a finer grain, which is why the two share their rules
+(`sequenceRound.ts`) and differ only in what a card carries.
+
+**Rules.**
+
+1. The resource supplies one target vocabulary item.
+2. Its letters are **derived** from its word, which is itself derived from its
+   syllables. A spelling that disagrees with the word is not expressible.
+3. Its picture is shown, together with one ordered, initially empty slot per
+   letter.
+4. Letter cards are presented in a seeded order in which **no card starts in
+   the slot it belongs to** — the same position derangement the syllables game
+   uses, for the same reason.
+5. Placing a card into a slot is an attempt:
+   - correct slot → the card stays and the slot is filled;
+   - wrong slot, or an occupied slot → the card returns and one life is spent.
+6. The round is won when every slot is filled, and lost when lives reach zero.
+7. A word of fewer than two or more than eight letters is refused. One letter is
+   already the whole word; nine cards on a panel is a search task rather than a
+   spelling one, and the cards stop being big enough to hit.
+
+**Roster fit.** No roster. Vocabulary only.
+
+**Where the length rule lives.** In the rules (`assertSpellable`), not the
+schema: the letters are derived, and a schema cannot constrain a value it does
+not store. The catalogue calls the same function while a world is authored, so
+an unplayable word fails when it is written rather than when a child opens the
+chapter.
+
+**Placement is a drag, with tap kept alongside it.** The child drags a letter
+from the row of cards onto a slot. Tap-the-card then tap-the-slot also works
+and calls the same `placeLetter`, so the two cannot disagree about the answer.
+The tap path is not a leftover: the reason the syllables game has no drag at
+all is that a drag gesture does not survive an aged panel digitiser equally
+across touch, stylus, and mouse, and on that hardware the tap path is the only
+one a child can finish.
+
+**Layout.** The picture is at the top, where a child cannot reach; the letter
+cards and the slots below them are both inside the lower reach band.
+
 ## Pictures
 
 Every vocabulary item names an `imageUrl` under `/vocabulary/`, served from
@@ -127,7 +173,9 @@ personalise.
 The card is the prototype's, reproduced in `vocabularyCard.ts`: 200×200, white,
 a 6px `#B359E6` border, a 20px corner radius, pictures inset by 10px, uppercase
 black labels, green on a match and red on a mistake, and the syllables game on
-its turquoise `#33F2D9` field. Those values are the prototype's Godot colours
+its turquoise `#33F2D9` field. The letters game has no prototype to reproduce;
+it takes the same card on a warm `#FFD98A` field, so the two ordering games are
+told apart from across a classroom rather than by reading their banners. Those values are the prototype's Godot colours
 converted from 0–1 floats.
 
 What is deliberately *not* reproduced is its layout: the prototype positioned
@@ -137,6 +185,6 @@ spaced from the logical canvas size.
 
 ## Lives
 
-All three spend from the same three-life budget the prototype used. Lives are
+All four spend from the same three-life budget the prototype used. Lives are
 round state owned by the rules, not progress state: templates never read or
 write progress (invariant 2).

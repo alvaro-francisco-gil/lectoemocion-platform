@@ -143,13 +143,35 @@ export const SyllablesGameManifestSchema = Type.Object(
   { additionalProperties: false }
 );
 
+/**
+ * Spell a pictured word from its letters.
+ *
+ * One target, like the syllables game. The letters are derived from the word,
+ * which is itself derived from the syllables, so the manifest cannot carry a
+ * spelling that disagrees with the word it spells. How long a word this game
+ * will accept is therefore a rules check rather than a schema one — see
+ * `assertSpellable` in `@lectoemocion/template-sdk`.
+ */
+export const LettersGameManifestSchema = Type.Object(
+  {
+    ...envelope,
+    template: Type.Object(
+      { id: Type.Literal("letters-game"), version: Type.Literal(1) },
+      { additionalProperties: false }
+    ),
+    vocabulary: Type.Array(VocabularyItemSchema, { minItems: 1, maxItems: 1 })
+  },
+  { additionalProperties: false }
+);
+
 export const ResourceManifestSchema = Type.Union([
   NameStoryManifestSchema,
   InitialsGameManifestSchema,
   MemoryAlbumManifestSchema,
   PairsGameManifestSchema,
   WordPictureGameManifestSchema,
-  SyllablesGameManifestSchema
+  SyllablesGameManifestSchema,
+  LettersGameManifestSchema
 ]);
 
 export type ResourceManifest = Static<typeof ResourceManifestSchema>;

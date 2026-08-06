@@ -12,6 +12,7 @@ import { createGame } from "../game/createGame";
 import {
   deriveMapView,
   EMPTY_PROGRESS,
+  STARS_PER_COMPLETION,
   type CollectionSlotView,
   type MapNodeView,
   type PendingRewardView,
@@ -39,13 +40,20 @@ const store = new LocalProgressStore(
  * it at a child's eye level, and a permanent list of destinations is a way
  * around the progression.
  *
- * Exactly one of three screens is on: a playing resource, the chest ceremony
- * owed for finishing one, or the map. They are exclusive rather than layered
- * so that nothing a child can touch is ever hidden behind something else.
+ * Exactly one screen is on at a time: a playing resource, the letriestrellas
+ * just won, the animal just revealed, the chests owed for a first finish, or
+ * the map. They are exclusive rather than layered so that nothing a child can
+ * touch is ever hidden behind something else.
  */
 export function App() {
   const [progress, setProgress] = useState<Progress>(EMPTY_PROGRESS);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
+  /*
+   * The stars just paid, held only until the child acknowledges them. Like the
+   * animal below, this cannot be derived: the total is already banked by the
+   * time the screen appears, and the screen is about what was added to it.
+   */
+  const [awarded, setAwarded] = useState<number | null>(null);
   /*
    * The animal just won, held only until the child acknowledges it. It cannot
    * be derived: the moment it is claimed it stops being pending, and without
@@ -88,14 +96,14 @@ export function App() {
     void store.recordCompletion(nodeId).then((next) => {
       setProgress(next);
       /*
-       * Finishing a chapter for the first time hands the screen to the chests.
-       * A replay does not: the child chose to play it again, and taking the
-       * game away from them for a reward they already hold would be a
-       * punishment for replaying.
+       * Every finish leaves the game, because every finish is paid: the stars
+       * come first and the chests, when a chapter is owed them, come after.
+       * Banked before they are shown, for the same reason as the animal — a
+       * child who is told they won something and then loses it to a closing
+       * tab has been given nothing.
        */
-      if (!next.rewards.some((reward) => reward.nodeId === nodeId)) {
-        setActiveNodeId(null);
-      }
+      setActiveNodeId(null);
+      setAwarded(STARS_PER_COMPLETION);
     });
   }, []);
 
@@ -135,6 +143,10 @@ export function App() {
     );
   }
 
+  if (awarded !== null) {
+    return <StarAward amount={awarded} onContinue={() => setAwarded(null)} />;
+  }
+
   if (revealed) {
     return <Reveal animal={revealed} onContinue={() => setRevealed(null)} />;
   }
@@ -145,13 +157,7 @@ export function App() {
 
   return (
     <main className="map">
-      {/*
-        The duende is the framing story's guide. It sits in the upper corner:
-        decoration belongs in the band a child aged 3–5 cannot reach, well
-        clear of the path they choose from. Empty `alt` because it names
-        nothing a screen reader needs — the world is the list below.
-      */}
-      <img className="map__duende" src="/world/duende.webp" alt="" />
+      <StarCounter stars={view.stars} />
       {/*
         An ordered list because the world is a sequence: that is what a screen
         reader should hear, and it is what the connecting line draws.
@@ -166,6 +172,59 @@ export function App() {
         </ol>
       </nav>
       <Collection slots={view.collection} />
+    </main>
+  );
+}
+
+/**
+ * Every letriestrella won so far, in the map's top corner.
+ *
+ * A running total rather than a per-chapter mark: stars are paid for playing,
+ * including replaying, and a number that only ever goes up is the part of the
+ * world a child can move on their own. It is display only — nothing here is
+ * pressable — and it lives on the map alone, because a total counting up
+ * beside a running game is a second thing to watch.
+ */
+function StarCounter({ stars }: { stars: number }) {
+  return (
+    <section className="star-counter" aria-label="Letriestrellas">
+      <StarIcon />
+      <span className="star-counter__count">{stars}</span>
+    </section>
+  );
+}
+
+/**
+ * What the finish itself was worth.
+ *
+ * Shown after every finish, before the chests when a chapter is owed them, so
+ * the two rewards are never the same beat: this one says "you played", the
+ * chests say "you got somewhere new". The stars are already banked when this
+ * appears — the screen is the telling, not the giving.
+ */
+function StarAward({
+  amount,
+  onContinue
+}: {
+  amount: number;
+  onContinue: () => void;
+}) {
+  return (
+    <main className="award">
+      <div className="award__prize" role="status">
+        {/* Decoration: the line below is what says how many. */}
+        <ul className="award__stars" aria-hidden="true">
+          {Array.from({ length: amount }, (_, index) => (
+            <li key={index}>
+              <StarIcon />
+            </li>
+          ))}
+        </ul>
+        <p className="award__count">¡+{amount} letriestrellas!</p>
+      </div>
+      <button type="button" className="reveal__continue" onClick={onContinue}>
+        Seguir
+      </button>
     </main>
   );
 }
@@ -236,20 +295,28 @@ function Chests({
   return (
     <main className="reward">
       <p className="reward__prompt">¡Muy bien! Elige un cofre</p>
-      <ul className="chests">
-        {reward.choices.map((animal, index) => (
-          <li key={animal.animalId}>
-            <button
-              type="button"
-              className="chest"
-              aria-label={`Abrir el cofre ${index + 1}`}
-              onClick={() => onOpen(reward.nodeId, animal)}
-            >
-              <ChestIcon />
-            </button>
-          </li>
-        ))}
-      </ul>
+      {/*
+        The duende is where the chests came from. He stands beside them rather
+        than above the prompt, so the screen reads as one offer being made —
+        and he is `alt=""` because he is not a fourth thing to choose.
+      */}
+      <div className="reward__offer">
+        <img className="duende" src="/world/duende.webp" alt="" />
+        <ul className="chests">
+          {reward.choices.map((animal, index) => (
+            <li key={animal.animalId}>
+              <button
+                type="button"
+                className="chest"
+                aria-label={`Abrir el cofre ${index + 1}`}
+                onClick={() => onOpen(reward.nodeId, animal)}
+              >
+                <ChestIcon />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
     </main>
   );
 }
@@ -267,9 +334,13 @@ function Reveal({
       {/*
         Announced when it appears: a child who cannot see the picture is still
         told what they won, at the moment they won it.
+
+        The animal is alone here. The duende handed over the chests and stayed
+        on that screen; putting him beside the prize as well would make the
+        reveal about the pair rather than about the animal.
       */}
       <div className="reveal__prize" role="status">
-        <img src={animal.imageUrl} alt="" />
+        <img className="reveal__animal" src={animal.imageUrl} alt="" />
         <p className="reveal__name">¡{animal.label}!</p>
       </div>
       <button type="button" className="reveal__continue" onClick={onContinue}>
@@ -340,6 +411,27 @@ function ChestIcon() {
       <rect x="6" y="34" width="88" height="10" fill="#8a4712" />
       <rect x="42" y="26" width="16" height="30" rx="4" fill="#f4c95d" />
       <circle cx="50" cy="44" r="5" fill="#8a4712" />
+    </svg>
+  );
+}
+
+/**
+ * A letriestrella, drawn rather than loaded.
+ *
+ * Same reason as the chest: it is on screen the instant a game ends, and on a
+ * classroom panel's cold cache a picture that arrives late would make the
+ * reward look like an afterthought.
+ */
+function StarIcon() {
+  return (
+    <svg viewBox="0 0 100 96" width="100%" height="100%" aria-hidden="true">
+      <path
+        d="M50 4 63.5 33.8 96 37.6 71.9 59.6 78.4 91.6 50 75.6 21.6 91.6 28.1 59.6 4 37.6 36.5 33.8Z"
+        fill="#f4c95d"
+        stroke="#c98a1b"
+        strokeWidth="5"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

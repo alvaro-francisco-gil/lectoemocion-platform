@@ -31,11 +31,28 @@ const NodeResourceSchema = Type.Union([
     },
     { additionalProperties: false }
   ),
+  /*
+   * A vocabulary game either names its pictures or asks for a number of them,
+   * never both. Two branches rather than two optional fields, so "three pairs,
+   * but also these four specific ones" cannot be written down and then quietly
+   * resolved by whichever field the builder happened to read first.
+   */
   Type.Object(
     {
       template: Type.Literal("pairs-game"),
       seed: Type.String({ minLength: 1 }),
       pairCount: Type.Integer({ minimum: 2, maximum: 8 })
+    },
+    { additionalProperties: false }
+  ),
+  Type.Object(
+    {
+      template: Type.Literal("pairs-game"),
+      seed: Type.String({ minLength: 1 }),
+      vocabulary: Type.Array(Type.String({ minLength: 1 }), {
+        minItems: 2,
+        maxItems: 8
+      })
     },
     { additionalProperties: false }
   ),
@@ -50,7 +67,28 @@ const NodeResourceSchema = Type.Union([
   ),
   Type.Object(
     {
+      template: Type.Literal("word-picture-game"),
+      seed: Type.String({ minLength: 1 }),
+      targetVocabularyItemId: Type.String({ minLength: 1 }),
+      /** The wrong answers, named. The target is added to them. */
+      distractors: Type.Array(Type.String({ minLength: 1 }), {
+        minItems: 1,
+        maxItems: 5
+      })
+    },
+    { additionalProperties: false }
+  ),
+  Type.Object(
+    {
       template: Type.Literal("syllables-game"),
+      seed: Type.String({ minLength: 1 }),
+      targetVocabularyItemId: Type.String({ minLength: 1 })
+    },
+    { additionalProperties: false }
+  ),
+  Type.Object(
+    {
+      template: Type.Literal("letters-game"),
       seed: Type.String({ minLength: 1 }),
       targetVocabularyItemId: Type.String({ minLength: 1 })
     },

@@ -5,6 +5,7 @@ export { createInitialsGameResource } from "./initialsGame";
 export { createMemoryAlbumResource } from "./memoryAlbum";
 export { createNameStoryResource } from "./nameStory";
 export {
+  createLettersGameResource,
   createPairsGameResource,
   createSyllablesGameResource,
   createWordPictureGameResource

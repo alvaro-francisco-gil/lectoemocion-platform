@@ -5,9 +5,11 @@ import { createInitialsGameResource } from "../initialsGame";
 import { createMemoryAlbumResource } from "../memoryAlbum";
 import { createNameStoryResource } from "../nameStory";
 import {
+  createLettersGameResource,
   createPairsGameResource,
   createSyllablesGameResource,
-  createWordPictureGameResource
+  createWordPictureGameResource,
+  requireItems
 } from "../vocabularyGames";
 import {
   parseWorld,
@@ -74,7 +76,12 @@ export const world: World = parseWorld({
       id: "parejas",
       title: "El bosque de parejas",
       unlockedBy: ["iniciales"],
-      resource: { template: "pairs-game", seed: "parejas", pairCount: 3 },
+      /* Named, not drawn: three short, unrelated words a child can tell apart. */
+      resource: {
+        template: "pairs-game",
+        seed: "parejas",
+        vocabulary: ["gato", "luna", "mesa"]
+      },
       reward: {
         choices: [
           animal("mariposa", "Mariposa"),
@@ -91,7 +98,8 @@ export const world: World = parseWorld({
         template: "word-picture-game",
         seed: "cual-es",
         targetVocabularyItemId: "manzana",
-        choiceCount: 3
+        /* Wrong answers chosen to be plainly different, not near-misses. */
+        distractors: ["tren", "pelota"]
       },
       reward: {
         choices: [
@@ -119,9 +127,27 @@ export const world: World = parseWorld({
       }
     },
     {
+      id: "letras",
+      title: "El taller de letras",
+      unlockedBy: ["silabas"],
+      /* Four letters, four distinct ones: nothing to place by elimination. */
+      resource: {
+        template: "letters-game",
+        seed: "letras",
+        targetVocabularyItemId: "pato"
+      },
+      reward: {
+        choices: [
+          animal("zorro", "Zorro"),
+          animal("erizo", "Erizo"),
+          animal("tortuga", "Tortuga")
+        ]
+      }
+    },
+    {
       id: "album",
       title: "Nuestro álbum",
-      unlockedBy: ["cual-es", "silabas"],
+      unlockedBy: ["cual-es", "letras"],
       resource: { template: "memory-album", seed: "album" },
       reward: {
         choices: [
@@ -159,21 +185,45 @@ export function createResourceForNode(
       );
     case "memory-album":
       return createMemoryAlbumResource(resource.seed, roster);
-    case "pairs-game":
-      return createPairsGameResource(
-        defaultVocabulary,
-        resource.pairCount,
-        resource.seed
-      );
-    case "word-picture-game":
+    /*
+     * Named pictures are resolved to exactly those items, and the builder is
+     * then asked for all of them — same code path as the random draw, so an
+     * authored set cannot diverge in behaviour from a drawn one.
+     */
+    case "pairs-game": {
+      const chosen =
+        "vocabulary" in resource
+          ? requireItems(defaultVocabulary, resource.vocabulary)
+          : defaultVocabulary;
+      const pairCount =
+        "vocabulary" in resource ? chosen.length : resource.pairCount;
+      return createPairsGameResource(chosen, pairCount, resource.seed);
+    }
+    case "word-picture-game": {
+      const chosen =
+        "distractors" in resource
+          ? requireItems(defaultVocabulary, [
+              resource.targetVocabularyItemId,
+              ...resource.distractors
+            ])
+          : defaultVocabulary;
+      const choiceCount =
+        "distractors" in resource ? chosen.length : resource.choiceCount;
       return createWordPictureGameResource(
-        defaultVocabulary,
+        chosen,
         resource.targetVocabularyItemId,
-        resource.choiceCount,
+        choiceCount,
         resource.seed
       );
+    }
     case "syllables-game":
       return createSyllablesGameResource(
+        defaultVocabulary,
+        resource.targetVocabularyItemId,
+        resource.seed
+      );
+    case "letters-game":
+      return createLettersGameResource(
         defaultVocabulary,
         resource.targetVocabularyItemId,
         resource.seed

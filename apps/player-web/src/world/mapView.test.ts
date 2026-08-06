@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { parseWorld, type World } from "@lectoemocion/resource-schema";
 import { world } from "@lectoemocion/template-catalog";
-import { deriveMapView, EMPTY_PROGRESS, type Progress } from "./mapView";
+import {
+  deriveMapView,
+  EMPTY_PROGRESS,
+  STARS_PER_COMPLETION,
+  type Progress
+} from "./mapView";
 
 /** Three animals for a node's chests, named after the node so they are traceable. */
 const chestsFor = (node: string) => ({
@@ -57,7 +62,8 @@ const progressAfter = (...completedNodes: string[]): Progress => ({
   rewards: completedNodes.map((nodeId) => ({
     nodeId,
     animalId: `${nodeId}-a`
-  }))
+  })),
+  stars: completedNodes.length * STARS_PER_COMPLETION
 });
 
 const stateOf = (view: ReturnType<typeof deriveMapView>, id: string) =>
@@ -119,6 +125,17 @@ describe("deriving the map from progress", () => {
     );
   });
 
+  /*
+   * The total is not derived from the node list on purpose: replays are paid
+   * too, and `completedNodes` is a set that has forgotten them.
+   */
+  it("carries the star total so the map can show it", () => {
+    expect(deriveMapView(chain, EMPTY_PROGRESS).stars).toBe(0);
+    expect(
+      deriveMapView(chain, { ...progressAfter("one"), stars: 42 }).stars
+    ).toBe(42);
+  });
+
   it("opens everything when the development bypass is on", () => {
     const view = deriveMapView(chain, EMPTY_PROGRESS, { unlockAll: true });
     expect(view.nodes.every((node) => node.playable)).toBe(true);
@@ -144,7 +161,8 @@ describe("the collection and the chests owed for it", () => {
     const finished: Progress = {
       completedNodes: ["one"],
       lastPlayedNode: "one",
-      rewards: []
+      rewards: [],
+      stars: STARS_PER_COMPLETION
     };
 
     const owed = deriveMapView(chain, finished);
@@ -164,7 +182,8 @@ describe("the collection and the chests owed for it", () => {
     const view = deriveMapView(chain, {
       completedNodes: ["one"],
       lastPlayedNode: "one",
-      rewards: [{ nodeId: "one", animalId: "one-c" }]
+      rewards: [{ nodeId: "one", animalId: "one-c" }],
+      stars: STARS_PER_COMPLETION
     });
     expect(collectionOf(view)).toEqual([
       ["one", "one-c"],
@@ -179,7 +198,8 @@ describe("the collection and the chests owed for it", () => {
     const view = deriveMapView(chain, {
       completedNodes: ["two", "one"],
       lastPlayedNode: "two",
-      rewards: []
+      rewards: [],
+      stars: 2 * STARS_PER_COMPLETION
     });
     expect(view.pendingReward?.nodeId).toBe("one");
   });
@@ -197,7 +217,8 @@ describe("the collection and the chests owed for it", () => {
     const view = deriveMapView(chain, {
       completedNodes: ["one"],
       lastPlayedNode: "one",
-      rewards: [{ nodeId: "one", animalId: "an-animal-from-an-older-release" }]
+      rewards: [{ nodeId: "one", animalId: "an-animal-from-an-older-release" }],
+      stars: STARS_PER_COMPLETION
     });
     expect(view.pendingReward?.nodeId).toBe("one");
     expect(view.collection[0]?.animal).toBeNull();

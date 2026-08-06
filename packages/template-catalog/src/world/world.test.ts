@@ -210,3 +210,96 @@ describe("world validation", () => {
     ).toThrow("Invalid world");
   });
 });
+
+/**
+ * Authoring a world means naming pictures, and a name is a thing you can get
+ * wrong. These pin that a named set is honoured exactly and that a bad name
+ * fails closed rather than shipping a game one picture short.
+ */
+describe("authored vocabulary", () => {
+  const nodeFor = (id: string) => {
+    const node = world.nodes.find((candidate) => candidate.id === id);
+    expect(node, `${id} is in the world`).toBeDefined();
+    return node!;
+  };
+
+  /*
+   * The author picks which pictures, not where they land: the game seeds its
+   * own layout, and the two card rows are shuffled independently by design.
+   */
+  it("plays exactly the pairs the world names", () => {
+    const resource = createResourceForNode(nodeFor("parejas"));
+    expect(resource.template.id).toBe("pairs-game");
+    expect(
+      "vocabulary" in resource
+        ? resource.vocabulary.map((item) => item.vocabularyItemId).sort()
+        : []
+    ).toEqual(["gato", "luna", "mesa"]);
+  });
+
+  it("spells exactly the word the world names", () => {
+    const resource = createResourceForNode(nodeFor("letras"));
+    expect(resource.template.id).toBe("letters-game");
+    expect(
+      "vocabulary" in resource
+        ? resource.vocabulary.map((item) => item.vocabularyItemId)
+        : []
+    ).toEqual(["pato"]);
+  });
+
+  it("fails closed on a word the letters game cannot show", () => {
+    expect(() =>
+      createResourceForNode({
+        ...nodeFor("letras"),
+        resource: {
+          template: "letters-game",
+          seed: "too-long",
+          targetVocabularyItemId: "astronauta"
+        }
+      })
+    ).toThrow("this game shows");
+  });
+
+  it("plays exactly the target and distractors the world names", () => {
+    const resource = createResourceForNode(nodeFor("cual-es"));
+    expect(
+      "vocabulary" in resource
+        ? resource.vocabulary.map((item) => item.vocabularyItemId).sort()
+        : []
+    ).toEqual(["manzana", "pelota", "tren"]);
+  });
+
+  it("still draws a set for a game that names none", () => {
+    const drawn = createResourceForNode({
+      ...nodeFor("parejas"),
+      resource: { template: "pairs-game", seed: "drawn", pairCount: 4 }
+    });
+    expect("vocabulary" in drawn ? drawn.vocabulary : []).toHaveLength(4);
+  });
+
+  it("fails closed on a picture the vocabulary does not have", () => {
+    expect(() =>
+      createResourceForNode({
+        ...nodeFor("parejas"),
+        resource: {
+          template: "pairs-game",
+          seed: "typo",
+          vocabulary: ["gato", "casa"]
+        }
+      })
+    ).toThrow("No vocabulary item named casa");
+  });
+
+  it("rejects the same picture named twice in one game", () => {
+    expect(() =>
+      createResourceForNode({
+        ...nodeFor("parejas"),
+        resource: {
+          template: "pairs-game",
+          seed: "duplicate",
+          vocabulary: ["gato", "gato"]
+        }
+      })
+    ).toThrow("Vocabulary item named twice: gato");
+  });
+});

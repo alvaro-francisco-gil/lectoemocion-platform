@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createInitialsGameResource,
+  createLettersGameResource,
   createNameStoryResource,
   createPairsGameResource,
   createSyllablesGameResource,
@@ -217,6 +218,18 @@ describe("published versions are immutable", () => {
       template: { id: "syllables-game", version: 1 },
       seed: "immutability-seed",
       vocabulary: [mariposa]
+    });
+  });
+
+  it("pins letters-game version 1 output", () => {
+    expect(
+      createLettersGameResource(PINNED, "casa", "immutability-seed")
+    ).toEqual({
+      schemaVersion: 1,
+      resourceId: "letters-game-immutability-seed",
+      template: { id: "letters-game", version: 1 },
+      seed: "immutability-seed",
+      vocabulary: [casa]
     });
   });
 });

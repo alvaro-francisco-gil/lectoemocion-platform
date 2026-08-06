@@ -10,6 +10,20 @@ export type {
   PairsRound,
   PairsSelection
 } from "./rules/pairsGame";
+export {
+  LETTERS_MAXIMUM,
+  LETTERS_MINIMUM,
+  assertSpellable,
+  createLettersRound,
+  placeLetter,
+  wordLetters
+} from "./rules/lettersGame";
+export type {
+  LetterAttempt,
+  LetterCard,
+  LetterPlacement,
+  LettersRound
+} from "./rules/lettersGame";
 export { createSyllablesRound, placeSyllable } from "./rules/syllablesGame";
 export type {
   SyllableAttempt,

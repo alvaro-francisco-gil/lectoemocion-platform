@@ -54,6 +54,14 @@ const validWordPictureManifest = {
   vocabulary: [casa, sol]
 };
 
+const validLettersManifest = {
+  schemaVersion: 1,
+  resourceId: "letters-1",
+  template: { id: "letters-game", version: 1 },
+  seed: "lesson-1",
+  vocabulary: [casa]
+};
+
 const validSyllablesManifest = {
   schemaVersion: 1,
   resourceId: "syllables-1",
@@ -85,7 +93,8 @@ describe("parseResourceManifest", () => {
   it.each([
     ["pairs-game", validPairsManifest],
     ["word-picture-game", validWordPictureManifest],
-    ["syllables-game", validSyllablesManifest]
+    ["syllables-game", validSyllablesManifest],
+    ["letters-game", validLettersManifest]
   ])("accepts a valid %s manifest", (_id, manifest) => {
     expect(parseResourceManifest(manifest)).toEqual(manifest);
   });

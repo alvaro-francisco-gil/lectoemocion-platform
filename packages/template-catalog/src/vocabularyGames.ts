@@ -1,5 +1,9 @@
 import type { ManifestFor, VocabularyItem } from "@lectoemocion/resource-schema";
-import { seededShuffle } from "@lectoemocion/template-sdk";
+import {
+  assertSpellable,
+  seededShuffle,
+  wordLetters
+} from "@lectoemocion/template-sdk";
 
 function requireItem(
   vocabulary: readonly VocabularyItem[],
@@ -12,6 +16,26 @@ function requireItem(
     throw new Error(`No vocabulary item named ${targetVocabularyItemId}`);
   }
   return target;
+}
+
+/**
+ * Resolves named vocabulary ids to their items, in the order named.
+ *
+ * A typo in an authored world is a content defect: it fails closed here
+ * (invariant 6) rather than silently shipping a game one picture short.
+ */
+export function requireItems(
+  vocabulary: readonly VocabularyItem[],
+  ids: readonly string[]
+): VocabularyItem[] {
+  const seen = new Set<string>();
+  return ids.map((id) => {
+    if (seen.has(id)) {
+      throw new Error(`Vocabulary item named twice: ${id}`);
+    }
+    seen.add(id);
+    return requireItem(vocabulary, id);
+  });
 }
 
 function requireCount(
@@ -84,6 +108,30 @@ export function createSyllablesGameResource(
     schemaVersion: 1,
     resourceId: `syllables-game-${seed}`,
     template: { id: "syllables-game", version: 1 },
+    seed,
+    vocabulary: [target]
+  };
+}
+
+/**
+ * Spell one word from its letters.
+ *
+ * The word is refused here as well as in the round, so an unplayable word is
+ * caught while the world is being authored rather than when a child opens the
+ * chapter. Both sides call `assertSpellable`, so there is still one rule.
+ */
+export function createLettersGameResource(
+  vocabulary: readonly VocabularyItem[],
+  targetVocabularyItemId: string,
+  seed: string
+): ManifestFor<"letters-game"> {
+  const target = requireItem(vocabulary, targetVocabularyItemId);
+  assertSpellable(targetVocabularyItemId, wordLetters(target).length);
+
+  return {
+    schemaVersion: 1,
+    resourceId: `letters-game-${seed}`,
+    template: { id: "letters-game", version: 1 },
     seed,
     vocabulary: [target]
   };

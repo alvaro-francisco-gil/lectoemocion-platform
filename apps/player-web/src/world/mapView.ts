@@ -8,6 +8,15 @@ export interface ClaimedReward {
 }
 
 /**
+ * What every finish is worth.
+ *
+ * Letriestrellas are the reward for the act of playing, so they are paid every
+ * time a chapter is finished — including a replay. The animals are the reward
+ * for reaching somewhere new, and those are paid once.
+ */
+export const STARS_PER_COMPLETION = 3;
+
+/**
  * What actually happened, and nothing else.
  *
  * Unlock state is deliberately absent: it is derived from the world graph on
@@ -15,18 +24,22 @@ export interface ClaimedReward {
  * content update changes the graph — and content updates change the graph.
  *
  * A claimed reward *is* stored, because it is not derivable: it records a
- * choice the child made, and nothing else in the world remembers it.
+ * choice the child made, and nothing else in the world remembers it. Stars are
+ * stored for the same reason — they count finishes, and `completedNodes`
+ * deliberately forgets that a chapter was played twice.
  */
 export interface Progress {
   readonly completedNodes: readonly string[];
   readonly lastPlayedNode: string | null;
   readonly rewards: readonly ClaimedReward[];
+  readonly stars: number;
 }
 
 export const EMPTY_PROGRESS: Progress = {
   completedNodes: [],
   lastPlayedNode: null,
-  rewards: []
+  rewards: [],
+  stars: 0
 };
 
 export type NodeState = "locked" | "unlocked" | "completed";
@@ -71,6 +84,8 @@ export interface MapView {
    * the last frame of a game and the chests does not quietly cost a reward.
    */
   readonly pendingReward: PendingRewardView | null;
+  /** Every letriestrella won so far, across every finish. */
+  readonly stars: number;
 }
 
 export interface MapViewOptions {
@@ -117,6 +132,7 @@ export function deriveMapView(
   );
 
   return {
+    stars: progress.stars,
     collection: world.nodes.map((node) => ({
       nodeId: node.id,
       title: node.title,

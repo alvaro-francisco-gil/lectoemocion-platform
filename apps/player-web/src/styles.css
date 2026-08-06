@@ -64,29 +64,22 @@ main { height: 100dvh; }
  * the reachable band on a panel and the comfortable one on a tablet — while
  * the row of animals sits under it as a footer a child looks at rather than
  * touches.
+ *
+ * The barn is the hub the framing story puts a child in, so it is the map's
+ * background rather than a picture on it: `cover` from the centre, because the
+ * composition is a room and the walls are what may be cropped, never the floor
+ * the path stands on. The white wash above it is what buys the contrast — the
+ * straw floor is a light mid-tone and the labels are dark ink, and without it
+ * the locked ones sit too close to the ground they are drawn on.
  */
 .map {
+  position: relative;
   display: grid;
   grid-template-rows: 1fr auto;
   overflow: hidden;
-}
-
-/*
- * The guide watches from the top-right corner. Fixed rather than absolute
- * because `.map` scrolls horizontally when the path outgrows the viewport, and
- * a guide that slid away with the path would be decoration that moves for no
- * reason. `pointer-events: none` so it can never swallow a tap meant for a
- * node, and it is sized off the viewport height so it shrinks on a phone in
- * landscape instead of covering the path.
- */
-.map__duende {
-  position: fixed;
-  top: clamp(0.5rem, 2vh, 1.5rem);
-  right: clamp(0.5rem, 2vw, 2rem);
-  height: clamp(88px, 26vh, 260px);
-  width: auto;
-  pointer-events: none;
-  user-select: none;
+  background:
+    linear-gradient(rgb(255 255 255 / 0.34), rgb(255 255 255 / 0.34)),
+    url("/world/granero.webp") center / cover no-repeat;
 }
 
 /*
@@ -143,7 +136,9 @@ main { height: 100dvh; }
   color: #402060;
   cursor: pointer;
 }
-.world-node[disabled] { cursor: not-allowed; color: #6f6280; }
+/* Dark enough to clear 4.5:1 against the straw floor behind it. A locked node
+   is told apart by its padlock and its label, never by being faint. */
+.world-node[disabled] { cursor: not-allowed; color: #3f3350; }
 
 .world-node__marker {
   width: 92px;
@@ -176,6 +171,38 @@ main { height: 100dvh; }
   .world-node__marker { transition: transform 120ms ease-out; }
 }
 
+/* ---------------------------------------------------------------- stars */
+
+/*
+ * The running total, over the map's top-right corner.
+ *
+ * Out of the flow on purpose: the map is a two-band layout and the path owns
+ * the middle of the screen, so a third band for one number would push the path
+ * off centre. `pointer-events: none` because it is a readout, not a control —
+ * it must never eat a tap aimed at the first node of the path.
+ */
+.star-counter {
+  position: absolute;
+  top: clamp(0.5rem, 2vh, 1.25rem);
+  right: clamp(0.5rem, 2vw, 1.5rem);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3em 0.9em 0.3em 0.5em;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.9);
+  font-size: clamp(1.1rem, 3vw, 2rem);
+  font-weight: 800;
+  color: #402060;
+  pointer-events: none;
+}
+
+.star-counter > svg {
+  width: 1.3em;
+  height: 1.3em;
+}
+
 /* ------------------------------------------------------------ collection */
 
 /*
@@ -186,7 +213,9 @@ main { height: 100dvh; }
   padding: clamp(0.5rem, 1.5vh, 1.25rem) clamp(0.5rem, 3vw, 2rem)
     clamp(0.75rem, 2.5vh, 2rem);
   border-top: 3px solid #e2d8f0;
-  background: rgb(255 255 255 / 0.6);
+  /* Nearly opaque, because it sits over the barn floor: the empty slots are
+     pale grey and a translucent band would let the straw read as a filled one. */
+  background: rgb(255 255 255 / 0.88);
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -248,6 +277,7 @@ main { height: 100dvh; }
  * The ceremony. Both screens put what a child touches in the lower band and
  * everything they only read above it.
  */
+.award,
 .reward,
 .reveal {
   display: grid;
@@ -263,8 +293,40 @@ main { height: 100dvh; }
   font-weight: 800;
 }
 
+/*
+ * The offer: the duende and the chests he brought, on one baseline, so the
+ * screen reads as one gesture rather than as a character and a menu. `end`
+ * rather than `center` because a guide whose feet float beside the chests he
+ * is holding out looks pasted on.
+ *
+ * It wraps, and the chests win the argument when it does. Three targets a
+ * small hand can hit are the point of this screen; the guide beside them is
+ * not, so on a narrow phone he takes the row above rather than squeezing a
+ * chest off the edge.
+ */
+.reward__offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: center;
+  gap: clamp(0.5rem, 4vw, 3.5rem);
+}
+
+/*
+ * Sized by width, not height: height alone ignores how much room the chests
+ * still need, which is what pushes the third one off a phone. `pointer-events:
+ * none` so he can never swallow a tap meant for a chest.
+ */
+.duende {
+  width: clamp(90px, 14vw, 250px);
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+}
+
 .chests {
   display: flex;
+  align-items: end;
   gap: clamp(0.75rem, 5vw, 4rem);
   margin: 0;
   padding: 0;
@@ -281,13 +343,43 @@ main { height: 100dvh; }
 }
 .chest:focus-visible { outline: 4px solid #402060; outline-offset: 6px; }
 
+/*
+ * The stars just won. The same shape as the reveal — what you got above, the
+ * one way on below — so the two rewards read as one ceremony in two beats
+ * rather than as two different screens.
+ */
+.award__prize {
+  display: grid;
+  justify-items: center;
+  gap: clamp(0.5rem, 2vh, 1.5rem);
+}
+
+.award__stars {
+  display: flex;
+  gap: clamp(0.5rem, 3vw, 2rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.award__stars > li {
+  width: clamp(70px, 16vw, 170px);
+}
+
+.award__count {
+  margin: 0;
+  font-size: clamp(1.5rem, 5vw, 3.5rem);
+  font-weight: 800;
+}
+
 .reveal__prize {
   display: grid;
   justify-items: center;
   gap: clamp(0.5rem, 2vh, 1.5rem);
 }
-.reveal__prize img {
-  width: clamp(140px, 34vw, 360px);
+
+.reveal__animal {
+  width: clamp(130px, 28vw, 320px);
   height: auto;
 }
 .reveal__name {
@@ -310,9 +402,88 @@ main { height: 100dvh; }
 }
 .reveal__continue:focus-visible { outline: 4px solid #402060; outline-offset: 4px; }
 
+/*
+ * The ceremony's motion. The duende steps in from the side and settles into a
+ * slow idle while the chests rise in after him, so the offer is made rather
+ * than merely displayed; on the next screen the animal springs out of where
+ * the chosen chest was, and its name follows a beat later.
+ *
+ * All of it is decoration over screens that are already complete without it:
+ * under reduced motion the same duende, chests, and animal are simply there,
+ * which is why nothing here sets a starting opacity outside this block.
+ */
 @media (prefers-reduced-motion: no-preference) {
   .chest { transition: transform 140ms ease-out; }
   .chest:hover { transform: translateY(-8px); }
+
+  .duende {
+    animation:
+      duende-enters 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
+      duende-breathes 2.8s ease-in-out 520ms infinite;
+  }
+
+  /* Set down one after another, left to right, as if he were placing them. */
+  .chests > li {
+    animation: chest-offered 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  .chests > li:nth-child(1) { animation-delay: 300ms; }
+  .chests > li:nth-child(2) { animation-delay: 400ms; }
+  .chests > li:nth-child(3) { animation-delay: 500ms; }
+
+  /* The stars land one at a time, so three feels like three. */
+  .award__stars > li {
+    animation: prize-springs 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  .award__stars > li:nth-child(1) { animation-delay: 120ms; }
+  .award__stars > li:nth-child(2) { animation-delay: 260ms; }
+  .award__stars > li:nth-child(3) { animation-delay: 400ms; }
+  .award__count {
+    animation: name-arrives 300ms ease-out 520ms both;
+  }
+
+  /* The animal, then its name — the two beats of being told what you got. */
+  .reveal__animal {
+    animation: prize-springs 460ms cubic-bezier(0.34, 1.56, 0.64, 1) 220ms both;
+  }
+  .reveal__name {
+    animation: name-arrives 300ms ease-out 620ms both;
+  }
+}
+
+@keyframes duende-enters {
+  from {
+    opacity: 0;
+    transform: translateX(-45%) rotate(-9deg);
+  }
+}
+
+/* Deliberately tiny: at classroom-panel distance this reads as alive, and any
+   more would pull attention off the animal the child just won. */
+@keyframes duende-breathes {
+  50% {
+    transform: translateY(-2.5%);
+  }
+}
+
+@keyframes chest-offered {
+  from {
+    opacity: 0;
+    transform: translateY(35%) scale(0.8);
+  }
+}
+
+@keyframes prize-springs {
+  from {
+    opacity: 0;
+    transform: scale(0.3) translateY(30%);
+  }
+}
+
+@keyframes name-arrives {
+  from {
+    opacity: 0;
+    transform: translateY(0.4em);
+  }
 }
 
 /* Announced, never drawn. */
