@@ -62,7 +62,8 @@ export function queueVocabularyPictures(
  */
 type CardRider = Phaser.GameObjects.GameObject &
   Phaser.GameObjects.Components.Transform &
-  Phaser.GameObjects.Components.Depth;
+  Phaser.GameObjects.Components.Depth &
+  Phaser.GameObjects.Components.Visible;
 
 /** A rounded card. Phaser's Rectangle cannot round corners, so this draws. */
 export class VocabularyCard {
@@ -166,6 +167,24 @@ export class VocabularyCard {
   /** Puts the card back where it was dealt. */
   returnHome(): void {
     this.moveTo(this.x, this.y);
+  }
+
+  /**
+   * Takes the card off the screen — its drawing, its contents, and its pointer
+   * target.
+   *
+   * A card that has been dragged somewhere and then consumed cannot be
+   * *repainted* out of sight: it is no longer over the field it came from, so
+   * filling it with the background colour leaves a blank card sitting wherever
+   * the child let go — on top of the slot it just filled, covering the answer.
+   * Clearing it is the only way that holds wherever it ended up.
+   */
+  hide(): void {
+    this.graphics.clear();
+    this.hit.disableInteractive();
+    for (const rider of this.riders) {
+      rider.setVisible(false);
+    }
   }
 
   /**

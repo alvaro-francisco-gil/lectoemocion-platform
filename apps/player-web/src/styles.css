@@ -59,11 +59,15 @@ main { height: 100dvh; }
  * The world reads left to right as one path, so progress is a place you have
  * reached rather than a number.
  *
- * Two bands: the path, centred in what is left of the screen, and the
- * collection pinned to the bottom. The path keeps the middle of the display —
- * the reachable band on a panel and the comfortable one on a tablet — while
- * the row of animals sits under it as a footer a child looks at rather than
- * touches.
+ * Two bands: the path, centred in the screen, and the collection over the
+ * bottom edge. The path keeps the middle of the display — the reachable band on
+ * a panel and the comfortable one on a tablet — while the row of animals sits
+ * under it as a footer a child looks at rather than touches.
+ *
+ * The collection is out of the flow on purpose. It grows a row taller on a
+ * narrow screen and shorter on a wide one, and as a grid band it would drag the
+ * path off the middle of the display every time it changed height. The path is
+ * the thing a child aims at, so it is the thing that stays put.
  *
  * The barn is the hub the framing story puts a child in, so it is the map's
  * background rather than a picture on it: `cover` from the centre, because the
@@ -75,7 +79,7 @@ main { height: 100dvh; }
 .map {
   position: relative;
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr;
   overflow: hidden;
   background:
     linear-gradient(rgb(255 255 255 / 0.34), rgb(255 255 255 / 0.34)),
@@ -83,9 +87,12 @@ main { height: 100dvh; }
 }
 
 /*
- * The path itself scrolls, not the page. `.map` is a fixed two-band layout, so
- * a path wider than the screen has to take its overflow here or it would push
- * the collection off the bottom.
+ * The path itself scrolls, not the page. `.map` fills the screen exactly, so a
+ * path wider than it has to take its overflow here.
+ *
+ * `align-self: center` against the map's single full-height row is what puts
+ * the path in the middle of the *screen*, not in the middle of whatever the
+ * collection leaves over.
  */
 .map__world {
   align-self: center;
@@ -93,6 +100,27 @@ main { height: 100dvh; }
   overflow-y: hidden;
   padding-block: clamp(0.75rem, 4vh, 3rem);
 }
+
+/*
+ * Both bands are dragged, not scrolled with a bar.
+ *
+ * A scrollbar is a thin adult target at the edge of a band: it says nothing to
+ * a child about what it does, and on an 86-inch panel the one under the path is
+ * not reachable at all. So it is hidden, and `useDragScroll` teaches the mouse
+ * and the stylus the grab-and-pan a touchscreen already does. Keyboard reach is
+ * unaffected — focusing a node still scrolls it into view.
+ */
+.map__world,
+.collection {
+  cursor: grab;
+  user-select: none;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.map__world::-webkit-scrollbar,
+.collection::-webkit-scrollbar { display: none; }
+.map__world[data-dragging],
+.collection[data-dragging] { cursor: grabbing; }
 
 .world-path {
   display: flex;
@@ -207,9 +235,14 @@ main { height: 100dvh; }
 
 /*
  * The animals, one slot per chapter. Display only — nothing here is a button,
- * so it may sit at the very bottom edge where a stray hand rests.
+ * so it may sit at the very bottom edge where a stray hand rests, and it may
+ * overlay the path rather than push it: out of the flow, it cannot move the one
+ * thing on this screen a child aims at.
  */
 .collection {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 1;
   padding: clamp(0.5rem, 1.5vh, 1.25rem) clamp(0.5rem, 3vw, 2rem)
     clamp(0.75rem, 2.5vh, 2rem);
   border-top: 3px solid #e2d8f0;

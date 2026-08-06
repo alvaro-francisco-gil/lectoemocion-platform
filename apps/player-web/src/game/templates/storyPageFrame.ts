@@ -2,53 +2,89 @@ import * as Phaser from "phaser";
 import type { StoryPage } from "@lectoemocion/resource-schema";
 
 /**
- * The page as it sat in the source application: a white card on pale blue,
- * with the drawing filling it and the letter out in its own margin.
+ * The reading surface, reproduced from the application the book shipped with.
  *
- * `#E9F3FA` is that application's own page background, carried over so the
- * book still looks like itself. The card's white, purple border and corner
- * radius are the player's existing card — reused rather than restated, so
- * there is one answer to what a card looks like here.
- */
-export const PAGE_BACKGROUND = "#e9f3fa";
-
-/**
- * The picture box, in the player's 1280×720 logical space.
+ * These values are that application's, converted from its stylesheet: a pale
+ * blue field (`#E9F3FA`), a white page with a soft grey edge, and a green play
+ * control in the bottom corner. Matching it is the point — this is the screen
+ * the author and her readers already know.
  *
- * Sized so a 4:3 page — every page in the book is 4:3 — leaves the lower band
- * clear for the controls a child actually touches.
+ * This is to a story what `CARD` is to a vocabulary game: the look lives in one
+ * place so a second title cannot quietly acquire a different one.
  */
-export const PAGE_BOX = { x: 640, y: 320, width: 760, height: 570 } as const;
+export const PAGE = {
+  backdrop: 0xe9f3fa,
+  sheet: 0xffffff,
+  sheetEdge: 0xd8e3ee,
+  ink: "#2b3a4a",
+  quiet: "#6a7c8d",
+  accent: 0x2f9e44,
+  control: 0xffffff,
+  controlEdge: 0xc3d2e0,
+  radius: 18,
+  /** The white margin around the drawing, on every side. */
+  margin: 14,
+  /* The page box. Scans are 4:3, so height is what binds; the width is slack. */
+  boxWidth: 940,
+  boxHeight: 560,
+  centreX: 640,
+  centreY: 336,
+  /** Everything a child touches sits in the bottom band of the display. */
+  controlsY: 654
+} as const;
 
-export function pageKey(page: StoryPage): string {
-  return `story-page:${page.pageId}`;
+export function storyPictureKey(page: StoryPage): string {
+  return `story-image:${page.pageId}`;
 }
 
-export function pageAudioKey(page: StoryPage): string {
+export function storyAudioKey(page: StoryPage): string {
   return `story-audio:${page.pageId}`;
 }
 
 /**
- * Queues every page picture a story needs.
+ * Queues every picture a story needs.
  *
- * Pictures are preloaded together — about a megabyte for the whole book — so a
- * page turn never waits on the network. The recordings are not: see
- * `renderIllustratedStory`.
+ * Call from a scene's `preload`. The pictures are the cheap half of a book —
+ * about a megabyte for thirty-one pages against five for the recordings — and
+ * a page that turns to a picture still arriving reads as broken, so these come
+ * up front and fail closed together (invariant 6). The recordings do not:
+ * they are fetched a page at a time as the book plays.
  */
 export function queueStoryPictures(
   scene: Phaser.Scene,
   pages: readonly StoryPage[]
 ): void {
   for (const page of pages) {
-    scene.load.image(pageKey(page), page.imageUrl);
+    scene.load.image(storyPictureKey(page), page.imageUrl);
   }
 }
 
-/** Fits a page inside the picture box, preserving its aspect. */
-export function fitPage(image: Phaser.GameObjects.Image): void {
+/**
+ * Lays a page on the sheet: the drawing fitted to the box, the white page drawn
+ * to whatever size that turned out to be.
+ *
+ * The sheet is sized from the picture rather than fixed, so a story whose pages
+ * are not 4:3 gets a page that fits its drawings instead of a letterbox.
+ */
+export function layOutPage(
+  sheet: Phaser.GameObjects.Graphics,
+  picture: Phaser.GameObjects.Image
+): void {
   const scale = Math.min(
-    PAGE_BOX.width / image.width,
-    PAGE_BOX.height / image.height
+    PAGE.boxWidth / picture.width,
+    PAGE.boxHeight / picture.height,
+    1
   );
-  image.setScale(scale);
+  picture.setScale(scale).setPosition(PAGE.centreX, PAGE.centreY);
+
+  const width = picture.width * scale + PAGE.margin * 2;
+  const height = picture.height * scale + PAGE.margin * 2;
+  const left = PAGE.centreX - width / 2;
+  const top = PAGE.centreY - height / 2;
+
+  sheet.clear();
+  sheet.fillStyle(PAGE.sheet, 1);
+  sheet.fillRoundedRect(left, top, width, height, PAGE.radius);
+  sheet.lineStyle(2, PAGE.sheetEdge, 1);
+  sheet.strokeRoundedRect(left, top, width, height, PAGE.radius);
 }

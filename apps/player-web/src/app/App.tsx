@@ -20,6 +20,7 @@ import {
 } from "../world/mapView";
 import { LOCAL_OWNER, LocalProgressStore } from "../world/progressStore";
 import { unlockAllEnabled } from "../world/unlockAll";
+import { useDragScroll } from "./useDragScroll";
 
 const store = new LocalProgressStore(
   typeof localStorage === "undefined"
@@ -61,6 +62,7 @@ export function App() {
    */
   const [revealed, setRevealed] = useState<CollectibleAnimal | null>(null);
   const host = useRef<HTMLDivElement>(null);
+  const panWorld = useDragScroll();
 
   useEffect(() => {
     let cancelled = false;
@@ -162,7 +164,7 @@ export function App() {
         An ordered list because the world is a sequence: that is what a screen
         reader should hear, and it is what the connecting line draws.
       */}
-      <nav aria-label="Mundo" className="map__world">
+      <nav aria-label="Mundo" className="map__world" ref={panWorld}>
         <ol className="world-path">
           {view.nodes.map((node, index) => (
             <li key={node.id}>
@@ -238,7 +240,11 @@ function StarAward({
  */
 function Collection({ slots }: { slots: readonly CollectionSlotView[] }) {
   return (
-    <section className="collection" aria-label="Mis animales">
+    <section
+      className="collection"
+      aria-label="Mis animales"
+      ref={useDragScroll()}
+    >
       <ul className="collection__slots">
         {slots.map((slot) => (
           <li

@@ -104,20 +104,16 @@ export function renderLettersGame(
     slotOf.set(slot.target, index);
   });
 
-  interface TrayView {
-    readonly card: VocabularyCard;
-    readonly label: Phaser.GameObjects.Text;
-  }
-  const tray = new Map<string, TrayView>();
+  /* The card carries its own letter, so the card alone is the whole view. */
+  const tray = new Map<string, VocabularyCard>();
   const cardOf = new Map<Phaser.GameObjects.GameObject, string>();
 
   round.tray.forEach((letter: LetterCard, index) => {
     const x = letterColumnX(index, round.tray.length);
     const card = new VocabularyCard(scene, x, trayRowY, cardWidth, cardHeight);
-    const label = addLabel(scene, letter.letter, x, trayRowY, 48);
-    card.carry(label);
+    card.carry(addLabel(scene, letter.letter, x, trayRowY, 48));
     card.draggable();
-    tray.set(letter.cardId, { card, label });
+    tray.set(letter.cardId, card);
     cardOf.set(card.target, letter.cardId);
 
     /*
@@ -144,7 +140,7 @@ export function renderLettersGame(
       placedByDrag = false;
       /* A drag is its own selection; a stale held card would place the wrong one. */
       heldCardId = null;
-      tray.get(cardId)?.card.lift(DRAG_DEPTH);
+      tray.get(cardId)?.lift(DRAG_DEPTH);
       paint();
     }
   );
@@ -159,7 +155,7 @@ export function renderLettersGame(
     ) => {
       const cardId = cardOf.get(object);
       if (cardId === undefined) return;
-      tray.get(cardId)?.card.moveTo(dragX, dragY);
+      tray.get(cardId)?.moveTo(dragX, dragY);
     }
   );
 
@@ -182,10 +178,10 @@ export function renderLettersGame(
     (_pointer: Phaser.Input.Pointer, object: Phaser.GameObjects.GameObject) => {
       const cardId = cardOf.get(object);
       if (cardId === undefined) return;
-      const view = tray.get(cardId);
-      view?.card.lift(0);
+      const card = tray.get(cardId);
+      card?.lift(0);
       /* A letter let go anywhere but its slot goes back where it was dealt. */
-      if (!placedByDrag) view?.card.returnHome();
+      if (!placedByDrag) card?.returnHome();
       dragging = null;
       paint();
     }
@@ -206,9 +202,8 @@ export function renderLettersGame(
     switch (outcome.kind) {
       case "placed":
         heldCardId = null;
-        held?.card.disable();
-        held?.card.paint(CARD.fill, LETTER_BACKGROUND, 0);
-        held?.label.setVisible(false);
+        /* The letter is in the slot now; the card that carried it is spent. */
+        held?.hide();
         if (round.status === "won") {
           banner.setText("¡Muy bien!");
           onComplete();
@@ -242,9 +237,9 @@ export function renderLettersGame(
       );
       slots[index]?.paint(filled ? CARD.matched : CARD.fill);
     });
-    for (const [cardId, view] of tray) {
+    for (const [cardId, card] of tray) {
       if (!round.tray.some((each) => each.cardId === cardId)) continue;
-      view.card.paint(
+      card.paint(
         cardId === heldCardId ? CARD.selected : CARD.fill,
         CARD.border,
         cardId === heldCardId ? CARD.borderWidth + 4 : CARD.borderWidth

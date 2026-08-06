@@ -52,3 +52,17 @@ export function pageLabel(page: StoryPage): string {
     ? `Letra ${page.grapheme}`
     : `Letra ${page.grapheme} (sonido /${page.sound}/)`;
 }
+
+/**
+ * The same page, named for a cell in a page picker rather than a sentence.
+ *
+ * A grid of thirty-one `Letra C (sonido /K/)` is unreadable at a glance, which
+ * is the only thing a picker is for. Derived from the same fields as
+ * `pageLabel` so the two can never name different letters.
+ */
+export function pageShortLabel(page: StoryPage): string {
+  if (page.kind === "cover") return "Portada";
+  return page.sound === undefined
+    ? page.grapheme
+    : `${page.grapheme} /${page.sound}/`;
+}

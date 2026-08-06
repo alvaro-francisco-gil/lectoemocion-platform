@@ -70,6 +70,11 @@ export class ResourceScene extends Phaser.Scene {
       renderNameStory(this, resource, done);
       return;
     }
+    /*
+     * The story loads its own pages. It is the one template whose content is
+     * too large to preload — thirty-one pictures and thirty-one recordings —
+     * so it fetches page by page and reports a missing one itself.
+     */
     if (isTemplate(resource, "illustrated-story")) {
       renderIllustratedStory(this, resource, done);
       return;
