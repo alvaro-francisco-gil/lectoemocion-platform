@@ -11,6 +11,7 @@ art here by hand.
 | Committed | Source | Size | Depicts |
 |---|---|---|---|
 | `duende.webp` | `duende.svg`, supplied by the repository owner | 31 kB | An illustrated elf |
+| `granero.webp` | a generated PNG supplied by the repository owner | 38 kB | An empty barn interior |
 
 ## Source and rights
 
@@ -19,8 +20,14 @@ As with `../vocabulary/`, no per-file licence identifier was recorded; if the
 image is ever challenged, the remedy is to replace the file and re-run the
 importer.
 
-The subject is a drawn cartoon character. It is not a photograph, it depicts no
-real person, and it carries no child data.
+`granero.webp` came from a 1536×1024 PNG the repository owner generated with an
+image model and supplied for this purpose. It is the map screen's backdrop. The
+same remedy applies: replace the source and re-run the importer.
+
+Both subjects are drawn. Neither is a photograph, neither depicts a real
+person, and neither carries child data. Note that this is generated *art*, not
+generated *content* — the product ships no AI-generated words, pictures of a
+child, or gameplay; see `AGENTS.md`.
 
 ## Processing
 
@@ -32,9 +39,15 @@ and the stocking stripes, survives — trims to the character, resizes to fit
 within 512×512 without enlargement, and re-encodes as WebP at quality 82. The
 committed file is 283×512 and 31 kB, a twentieth of what was supplied.
 
-The source SVG is deliberately not committed. It is strictly worse than the
-file beside it in every dimension, and keeping both would leave two answers to
-"which one does the player use".
+`granero.webp` was imported with `--scene`, which skips both the background
+lift and the trim: the picture *is* the rectangle, so flooding its edges or
+cropping to content would destroy the composition. It keeps its full 1536×1024
+— under the 1920 scene ceiling — and re-encodes at quality 72, which turns a
+1.7 MB PNG into 38 kB.
+
+Neither source file is committed. Each is strictly worse than the file beside
+it in every dimension, and keeping both would leave two answers to "which one
+does the player use".
 
 ## Why this directory carries a PROVENANCE.md
 
