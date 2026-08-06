@@ -146,13 +146,6 @@ export function App() {
   return (
     <main className="map">
       {/*
-        The duende is the framing story's guide. It sits in the upper corner:
-        decoration belongs in the band a child aged 3–5 cannot reach, well
-        clear of the path they choose from. Empty `alt` because it names
-        nothing a screen reader needs — the world is the list below.
-      */}
-      <img className="map__duende" src="/world/duende.webp" alt="" />
-      {/*
         An ordered list because the world is a sequence: that is what a screen
         reader should hear, and it is what the connecting line draws.
       */}
@@ -236,20 +229,28 @@ function Chests({
   return (
     <main className="reward">
       <p className="reward__prompt">¡Muy bien! Elige un cofre</p>
-      <ul className="chests">
-        {reward.choices.map((animal, index) => (
-          <li key={animal.animalId}>
-            <button
-              type="button"
-              className="chest"
-              aria-label={`Abrir el cofre ${index + 1}`}
-              onClick={() => onOpen(reward.nodeId, animal)}
-            >
-              <ChestIcon />
-            </button>
-          </li>
-        ))}
-      </ul>
+      {/*
+        The duende is where the chests came from. He stands beside them rather
+        than above the prompt, so the screen reads as one offer being made —
+        and he is `alt=""` because he is not a fourth thing to choose.
+      */}
+      <div className="reward__offer">
+        <img className="duende" src="/world/duende.webp" alt="" />
+        <ul className="chests">
+          {reward.choices.map((animal, index) => (
+            <li key={animal.animalId}>
+              <button
+                type="button"
+                className="chest"
+                aria-label={`Abrir el cofre ${index + 1}`}
+                onClick={() => onOpen(reward.nodeId, animal)}
+              >
+                <ChestIcon />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
     </main>
   );
 }

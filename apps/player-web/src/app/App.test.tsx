@@ -174,16 +174,12 @@ describe("the world shell", () => {
     expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
   });
 
-  it("shows the duende on the map as decoration only", () => {
+  it("keeps the duende off the map and off a running game", () => {
     const { container } = render(<App />);
-
-    /* Present, but nameless: it guides the eye, not the screen reader, and it
-       must never compete with a node for a tap. */
-    expect(container.querySelector(".map__duende")).toBeInTheDocument();
-    expect(screen.queryAllByRole("img")).toEqual([]);
+    expect(container.querySelector(".duende")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
-    expect(container.querySelector(".map__duende")).toBeNull();
+    expect(container.querySelector(".duende")).toBeNull();
   });
 
   it("keeps the collection out of the world's list of destinations", () => {
@@ -237,6 +233,30 @@ describe("the chest a chapter is worth", () => {
     ).toBe(3);
     /* The map is not behind the chests: the ceremony is the whole screen. */
     expect(screen.queryByRole("navigation", { name: "Mundo" })).toBeNull();
+  });
+
+  /*
+   * The duende belongs to this one moment. He is the framing story's guide, and
+   * a guide who is always on screen stops being an event; handing over the
+   * chests is the one thing in the world he actually does.
+   */
+  it("stands the duende with the chests and takes him away at the reveal", async () => {
+    const { container } = render(<App />);
+    finishTheFirstChapter();
+
+    /* Present, but nameless: he is who the chests came from, not a fourth
+       thing to press, and a screen reader offering him would be offering a
+       choice that does not exist. */
+    await screen.findByRole("button", { name: "Abrir el cofre 1" });
+    expect(container.querySelector(".duende")).toBeInTheDocument();
+    expect(screen.queryAllByRole("img")).toEqual([]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir el cofre 1" }));
+
+    /* The animal arrives alone. Whatever a child won has the screen to
+       itself. */
+    expect(await screen.findByRole("status")).toBeInTheDocument();
+    expect(container.querySelector(".duende")).toBeNull();
   });
 
   it("puts the animal from the chest into that chapter's slot", async () => {
