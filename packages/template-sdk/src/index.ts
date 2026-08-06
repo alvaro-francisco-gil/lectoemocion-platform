@@ -11,6 +11,19 @@ export type {
   PairsSelection
 } from "./rules/pairsGame";
 export {
+  assertDistinctInitials,
+  createInitialLetterRound,
+  selectInitialLetterCard,
+  wordInitial
+} from "./rules/initialLetterGame";
+export type {
+  InitialLetterAttempt,
+  InitialLetterCard,
+  InitialLetterCardGroup,
+  InitialLetterRound,
+  InitialLetterSelection
+} from "./rules/initialLetterGame";
+export {
   LETTERS_MAXIMUM,
   LETTERS_MINIMUM,
   assertSpellable,

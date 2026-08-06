@@ -16,6 +16,7 @@ import { setDefaultResultOrder } from "node:dns";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
+import { removeWhiteBackground } from "./lib/remove-white-background.mjs";
 
 /* Some networks advertise IPv6 for github.com but cannot route it. */
 setDefaultResultOrder("ipv4first");
@@ -98,14 +99,7 @@ async function main() {
       throw new Error(`Downloading ${item.entry.name} failed: ${response.status}`);
     }
     const source = Buffer.from(await response.arrayBuffer());
-    const output = await sharp(source)
-      .resize(EDGE, EDGE, {
-        fit: "inside",
-        withoutEnlargement: true,
-        background: { r: 255, g: 255, b: 255, alpha: 0 }
-      })
-      .webp({ quality: QUALITY })
-      .toBuffer();
+    const output = await encode(source);
 
     await writeFile(join(OUTPUT_DIR, `${item.word}.webp`), output);
     imported.push({ ...item, bytes: output.length, sourceBytes: source.length });

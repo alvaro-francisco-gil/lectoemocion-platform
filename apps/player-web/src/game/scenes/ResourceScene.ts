@@ -2,6 +2,7 @@ import * as Phaser from "phaser";
 import { assertNever } from "@lectoemocion/domain";
 import { isTemplate, type ResourceManifest } from "@lectoemocion/resource-schema";
 import { renderIllustratedStory } from "../templates/renderIllustratedStory";
+import { renderInitialLetterGame } from "../templates/renderInitialLetterGame";
 import { renderInitialsGame } from "../templates/renderInitialsGame";
 import { renderLettersGame } from "../templates/renderLettersGame";
 import { renderMemoryAlbum } from "../templates/renderMemoryAlbum";
@@ -93,6 +94,10 @@ export class ResourceScene extends Phaser.Scene {
     }
     if (isTemplate(resource, "word-picture-game")) {
       renderWordPictureGame(this, resource, done);
+      return;
+    }
+    if (isTemplate(resource, "initial-letter-game")) {
+      renderInitialLetterGame(this, resource, done);
       return;
     }
     if (isTemplate(resource, "syllables-game")) {

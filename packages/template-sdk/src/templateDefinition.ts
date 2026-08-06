@@ -31,6 +31,7 @@ export const TEMPLATE_KINDS: Record<TemplateIdentifier, ResourceKind> = {
   "memory-album": "non-interactive",
   "pairs-game": "minigame",
   "word-picture-game": "minigame",
+  "initial-letter-game": "minigame",
   "syllables-game": "minigame",
   "letters-game": "minigame"
 };

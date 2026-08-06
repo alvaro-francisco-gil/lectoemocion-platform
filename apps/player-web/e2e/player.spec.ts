@@ -1,6 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 import { createResourceForNode, world } from "@lectoemocion/template-catalog";
-import { createLettersRound } from "@lectoemocion/template-sdk";
+import {
+  createInitialLetterRound,
+  createLettersRound
+} from "@lectoemocion/template-sdk";
+import {
+  INITIAL_LETTER_LAYOUT,
+  initialLetterColumnX
+} from "../src/game/templates/initialLetterLayout";
 import {
   LETTERS_LAYOUT,
   letterColumnX
@@ -125,8 +132,10 @@ test("finishing a chapter hands out an animal for the collection", async ({
   page
 }) => {
   await page.goto("/");
+  /* One slot per chapter, counted from the world so a new one does not fail
+     this test for having been added. */
   const empty = page.locator('.collection__slot[data-filled="false"]');
-  await expect(empty).toHaveCount(8);
+  await expect(empty).toHaveCount(world.nodes.length);
 
   await page.getByRole("button", { name: ENTRY }).click();
   await completed(page, "encuentro");
@@ -141,7 +150,7 @@ test("finishing a chapter hands out an animal for the collection", async ({
   const filled = page.locator('.collection__slot[data-filled="true"]');
   await expect(filled).toHaveCount(1);
   await expect(filled.locator("img")).toBeVisible();
-  await expect(empty).toHaveCount(7);
+  await expect(empty).toHaveCount(world.nodes.length - 1);
 });
 
 test("the collection sits below the path, and the path is centred", async ({
@@ -179,14 +188,13 @@ test("a completed chapter stays replayable", async ({ page }) => {
 });
 
 test("the non-interactive resource plays to its end", async ({ page }) => {
-  await withProgress(page, [
-    "encuentro",
-    "iniciales",
-    "parejas",
-    "cual-es",
-    "silabas",
-    "letras"
-  ]);
+  /* Everything but the album itself, taken from the world rather than listed:
+     what unlocks it is the world's business, and a hand-written list would
+     leave this test locked out the next time a chapter is added before it. */
+  await withProgress(
+    page,
+    world.nodes.map((node) => node.id).filter((id) => id !== "album")
+  );
   await page.goto("/");
 
   const album = page.getByRole("button", { name: ALBUM });
@@ -204,15 +212,17 @@ test("the non-interactive resource plays to its end", async ({ page }) => {
   );
 });
 
+/**
+ * Every node is seeded complete so that every one of them is open, and the
+ * list swept is the world's own rather than a copy of it. A hand-written list
+ * silently stops covering the world the moment a chapter is added — which is
+ * exactly when a new resource has never been looked at on a real viewport.
+ */
 test("the world and every resource fit the viewport", async ({ page }) => {
-  await withProgress(page, [
-    "encuentro",
-    "iniciales",
-    "parejas",
-    "cual-es",
-    "silabas",
-    "letras"
-  ]);
+  await withProgress(
+    page,
+    world.nodes.map((node) => node.id)
+  );
   await page.goto("/");
 
   const viewport = await page.evaluate(() => ({
@@ -237,6 +247,7 @@ test("the world and every resource fit the viewport", async ({ page }) => {
     SECOND,
     "El bosque de parejas",
     "¿Cuál es?",
+    "Las primeras letras",
     "El puente de sílabas",
     "El taller de letras",
     ALBUM
@@ -478,5 +489,78 @@ test("the letters game is won by dragging each letter into its slot", async ({
   }
 
   await completed(page, "letras");
+  expect(failures).toEqual([]);
+});
+
+/**
+ * The initial-letter game, won by tapping.
+ *
+ * Its rules are proved by their own tests; what cannot be is that each of the
+ * two rows is actually under the pointer. The letter row is a different size
+ * from the picture row, so a card whose drawing and whose hit area disagree
+ * would leave a child pressing a letter that never answers — and every rules
+ * test would still pass.
+ *
+ * Where to press is derived from the seeded deal and `INITIAL_LETTER_LAYOUT`,
+ * never copied here.
+ */
+test("the initial-letter game is won by tapping each picture and its letter", async ({
+  page
+}) => {
+  const failures: string[] = [];
+  page.on("pageerror", (error) => failures.push(error.message));
+
+  await withProgress(page, ["encuentro", "iniciales", "parejas", "cual-es"]);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Las primeras letras" }).click();
+
+  const box = await canvasBox(page);
+  const node = world.nodes.find(
+    (candidate) => candidate.id === "primeras-letras"
+  )!;
+  const resource = createResourceForNode(node);
+  if (resource.template.id !== "initial-letter-game") {
+    throw new Error("The chapter no longer plays the initial-letter game");
+  }
+  const round = createInitialLetterRound(resource);
+
+  const scale = Math.min(
+    box.width / INITIAL_LETTER_LAYOUT.canvasWidth,
+    box.height / INITIAL_LETTER_LAYOUT.canvasHeight
+  );
+  const at = (x: number, y: number) => ({
+    x:
+      box.x +
+      box.width / 2 +
+      (x - INITIAL_LETTER_LAYOUT.canvasWidth / 2) * scale,
+    y:
+      box.y +
+      box.height / 2 +
+      (y - INITIAL_LETTER_LAYOUT.canvasHeight / 2) * scale
+  });
+
+  const row = (group: "picture" | "letter") =>
+    round.cards.filter((card) => card.group === group);
+  const pictures = row("picture");
+  const letters = row("letter");
+
+  for (const [index, picture] of pictures.entries()) {
+    const letterIndex = letters.findIndex(
+      (card) => card.initial === picture.initial
+    );
+    const from = at(
+      initialLetterColumnX(index, pictures.length),
+      INITIAL_LETTER_LAYOUT.pictureRowY
+    );
+    const to = at(
+      initialLetterColumnX(letterIndex, letters.length),
+      INITIAL_LETTER_LAYOUT.letterRowY
+    );
+
+    await page.mouse.click(from.x, from.y);
+    await page.mouse.click(to.x, to.y);
+  }
+
+  await completed(page, "primeras-letras");
   expect(failures).toEqual([]);
 });
