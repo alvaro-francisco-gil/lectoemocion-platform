@@ -189,6 +189,17 @@ main { height: 100dvh; }
 .world-node[disabled] { cursor: not-allowed; }
 
 /*
+ * The card's corner radius, named because three rules depend on it.
+ *
+ * The marker rounds by it, and the two chips that ride over the picture — the
+ * title and the adult's note — are held above the bottom by it. Their left edge
+ * is flat and flush with the card's, which only lines up along the part of that
+ * edge that is straight: below this much, the card curves away and the chip
+ * hangs over nothing.
+ */
+.world-node { --world-card-radius: 24px; }
+
+/*
  * The card a chapter's picture fills.
  *
  * 4:3 and rounded, with the picture covering it edge to edge: a rectangle is
@@ -207,7 +218,7 @@ main { height: 100dvh; }
   display: grid;
   grid-template: 1fr / 1fr;
   overflow: hidden;
-  border-radius: 24px;
+  border-radius: var(--world-card-radius);
   background: #4a2a75;
   box-shadow: 0 8px 0 rgb(0 0 0 / 0.22);
 }
@@ -252,7 +263,7 @@ main { height: 100dvh; }
 .world-node__icon {
   width: 100%;
   height: 100%;
-  padding: 5% 5% 16%;
+  padding: 5% 5% 20%;
   object-fit: contain;
 }
 
@@ -265,14 +276,14 @@ main { height: 100dvh; }
 .world-node__title {
   place-self: end start;
   z-index: 1;
-  max-width: 85%;
-  margin-bottom: 0.7rem;
-  padding: 0.3em 0.9em;
+  max-width: 95%;
+  margin-bottom: var(--world-card-radius);
+  padding: 0.35em 1em;
   border-radius: 0 999px 999px 0;
   background: #fff;
   color: #241133;
   font-weight: 800;
-  font-size: clamp(0.85rem, 1.6vw, 1.15rem);
+  font-size: clamp(1rem, 2.1vw, 1.5rem);
   line-height: 1.2;
   text-align: left;
 }
@@ -308,7 +319,7 @@ main { height: 100dvh; }
   place-self: end start;
   z-index: 1;
   max-width: 92%;
-  margin-bottom: 0.15rem;
+  margin-bottom: var(--world-card-radius);
   padding: 0.25em 0.9em;
   border-radius: 0 999px 999px 0;
   background: rgb(36 17 51 / 82%);
@@ -317,6 +328,17 @@ main { height: 100dvh; }
   font-size: clamp(0.6rem, 1.05vw, 0.78rem);
   line-height: 1.25;
   text-align: left;
+}
+
+/*
+ * The note takes the bottom of the card, so the title moves up over it.
+ *
+ * They are siblings in one grid cell rather than a stacked pair, so neither can
+ * be laid out from the other's height; this is the note's, with a gap, and it
+ * applies to the single card that carries a note.
+ */
+.world-node[data-state="needs-roster"] .world-node__title {
+  margin-bottom: calc(var(--world-card-radius) + 2.1rem);
 }
 
 /*
@@ -348,10 +370,20 @@ main { height: 100dvh; }
 }
 
 .world-node:focus-visible { outline: 4px solid #f4c95d; outline-offset: 4px; }
-.world-node:not([disabled]):hover .world-node__marker { transform: scale(1.04); }
+
+/*
+ * The whole card grows, not the picture inside it.
+ *
+ * The title chip and the adult's note are siblings of the marker, not children
+ * of it — the marker is `aria-hidden`, and the title is the button's accessible
+ * name, so it cannot live in there. Scaling the marker alone therefore left the
+ * chip at its original size, sliding out of the corner it belongs in. Scaling
+ * the button carries picture, chip and note as one.
+ */
+.world-node:not([disabled]):hover { transform: scale(1.04); }
 
 @media (prefers-reduced-motion: no-preference) {
-  .world-node__marker { transition: transform 120ms ease-out; }
+  .world-node { transition: transform 120ms ease-out; }
 }
 
 /* ---------------------------------------------------------------- stars */
@@ -381,7 +413,7 @@ main { height: 100dvh; }
   padding: 0.3em 0.9em 0.3em 0.5em;
   border-radius: 999px;
   background: rgb(255 255 255 / 0.9);
-  font-size: clamp(1.1rem, 3vw, 2rem);
+  font-size: clamp(1.1rem, 3.8vw, 2.6rem);
   font-weight: 800;
   color: #402060;
   pointer-events: none;
@@ -402,6 +434,13 @@ main { height: 100dvh; }
  * Out of the flow so it cannot move the row of cards when its height changes,
  * and `pointer-events` only on the pill itself, so the empty space beside it
  * stays part of the surface a hand can grab to pan the world.
+ *
+ * The bar grows with the viewport but its floor does not. A centred pill and a
+ * right-hand collection button meet in the middle of the bottom edge, and on
+ * the narrowest phone they already clear each other by a few pixels; the room
+ * to be bigger is on a tablet and on a classroom panel, which is where the vw
+ * term and the ceiling were raised. Anything that raises a `clamp` minimum
+ * along this edge has to be checked at 320px first.
  */
 .tab-bar {
   position: absolute;
@@ -429,19 +468,19 @@ main { height: 100dvh; }
   display: grid;
   justify-items: center;
   gap: 0.15rem;
-  min-width: clamp(64px, 16vw, 130px);
+  min-width: clamp(64px, 18vw, 160px);
   padding: 0.4rem 0.6rem;
   border: 0;
   border-radius: 20px;
   background: none;
   font: inherit;
   font-weight: 700;
-  font-size: clamp(0.75rem, 1.7vw, 1.05rem);
+  font-size: clamp(0.75rem, 2.1vw, 1.35rem);
   color: #d6c4ee;
   cursor: pointer;
 }
 .tab__icon { display: grid; place-items: center; }
-.tab__icon > svg { width: clamp(24px, 5vw, 34px); height: auto; }
+.tab__icon > svg { width: clamp(24px, 6.2vw, 46px); height: auto; }
 
 /* Where you are standing, said twice: brighter, and on a plate of its own. */
 .tab[aria-current="page"] {
@@ -468,7 +507,7 @@ main { height: 100dvh; }
   right: clamp(0.5rem, 3vw, 2rem);
   bottom: clamp(0.75rem, 3vh, 2rem);
   z-index: 2;
-  width: clamp(56px, 11vw, 76px);
+  width: clamp(56px, 14vw, 104px);
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -494,9 +533,11 @@ main { height: 100dvh; }
  *
  * A face rather than three bars because the one person on this screen who
  * cannot read is the one most likely to press it, and their own avatar is the
- * only label that needs no words. It is the same 56px disc as the way back out
- * of a game: they are the same kind of control — the app talking, not the
- * world.
+ * only label that needs no words. It is the same disc as the way back out of a
+ * game — the same kind of control, the app talking rather than the world — but
+ * a larger one: the back button carries an arrow that reads at any size, while
+ * this one has to be recognised as a particular child's face from across a
+ * classroom, and a 56px face is a smudge at that distance.
  *
  * High and in a corner: adult chrome may sit above the world, but never in the
  * band where a child's hands land — that band is the bar's.
@@ -506,8 +547,8 @@ main { height: 100dvh; }
   top: clamp(0.5rem, 2vh, 1.25rem);
   left: clamp(0.5rem, 2vw, 1.5rem);
   z-index: 2;
-  width: 56px;
-  height: 56px;
+  width: clamp(72px, 8vw, 104px);
+  height: clamp(72px, 8vw, 104px);
   display: grid;
   place-items: center;
   padding: 0;
