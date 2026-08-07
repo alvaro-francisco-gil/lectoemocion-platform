@@ -65,7 +65,7 @@ export const world: World = parseWorld({
       unlockedBy: [],
       resource: { template: "name-story", seed: "encuentro" },
       reward: {
-        choices: [animal("gato", "Gato"), animal("perro", "Perro"), animal("conejo", "Conejo")]
+        animal: animal("gato", "Gato")
       }
     },
     /*
@@ -88,11 +88,7 @@ export const world: World = parseWorld({
       },
       /* The three the book itself opens on: the rooster and his two mice. */
       reward: {
-        choices: [
-          animal("gallo", "Gallo"),
-          animal("pollito", "Pollito"),
-          animal("raton", "Ratón")
-        ]
+        animal: animal("gallo", "Gallo")
       }
     },
     /*
@@ -131,11 +127,7 @@ export const world: World = parseWorld({
         targetInitial: "A"
       },
       reward: {
-        choices: [
-          animal("koala", "Koala"),
-          animal("jirafa", "Jirafa"),
-          animal("elefante", "Elefante")
-        ]
+        animal: animal("koala", "Koala")
       }
     },
     {
@@ -151,11 +143,7 @@ export const world: World = parseWorld({
         vocabulary: ["gato", "luna", "mesa"]
       },
       reward: {
-        choices: [
-          animal("mariposa", "Mariposa"),
-          animal("abeja", "Abeja"),
-          animal("mariquita", "Mariquita")
-        ]
+        animal: animal("mariposa", "Mariposa")
       }
     },
     {
@@ -172,11 +160,7 @@ export const world: World = parseWorld({
         distractors: ["tren", "pelota"]
       },
       reward: {
-        choices: [
-          animal("delfin", "Delfín"),
-          animal("ballena", "Ballena"),
-          animal("pulpo", "Pulpo")
-        ]
+        animal: animal("delfin", "Delfín")
       }
     },
     {
@@ -197,11 +181,7 @@ export const world: World = parseWorld({
         vocabulary: ["luna", "sol", "pato", "flor"]
       },
       reward: {
-        choices: [
-          animal("caballo", "Caballo"),
-          animal("vaca", "Vaca"),
-          animal("oveja", "Oveja")
-        ]
+        animal: animal("caballo", "Caballo")
       }
     },
     {
@@ -216,11 +196,7 @@ export const world: World = parseWorld({
         targetVocabularyItemId: "mariposa"
       },
       reward: {
-        choices: [
-          animal("tigre", "Tigre"),
-          animal("leon", "León"),
-          animal("mono", "Mono")
-        ]
+        animal: animal("tigre", "Tigre")
       }
     },
     {
@@ -236,11 +212,7 @@ export const world: World = parseWorld({
         targetVocabularyItemId: "pato"
       },
       reward: {
-        choices: [
-          animal("zorro", "Zorro"),
-          animal("erizo", "Erizo"),
-          animal("tortuga", "Tortuga")
-        ]
+        animal: animal("zorro", "Zorro")
       }
     },
     {
@@ -260,11 +232,7 @@ export const world: World = parseWorld({
         targetVocabularyItemId: "gato"
       },
       reward: {
-        choices: [
-          animal("buho", "Búho"),
-          animal("rana", "Rana"),
-          animal("flamenco", "Flamenco")
-        ]
+        animal: animal("buho", "Búho")
       }
     },
     {
@@ -275,11 +243,7 @@ export const world: World = parseWorld({
       unlockedBy: ["primeras-letras", "empieza-igual"],
       resource: { template: "memory-album", seed: "album" },
       reward: {
-        choices: [
-          animal("pinguino", "Pingüino"),
-          animal("foca", "Foca"),
-          animal("tucan", "Tucán")
-        ]
+        animal: animal("pinguino", "Pingüino")
       }
     }
   ]

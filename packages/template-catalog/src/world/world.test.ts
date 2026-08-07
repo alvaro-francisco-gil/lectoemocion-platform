@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  CHEST_COUNT,
   parseResourceManifest,
   parseWorld,
   worldNodes
@@ -51,11 +50,7 @@ describe("the authored world", () => {
      it keeps its slot in the collection. */
   it("still pays a chest for the story on the shelf", () => {
     const story = worldNodes(world).find((node) => node.id === "gallo-rayo");
-    expect(story?.reward.choices.map((choice) => choice.animalId)).toEqual([
-      "gallo",
-      "pollito",
-      "raton"
-    ]);
+    expect(story?.reward.animal.animalId).toBe("gallo");
   });
 
   it("puts every other chapter under Juegos", () => {
@@ -132,22 +127,14 @@ describe("the authored world", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("offers a chest for every node, each hiding a different animal", () => {
-    for (const node of worldNodes(world)) {
-      expect(node.reward.choices, node.id).toHaveLength(CHEST_COUNT);
-      const animals = node.reward.choices.map((choice) => choice.animalId);
-      expect(new Set(animals).size, node.id).toBe(animals.length);
-    }
-  });
-
   /*
-   * A collection with the same animal in two slots reads as a bug to a child
-   * who has just been told they found something new.
+   * One page of the book per chapter, and a different animal on each. The book
+   * shows a child the shadow of what is still owed, so two chapters granting
+   * the same animal would draw the same shadow twice and leave one page that
+   * can never be filled.
    */
-  it("never offers the same animal in two nodes", () => {
-    const animals = worldNodes(world).flatMap((node) =>
-      node.reward.choices.map((choice) => choice.animalId)
-    );
+  it("grants a different animal in every chapter", () => {
+    const animals = worldNodes(world).map((node) => node.reward.animal.animalId);
     expect(new Set(animals).size).toBe(animals.length);
   });
 
@@ -165,23 +152,19 @@ describe("the authored world", () => {
     );
 
     for (const node of worldNodes(world)) {
-      for (const choice of node.reward.choices) {
-        expect(known.get(choice.animalId), choice.animalId).toBe(
-          choice.imageUrl
-        );
-      }
+      const { animalId, imageUrl } = node.reward.animal;
+      expect(known.get(animalId), animalId).toBe(imageUrl);
     }
   });
 });
 
 describe("world validation", () => {
-  /** Three animals, so a fixture exercises the graph rules and not the reward. */
+  /** One animal each, so a fixture exercises the graph rules and not the reward. */
   const reward = {
-    choices: [
-      { animalId: "gato", label: "Gato", imageUrl: "/vocabulary/gato.webp" },
-      { animalId: "perro", label: "Perro", imageUrl: "/vocabulary/perro.webp" },
-      { animalId: "pato", label: "Pato", imageUrl: "/vocabulary/pato.webp" }
-    ]
+    animal: { animalId: "gato", label: "Gato", imageUrl: "/vocabulary/gato.webp" }
+  };
+  const otherReward = {
+    animal: { animalId: "pato", label: "Pato", imageUrl: "/vocabulary/pato.webp" }
   };
 
   /** A world holding the nodes under test. */
@@ -220,10 +203,31 @@ describe("world validation", () => {
           surface: "juegos",
           unlockedBy: ["nowhere"],
           resource: { template: "pairs-game", seed: "second", pairCount: 3 },
-          reward
+          reward: otherReward
         })
       )
     ).toThrow("nowhere");
+  });
+
+  /*
+   * The book draws one page per chapter and fills it with that chapter's
+   * animal. Two chapters granting the same one would draw the same shadow in
+   * two places and leave a page that can never be filled.
+   */
+  it("rejects the same animal granted by two chapters", () => {
+    expect(() =>
+      parseWorld(
+        worldOf(entry, {
+          id: "second",
+          title: "Segundo",
+          icon: "/vocabulary/perro.webp",
+          surface: "juegos",
+          unlockedBy: ["start"],
+          resource: { template: "pairs-game", seed: "second", pairCount: 3 },
+          reward
+        })
+      )
+    ).toThrow("gato");
   });
 
   it("rejects a duplicate node id", () => {
@@ -252,7 +256,7 @@ describe("world validation", () => {
             surface: "juegos",
             unlockedBy: ["b"],
             resource: { template: "pairs-game", seed: "a", pairCount: 3 },
-            reward
+            reward: otherReward
           },
           {
             id: "b",
@@ -261,7 +265,13 @@ describe("world validation", () => {
             surface: "juegos",
             unlockedBy: ["a"],
             resource: { template: "pairs-game", seed: "b", pairCount: 3 },
-            reward
+            reward: {
+              animal: {
+                animalId: "luna",
+                label: "Luna",
+                imageUrl: "/vocabulary/luna.webp"
+              }
+            }
           }
         )
       )
@@ -280,25 +290,10 @@ describe("world validation", () => {
     expect(() => parseWorld(worldOf(rewardless))).toThrow("Invalid world");
   });
 
-  it("rejects a number of chests other than three", () => {
-    expect(() =>
-      parseWorld(
-        worldOf({ ...entry, reward: { choices: reward.choices.slice(0, 2) } })
-      )
-    ).toThrow("Invalid world");
-  });
-
-  it("rejects the same animal hidden in two chests", () => {
-    expect(() =>
-      parseWorld(
-        worldOf({
-          ...entry,
-          reward: {
-            choices: [reward.choices[0], reward.choices[0], reward.choices[1]]
-          }
-        })
-      )
-    ).toThrow("the same animal in two chests");
+  it("rejects a chapter that grants no animal", () => {
+    expect(() => parseWorld(worldOf({ ...entry, reward: {} }))).toThrow(
+      "Invalid world"
+    );
   });
 
   it("rejects an unknown template", () => {

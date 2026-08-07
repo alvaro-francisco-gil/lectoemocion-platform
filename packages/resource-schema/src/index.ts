@@ -39,7 +39,6 @@ export type {
   VocabularyItem
 } from "./resourceManifest";
 export {
-  CHEST_COUNT,
   CollectibleAnimalSchema,
   WorldNodeSchema,
   WorldSchema,

@@ -165,28 +165,19 @@ export const CollectibleAnimalSchema = Type.Object(
 );
 
 /**
- * How many chests a node offers.
- *
- * Fixed rather than per-node: three is a choice a child aged 3–5 can hold in
- * mind at once, and a node that offered a different number would make the
- * ceremony a thing to learn again each time.
- */
-export const CHEST_COUNT = 3;
-
-/**
  * What a node gives the first time it is finished.
  *
- * The choices are authored, not derived, so a content review can see every
- * animal a child can be handed. Which of the three they get is decided by the
- * chest they open and by nothing else.
+ * One animal, authored rather than derived, so a content review can see every
+ * animal a child can be handed. The chests the ceremony offers are theatre:
+ * they are how the reward is handed over, not what it is, and how many of them
+ * there are is a question for the shell rather than for the world.
+ *
+ * One rather than a choice of three because the book shows a child the shadow
+ * of what each chapter still owes them. A shadow can only promise a specific
+ * animal if the chapter grants a specific animal.
  */
 const NodeRewardSchema = Type.Object(
-  {
-    choices: Type.Array(CollectibleAnimalSchema, {
-      minItems: CHEST_COUNT,
-      maxItems: CHEST_COUNT
-    })
-  },
+  { animal: CollectibleAnimalSchema },
   { additionalProperties: false }
 );
 
@@ -270,15 +261,17 @@ export function parseWorld(value: unknown): World {
   }
 
   /*
-   * Three chests must hold three different animals. Two chests hiding the same
-   * one turns a choice into a trick: the child weighs three doors and two of
-   * them were never distinct.
+   * No two chapters may grant the same animal. The book draws one page per
+   * chapter and fills it with that chapter's animal, so a repeat would print
+   * the same shadow twice and leave a page that can never be filled.
    */
+  const animals = new Set<string>();
   for (const node of nodes) {
-    const animals = new Set(node.reward.choices.map((choice) => choice.animalId));
-    if (animals.size !== node.reward.choices.length) {
-      throw new Error(`Node ${node.id} offers the same animal in two chests`);
+    const { animalId } = node.reward.animal;
+    if (animals.has(animalId)) {
+      throw new Error(`Two chapters grant the same animal: ${animalId}`);
     }
+    animals.add(animalId);
   }
 
   for (const node of nodes) {
