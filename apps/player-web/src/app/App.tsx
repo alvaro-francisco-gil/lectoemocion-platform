@@ -4,11 +4,26 @@ import {
   useId,
   useMemo,
   useRef,
-  useState
+  useState,
+  type ReactNode
 } from "react";
+import type {
+  CouponDraft,
+  CouponId,
+  Purchase
+} from "@lectoemocion/domain";
 import type { CollectibleAnimal } from "@lectoemocion/resource-schema";
 import { createResourceForNode, world } from "@lectoemocion/template-catalog";
 import { createGame } from "../game/createGame";
+import {
+  deriveShopView,
+  EMPTY_INCENTIVES,
+  type Incentives
+} from "../world/incentives";
+import {
+  LocalIncentiveStore,
+  systemMinter
+} from "../world/incentiveStore";
 import {
   deriveMapView,
   EMPTY_PROGRESS,
@@ -20,13 +35,28 @@ import {
 } from "../world/mapView";
 import { LOCAL_OWNER, LocalProgressStore } from "../world/progressStore";
 import { unlockAllEnabled } from "../world/unlockAll";
+import { Coupons } from "./Coupons";
+import {
+  BackArrow,
+  ChestIcon,
+  CloseIcon,
+  GiftIcon,
+  MenuIcon,
+  StarIcon
+} from "./icons";
+import { Shop } from "./Shop";
 import { useDragScroll } from "./useDragScroll";
 
-const store = new LocalProgressStore(
+const storage =
   typeof localStorage === "undefined"
     ? { getItem: () => null, setItem: () => undefined }
-    : localStorage,
-  LOCAL_OWNER
+    : localStorage;
+
+const store = new LocalProgressStore(storage, LOCAL_OWNER);
+const incentiveStore = new LocalIncentiveStore(
+  storage,
+  LOCAL_OWNER,
+  systemMinter()
 );
 
 /**
@@ -43,11 +73,13 @@ const store = new LocalProgressStore(
  *
  * Exactly one screen is on at a time: a playing resource, the letriestrellas
  * just won, the animal just revealed, the chests owed for a first finish, the
- * menu, or the map. They are exclusive rather than layered so that nothing a
- * child can touch is ever hidden behind something else.
+ * prize just bought, the shop, the menu, or the map. They are exclusive rather
+ * than layered so that nothing a child can touch is ever hidden behind
+ * something else.
  */
 export function App() {
   const [progress, setProgress] = useState<Progress>(EMPTY_PROGRESS);
+  const [incentives, setIncentives] = useState<Incentives>(EMPTY_INCENTIVES);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   /*
    * The stars just paid, held only until the child acknowledges them. Like the
@@ -61,8 +93,18 @@ export function App() {
    * this the reveal would vanish in the same frame the chest opened.
    */
   const [revealed, setRevealed] = useState<CollectibleAnimal | null>(null);
-  /* The menu is a screen of its own, so whether it is on is part of which one. */
-  const [menuOpen, setMenuOpen] = useState(false);
+  /*
+   * The prize just bought, held only until the child acknowledges it. Same
+   * reason as the animal above: it is already paid for and already in the
+   * history by the time this appears, so the screen is the telling.
+   */
+  const [bought, setBought] = useState<Purchase | null>(null);
+  /*
+   * The shop and the menu are screens of their own rather than layers, so which
+   * one is on is one fact. A pair of booleans could say "both", and both is not
+   * a state this shell has.
+   */
+  const [detour, setDetour] = useState<"none" | "shop" | "menu">("none");
   const host = useRef<HTMLDivElement>(null);
   const panWorld = useDragScroll();
 
@@ -70,6 +112,9 @@ export function App() {
     let cancelled = false;
     void store.read().then((stored) => {
       if (!cancelled) setProgress(stored);
+    });
+    void incentiveStore.read().then((stored) => {
+      if (!cancelled) setIncentives(stored);
     });
     return () => {
       cancelled = true;
@@ -79,6 +124,11 @@ export function App() {
   const view = useMemo(
     () => deriveMapView(world, progress, { unlockAll: unlockAllEnabled() }),
     [progress]
+  );
+
+  const shop = useMemo(
+    () => deriveShopView(incentives, view.stars),
+    [incentives, view.stars]
   );
 
   const activeNode = useMemo(
@@ -121,6 +171,39 @@ export function App() {
     void store.claimReward(nodeId, animal.animalId).then(setProgress);
   }, []);
 
+  /**
+   * Buying is the whole transaction: the stars are spent, the promise is owed,
+   * and the history entry is the reminder an adult settles it against.
+   *
+   * The refusal is not surfaced as a message. The only way to reach one from
+   * this screen is a coupon the shop already showed as out of reach and
+   * disabled, or one an adult deleted in another tab — in both cases the shop
+   * re-rendering from the store is the answer, not an error a child has to
+   * dismiss.
+   */
+  const buy = useCallback(
+    (couponId: CouponId) => {
+      void incentiveStore.buy(couponId, view.stars).then((outcome) => {
+        if (!outcome.ok) return;
+        setIncentives(outcome.incentives);
+        setBought(outcome.purchase);
+      });
+    },
+    [view.stars]
+  );
+
+  const addCoupon = useCallback((draft: CouponDraft) => {
+    void incentiveStore.addCoupon(draft).then(setIncentives);
+  }, []);
+
+  const editCoupon = useCallback((id: CouponId, draft: CouponDraft) => {
+    void incentiveStore.editCoupon(id, draft).then(setIncentives);
+  }, []);
+
+  const removeCoupon = useCallback((id: CouponId) => {
+    void incentiveStore.removeCoupon(id).then(setIncentives);
+  }, []);
+
   useEffect(() => {
     const parent = host.current;
     if (!activeNode || !parent) return;
@@ -159,21 +242,58 @@ export function App() {
     return <Chests reward={view.pendingReward} onOpen={openChest} />;
   }
 
-  if (menuOpen) {
-    return <Menu onClose={() => setMenuOpen(false)} />;
+  if (bought) {
+    return <Bought purchase={bought} onContinue={() => setBought(null)} />;
+  }
+
+  if (detour === "shop") {
+    return <Shop view={shop} onBuy={buy} onClose={() => setDetour("none")} />;
+  }
+
+  if (detour === "menu") {
+    return (
+      <Menu onClose={() => setDetour("none")}>
+        <Coupons
+          coupons={incentives.coupons}
+          history={shop.history}
+          onAdd={addCoupon}
+          onEdit={editCoupon}
+          onRemove={removeCoupon}
+        />
+      </Menu>
+    );
   }
 
   return (
     <main className="map">
-      <StarCounter stars={view.stars} />
+      <StarCounter stars={shop.balance} />
       <button
         type="button"
         className="menu-button"
         aria-label="Menú"
-        onClick={() => setMenuOpen(true)}
+        onClick={() => setDetour("menu")}
       >
         <MenuIcon />
       </button>
+      {/*
+        Offered only once an adult has promised something. A shop with an empty
+        shelf is a door a child opens and finds nothing behind, and the coupons
+        are opt-in per family or class — most deployments will never have one.
+
+        Low and on the left, unlike the map's other two corners: those are adult
+        chrome and a readout, and this is the one control on this screen a child
+        is meant to press. The reachable band is the bottom of an 86-inch panel.
+      */}
+      {shop.items.length === 0 ? null : (
+        <button
+          type="button"
+          className="shop-button"
+          onClick={() => setDetour("shop")}
+        >
+          <GiftIcon />
+          <span className="shop-button__label">Premios</span>
+        </button>
+      )}
       {/*
         An ordered list because the world is a sequence: that is what a screen
         reader should hear, and it is what the connecting line draws.
@@ -193,13 +313,16 @@ export function App() {
 }
 
 /**
- * Every letriestrella won so far, in the map's top-left corner.
+ * The letriestrellas there are to spend, in the map's top-left corner.
  *
- * A running total rather than a per-chapter mark: stars are paid for playing,
- * including replaying, and a number that only ever goes up is the part of the
- * world a child can move on their own. It is display only — nothing here is
- * pressable — and it lives on the map alone, because a total counting up
- * beside a running game is a second thing to watch.
+ * A balance rather than a lifetime total, now that there is something to spend
+ * them on: the number in the corner has to be the number a child compares
+ * against a price, or the shop refuses a coupon the map said they could afford.
+ * Earned and spent are still kept apart in storage — see `starBalance` — so
+ * nothing is ever unpaid, only used.
+ *
+ * It is display only, nothing here is pressable, and it lives on the map alone:
+ * a total counting up beside a running game is a second thing to watch.
  */
 function StarCounter({ stars }: { stars: number }) {
   return (
@@ -213,13 +336,22 @@ function StarCounter({ stars }: { stars: number }) {
 /**
  * The adult's way in, in the map's top-right corner.
  *
- * Empty for now: it is the place the app's own settings will live, kept apart
- * from the world so that nothing on the map is about the app rather than about
- * playing. It takes the screen rather than floating over the map, like every
- * other screen here — a panel a child can tap through is a way to leave the
- * world by accident.
+ * The place the app's own settings live, kept apart from the world so that
+ * nothing on the map is about the app rather than about playing. It takes the
+ * screen rather than floating over the map, like every other screen here — a
+ * panel a child can tap through is a way to leave the world by accident.
+ *
+ * There is no gate on it yet. Everything reachable from here is recoverable by
+ * the adult who wrote it, and destructive actions ask twice; a PIN belongs with
+ * accounts, not with a list of coupons on one device.
  */
-function Menu({ onClose }: { onClose: () => void }) {
+function Menu({
+  children,
+  onClose
+}: {
+  children: ReactNode;
+  onClose: () => void;
+}) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -237,6 +369,38 @@ function Menu({ onClose }: { onClose: () => void }) {
         onClick={onClose}
       >
         <CloseIcon />
+      </button>
+      <div className="menu__scroll">{children}</div>
+    </main>
+  );
+}
+
+/**
+ * What the letriestrellas just bought.
+ *
+ * The same beat as the animal reveal, for the same reason: a reward a child is
+ * not told about in the moment is one they did not feel they earned. It is
+ * already paid and already in the history when this appears — the screen is the
+ * telling, not the giving — and it names the promise rather than the price,
+ * because the stars are spent and what is left is the football.
+ */
+function Bought({
+  purchase,
+  onContinue
+}: {
+  purchase: Purchase;
+  onContinue: () => void;
+}) {
+  return (
+    <main className="reveal">
+      <div className="reveal__prize" role="status">
+        <div className="reveal__gift">
+          <GiftIcon />
+        </div>
+        <p className="reveal__name">¡{purchase.label}!</p>
+      </div>
+      <button type="button" className="reveal__continue" onClick={onContinue}>
+        Seguir
       </button>
     </main>
   );
@@ -452,88 +616,4 @@ function stateLabel(node: MapNodeView): string {
   if (node.state === "locked") return "Bloqueado";
   if (node.state === "completed") return "Completado";
   return node.kind === "cinematic" ? "Historia" : "Jugar";
-}
-
-/**
- * A closed chest, drawn rather than loaded.
- *
- * Three of these are the first thing on screen after a game ends, and a
- * picture that arrives a beat late would make the ceremony stutter on the
- * classroom panel's cold cache.
- */
-function ChestIcon() {
-  return (
-    <svg viewBox="0 0 100 84" width="100%" height="100%" aria-hidden="true">
-      <rect x="6" y="34" width="88" height="44" rx="8" fill="#b5651d" />
-      <path d="M6 38a44 26 0 0 1 88 0Z" fill="#d98c3f" />
-      <rect x="6" y="34" width="88" height="10" fill="#8a4712" />
-      <rect x="42" y="26" width="16" height="30" rx="4" fill="#f4c95d" />
-      <circle cx="50" cy="44" r="5" fill="#8a4712" />
-    </svg>
-  );
-}
-
-/**
- * A letriestrella, drawn rather than loaded.
- *
- * Same reason as the chest: it is on screen the instant a game ends, and on a
- * classroom panel's cold cache a picture that arrives late would make the
- * reward look like an afterthought.
- */
-function StarIcon() {
-  return (
-    <svg viewBox="0 0 100 96" width="100%" height="100%" aria-hidden="true">
-      <path
-        d="M50 4 63.5 33.8 96 37.6 71.9 59.6 78.4 91.6 50 75.6 21.6 91.6 28.1 59.6 4 37.6 36.5 33.8Z"
-        fill="#f4c95d"
-        stroke="#c98a1b"
-        strokeWidth="5"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-/** Three bars: the one shape an adult reads as "everything else" without a word. */
-function MenuIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
-      <path
-        d="M4 7h16M4 12h16M4 17h16"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
-      <path
-        d="M6 6l12 12M18 6L6 18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function BackArrow() {
-  return (
-    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
-      <path
-        d="M15 4 7 12l8 8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
 }

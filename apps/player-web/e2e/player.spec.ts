@@ -625,3 +625,131 @@ test("the initial-syllable game is won by dragging the match onto the target", a
   await completed(page, "empieza-igual");
   expect(failures).toEqual([]);
 });
+
+/**
+ * Seeds the coupons an adult would have written, through the same key the app
+ * reads. Nothing ships with a coupon list, so without this the shop does not
+ * exist — which is itself the behaviour the first test below relies on.
+ */
+async function withCoupons(
+  page: Page,
+  coupons: { id: string; label: string; cost: number }[]
+) {
+  await page.addInitScript((entries) => {
+    localStorage.setItem(
+      "lectoemocion.incentives.local",
+      JSON.stringify({ coupons: entries, purchases: [] })
+    );
+  }, coupons);
+}
+
+test("the map offers no shop until an adult has promised something", async ({
+  page
+}) => {
+  await page.goto("/");
+  await expect(page.getByRole("navigation", { name: "Mundo" })).toBeVisible();
+
+  await expect(page.getByRole("button", { name: "Premios" })).toHaveCount(0);
+});
+
+test("the way into the shop sits in the child's reach band", async ({
+  page
+}) => {
+  await withCoupons(page, [{ id: "futbol", label: "Fútbol", cost: 3 }]);
+  await page.goto("/");
+
+  const height = await page.evaluate(() => innerHeight);
+  const button = await page
+    .getByRole("button", { name: "Premios" })
+    .boundingBox();
+
+  /*
+   * The lower half of the screen. A child of three cannot touch the top of an
+   * 86-inch panel, and this is the one control on the map they are meant to
+   * press — the star counter and the menu, which sit high, are a readout and
+   * adult chrome.
+   */
+  expect(button).not.toBeNull();
+  expect(button!.y).toBeGreaterThan(height / 2);
+});
+
+test("the shop fits the viewport and never scrolls the page", async ({
+  page
+}) => {
+  await withCoupons(
+    page,
+    Array.from({ length: 12 }, (_, index) => ({
+      id: `premio-${index}`,
+      label: `Premio número ${index + 1}`,
+      cost: index + 1
+    }))
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Premios" }).click();
+  await expect(page.getByRole("main", { name: "Premios" })).toBeVisible();
+
+  /*
+   * Twelve coupons is more than any shelf shows at once, so this is the case
+   * that proves the list takes its own overflow rather than pushing the page.
+   */
+  const viewport = await page.evaluate(() => ({
+    width: innerWidth,
+    height: innerHeight,
+    scrollWidth: document.documentElement.scrollWidth,
+    scrollHeight: document.documentElement.scrollHeight
+  }));
+  expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.width);
+  expect(viewport.scrollHeight).toBeLessThanOrEqual(viewport.height);
+});
+
+test("a coupon is bought with letriestrellas and lands in the history", async ({
+  page
+}) => {
+  await withProgress(page, ["encuentro"]);
+  await withCoupons(page, [
+    { id: "futbol", label: "Fútbol", cost: 3 },
+    { id: "peli", label: "Elegir la peli", cost: 99 }
+  ]);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Premios" }).click();
+  /* Out of reach stays on the shelf, visible and refused. */
+  await expect(
+    page.getByRole("button", { name: "Elegir la peli, 99 letriestrellas" })
+  ).toBeDisabled();
+
+  await page.getByRole("button", { name: "Fútbol, 3 letriestrellas" }).click();
+  await expect(page.getByRole("status")).toContainText("Fútbol");
+  await page.getByRole("button", { name: "Seguir" }).click();
+
+  await expect(
+    page.getByRole("region", { name: "Ya conseguidos" })
+  ).toContainText("Fútbol");
+  await expect(
+    page.getByLabel("Letriestrellas para gastar")
+  ).toContainText("0");
+
+  await page.getByRole("button", { name: "Volver al mapa" }).click();
+  await expect(page.getByRole("region", { name: "Letriestrellas" })).toContainText(
+    "0"
+  );
+});
+
+test("an adult writes a coupon from the menu", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Menú" }).click();
+
+  /* By role: the menu also holds two regions whose names start with "Premio". */
+  await page
+    .getByRole("textbox", { name: "Premio", exact: true })
+    .fill("30 minutos de fútbol");
+  await page.getByRole("textbox", { name: "Letriestrellas" }).fill("12");
+  await page.getByRole("button", { name: "Crear" }).click();
+
+  await expect(
+    page.getByRole("button", { name: "Editar 30 minutos de fútbol" })
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Cerrar el menú" }).click();
+  await expect(page.getByRole("button", { name: "Premios" })).toBeVisible();
+});

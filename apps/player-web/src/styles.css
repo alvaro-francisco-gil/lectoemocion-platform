@@ -271,10 +271,25 @@ main { height: 100dvh; }
 .menu-button:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
 
 /* A screen, not a layer: the map is gone while this is up, so there is nothing
-   underneath to tap through. Empty until it holds something. */
+   underneath to tap through. */
 .menu {
   position: relative;
   background: #f6f2fb;
+}
+
+/*
+ * The menu's content scrolls under its close button rather than beside it.
+ *
+ * This is the one screen in the app written for an adult holding a phone: it is
+ * a form and two lists, it will not fit, and the ordinary vertical scroll is
+ * what that reader already expects. The right padding keeps the first line of
+ * text out from under the close disc.
+ */
+.menu__scroll {
+  height: 100%;
+  overflow-y: auto;
+  padding: clamp(1rem, 3vh, 2rem);
+  padding-right: max(clamp(1rem, 3vw, 2rem), 78px);
 }
 
 .menu__close {
@@ -476,6 +491,12 @@ main { height: 100dvh; }
   width: clamp(130px, 28vw, 320px);
   height: auto;
 }
+
+/* A bought prize has no picture of its own — the present stands in for it. */
+.reveal__gift {
+  width: clamp(130px, 28vw, 320px);
+  aspect-ratio: 1;
+}
 .reveal__name {
   margin: 0;
   font-size: clamp(1.5rem, 5vw, 3.5rem);
@@ -591,4 +612,278 @@ main { height: 100dvh; }
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* ------------------------------------------------------------- incentives */
+
+/*
+ * The way into the shop, low on the left of the map.
+ *
+ * The map's other two corners are adult chrome and a readout; this is the one
+ * control on that screen a child is meant to press, so it sits in the reachable
+ * band at the bottom of an 86-inch panel rather than beside them. It is a disc
+ * with a word under it: the present is what a child recognises across a room,
+ * and the word is what an adult reads.
+ */
+.shop-button {
+  position: absolute;
+  left: clamp(0.5rem, 2vw, 1.5rem);
+  bottom: clamp(0.75rem, 3vh, 2rem);
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+  padding: 0.5rem;
+  border: 3px solid #7b2cbf;
+  border-radius: 1.25rem;
+  background: rgb(255 255 255 / 0.92);
+  color: #402060;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.shop-button > svg { width: clamp(40px, 6vw, 72px); height: auto; }
+.shop-button__label { font-size: clamp(0.8rem, 1.4vw, 1.1rem); }
+.shop-button:hover { background: #fff; }
+.shop-button:focus-visible { outline: 4px solid #402060; outline-offset: 3px; }
+
+/*
+ * The shop sits clear of the button that opens it: the collection is centred in
+ * a full-width band, so without this the animals would run under the disc on a
+ * wide panel. Reserved on both sides so the row stays centred.
+ */
+.map .collection { padding-inline: max(clamp(0.5rem, 3vw, 2rem), 110px); }
+
+/*
+ * Three bands: what you have, what it buys, and the way out. The way out is at
+ * the bottom because this screen belongs to the child, unlike the menu.
+ */
+.shop {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: clamp(0.5rem, 2vh, 1.5rem);
+  padding: clamp(0.75rem, 3vh, 2rem);
+  background: #f6f2fb;
+}
+
+.shop__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.shop__title {
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 3rem);
+}
+
+.shop__balance {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  margin: 0;
+  padding: 0.3em 0.9em 0.3em 0.5em;
+  border-radius: 999px;
+  background: #fff;
+  font-size: clamp(1.1rem, 3vw, 2rem);
+  font-weight: 800;
+  color: #402060;
+}
+.shop__balance > svg { width: 1.3em; height: 1.3em; }
+
+.shop__scroll { overflow-y: auto; min-height: 0; }
+
+.shop__empty,
+.history__empty,
+.coupons__empty {
+  margin: 0.5rem 0;
+  color: #6b5b7d;
+}
+
+.shop__items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: clamp(0.5rem, 2vw, 1.25rem);
+  margin: 0 0 clamp(1rem, 4vh, 2.5rem);
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * A coupon a child cannot afford stays on the shelf, faded and disabled.
+ * Seeing what you are saving for is the mechanism; the fade is presentation and
+ * `disabled` is the rule, so neither carries it alone.
+ */
+.coupon {
+  width: 100%;
+  min-height: clamp(84px, 12vh, 130px);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  border: 3px solid #7b2cbf;
+  border-radius: 1.25rem;
+  background: #fff;
+  color: #241133;
+  font: inherit;
+  font-weight: 700;
+  font-size: clamp(0.95rem, 2vw, 1.4rem);
+  text-align: center;
+  cursor: pointer;
+}
+.coupon[data-affordable="false"] {
+  border-color: #c3b3d6;
+  background: #ece7f3;
+  color: #6b5b7d;
+  cursor: not-allowed;
+}
+.coupon:focus-visible { outline: 4px solid #402060; outline-offset: 3px; }
+
+.coupon__cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-weight: 800;
+  color: #402060;
+}
+.coupon__cost > svg,
+.history__cost > svg { width: 1.2em; height: 1.2em; }
+
+.shop__close {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.8rem;
+  border: 0;
+  border-radius: 999px;
+  background: #7b2cbf;
+  color: #fff;
+  font: inherit;
+  font-size: clamp(1rem, 2.2vw, 1.5rem);
+  font-weight: 800;
+  cursor: pointer;
+}
+.shop__close:focus-visible { outline: 4px solid #402060; outline-offset: 4px; }
+
+/* ------------------------------------------------------- the history list */
+
+.history__title {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.05rem, 2.2vw, 1.5rem);
+}
+
+.history__entries,
+.coupons__list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history__entry,
+.coupons__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.9rem;
+  background: #fff;
+}
+
+.history__label,
+.coupons__label { flex: 1 1 12ch; font-weight: 700; }
+
+.history__cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-weight: 800;
+  color: #402060;
+}
+
+.history__date,
+.coupons__cost { color: #6b5b7d; }
+
+/* ---------------------------------------------------- the coupon manager */
+
+/* An adult's screen: ordinary form controls, ordinary reading size. */
+.coupons { display: grid; gap: clamp(0.75rem, 2vh, 1.5rem); }
+
+.coupons__title { margin: 0; font-size: clamp(1.4rem, 3.5vw, 2.25rem); }
+.coupons__lead { margin: 0; color: #6b5b7d; }
+
+.coupon-form {
+  display: grid;
+  gap: 0.75rem;
+  padding: clamp(0.75rem, 2vw, 1.25rem);
+  border-radius: 1rem;
+  background: #fff;
+}
+
+.coupon-form__field { display: grid; gap: 0.25rem; font-weight: 700; }
+
+.coupon-form__field input {
+  padding: 0.6rem 0.75rem;
+  border: 2px solid #c3b3d6;
+  border-radius: 0.6rem;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+.coupon-form__field input:focus-visible {
+  outline: 3px solid #402060;
+  outline-offset: 1px;
+}
+
+/* Never colour alone: the message says what is wrong in words. */
+.coupon-form__problem {
+  margin: 0;
+  color: #a4133c;
+  font-weight: 700;
+}
+
+.coupon-form__actions,
+.coupons__actions,
+.coupons__confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.coupon-form__actions button,
+.coupons__actions button,
+.coupons__confirm button {
+  padding: 0.5rem 1.1rem;
+  border: 2px solid #7b2cbf;
+  border-radius: 999px;
+  background: #fff;
+  color: #402060;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.coupon-form__actions button[type="submit"] {
+  border-color: #7b2cbf;
+  background: #7b2cbf;
+  color: #fff;
+}
+.coupon-form__actions button:focus-visible,
+.coupons__actions button:focus-visible,
+.coupons__confirm button:focus-visible {
+  outline: 3px solid #402060;
+  outline-offset: 2px;
+}
+
+/* The second, differently-worded tap. Red says it, and so does the word. */
+.coupons__danger {
+  border-color: #a4133c !important;
+  background: #a4133c !important;
+  color: #fff !important;
 }

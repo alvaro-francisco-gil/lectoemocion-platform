@@ -9,7 +9,7 @@ inside the mobile shell. See
 
 ```text
 src/app/      React shell — routing, adult-facing UI
-src/world/    progression — progress storage and the map view derived from it
+src/world/    progression — progress and incentives, and the views derived from them
 src/game/     the rendering adapter — the only place Phaser may appear
 ```
 
@@ -27,6 +27,12 @@ containment holds.
 The shell never reaches into a scene, and a scene never reads application
 state. They communicate through the manifest going in and completion events
 coming out.
+
+The same division holds for what letriestrellas buy. `incentives.ts` is pure —
+the ledger, the rules, and `deriveShopView` — and `incentiveStore.ts` persists
+it. Screens receive a `ShopView` and a callback, never `Incentives`, so no
+screen grows its own opinion about what a child can afford. Rationale is in
+[ADR 0008](../../docs/decisions/0008-incentives-and-the-star-economy.md).
 
 ## Rendering rules
 
