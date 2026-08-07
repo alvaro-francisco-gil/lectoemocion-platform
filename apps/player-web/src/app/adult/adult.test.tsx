@@ -1,5 +1,10 @@
-import { prizeId, type PrizeContent, type PrizeId } from "@lectoemocion/domain";
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  prizeId,
+  prizeImageId,
+  type PrizeContent,
+  type PrizeId
+} from "@lectoemocion/domain";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { derivePrizeView, EMPTY_PRIZES, awardDue } from "../../world/prizes";
 import { AdultArea } from "./index";
@@ -131,5 +136,45 @@ describe("configuring a waiting gift", () => {
     fireEvent.click(screen.getByRole("button", { name: "Guardar el regalo" }));
     expect(props.onConfigure).not.toHaveBeenCalled();
     expect(screen.getByRole("alert")).toHaveTextContent("Escribe qué hay dentro");
+  });
+
+  it("does not lose a photo picked while the pick is still processing", async () => {
+    let resolvePick: (id: ReturnType<typeof prizeImageId> | null) => void =
+      () => {};
+    const pending = new Promise<ReturnType<typeof prizeImageId> | null>(
+      (resolve) => {
+        resolvePick = resolve;
+      }
+    );
+    const props = open({
+      view: derivePrizeView(waiting, 30),
+      onPickImage: vi.fn(() => pending)
+    });
+    passGate();
+    fireEvent.click(screen.getByRole("radio", { name: "Escribirlo yo" }));
+    fireEvent.change(screen.getByLabelText("¿Qué hay dentro?"), {
+      target: { value: "un helado" }
+    });
+    const file = new File(["foto"], "foto.png", { type: "image/png" });
+    fireEvent.change(screen.getByLabelText("Añadir una foto"), {
+      target: { files: [file] }
+    });
+
+    /* The pick has not resolved yet: an attempt to save now must not go
+       through with the photo silently dropped. */
+    fireEvent.click(screen.getByRole("button", { name: "Guardar el regalo" }));
+    expect(props.onConfigure).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolvePick(prizeImageId("img-1"));
+      await pending;
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar el regalo" }));
+    expect(props.onConfigure).toHaveBeenCalledWith(prizeId("p-1"), {
+      kind: "custom",
+      text: "un helado",
+      imageId: prizeImageId("img-1")
+    } satisfies PrizeContent);
   });
 });

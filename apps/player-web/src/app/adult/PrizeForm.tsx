@@ -96,6 +96,13 @@ export function PrizeForm({
   const [selection, setSelection] = useState<Selection | null>(null);
   const [text, setText] = useState("");
   const [imageId, setImageId] = useState<PrizeImageId | null>(null);
+  /*
+   * Set the instant a file is picked and cleared only once `onPickImage`
+   * settles. Downscaling a photo is not instant, and without this a save
+   * pressed mid-decode would go through with `imageId` still `null` — the
+   * photo silently dropped rather than attached.
+   */
+  const [imagePending, setImagePending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const groupName = useId();
   const textFieldId = useId();
@@ -107,6 +114,10 @@ export function PrizeForm({
       onSubmit={(event) => {
         event.preventDefault();
         if (selection === null) return;
+        /* Belt and braces alongside the disabled button below: a picked
+           photo still being processed must never be dropped by a submit
+           that slips through. */
+        if (imagePending) return;
 
         if (selection === "custom") {
           const checked = checkCustomPrize(text);
@@ -175,7 +186,11 @@ export function PrizeForm({
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (file === undefined) return;
-              void onPickImage(file).then(setImageId);
+              setImagePending(true);
+              void onPickImage(file).then((id) => {
+                setImageId(id);
+                setImagePending(false);
+              });
             }}
           />
         </div>
@@ -185,7 +200,11 @@ export function PrizeForm({
           {error}
         </p>
       ) : null}
-      <button type="submit" className="prize-form__submit">
+      <button
+        type="submit"
+        className="prize-form__submit"
+        disabled={imagePending}
+      >
         Guardar el regalo
       </button>
     </form>
