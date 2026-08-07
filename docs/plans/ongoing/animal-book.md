@@ -3,23 +3,40 @@
 ## Status
 
 - **Updated:** 2026-08-07
-- **Stage:** built and verified; not yet merged
+- **Stage:** built, rebased onto `8e12ceb`, verified; merging
 - **Branch:** `feat/animal-book`, worktree `.worktrees/animal-book`
 - **Done:** all of it. One animal per chapter with the distinctness rule and its
   tests; the ten authored animals; `CollectionSlotView` carrying its animal and
   `earned`; three chests over one animal; the book as a modal over the world,
   one page, silhouettes for what is owed; the stamp, opening and closing itself.
-  `pnpm check` passes (1012 tests) and `pnpm test:e2e` passes bar one
+  `pnpm check` passes (1138 tests) and `pnpm test:e2e` passes bar one
   pre-existing flake — see below.
+
+  Rebased twice while `main` moved underneath: the profile drawer and adult gate
+  arrived in `App.tsx`, and *El libro de los nombres* arrived as an eleventh
+  chapter still shaped as three chests. It grants Llama now. The component is
+  `AnimalBook` with `.animal-book__*` classes, because `book` on `main` means the
+  book of profiles on the device and one name may mean one thing.
 - **Next:** merge to `main`, then distil this into a decision record and delete
   the file.
 - **Blockers:** none.
 
-**Pre-existing flake, not from this work:** "the letters game is won by dragging
-each letter into its slot" times out at `classroom-hd` and `classroom-4k` under
-full-suite load, and passes in isolation in 7.6s. It fails identically at
-`2445482`, before any of this branch, so it is untouched by these changes and
-wants a scoped fix of its own.
+**Pre-existing flake, not from this work.** Under full-suite load, one Phaser
+pointer test times out at the 120s `completed()` poll — a different one each
+run, usually "the letters game is won by dragging each letter into its slot" or
+"the initial-letter game is won by tapping each picture and its letter", at
+`classroom-hd`, `classroom-4k` or `phone`. Each passes in isolation in 1.4–7.6s,
+so the game is not broken: the clicks are being dropped while several browsers
+compete for the machine.
+
+Measured on untouched `main` at the commit this branch sits on: run 1 passed
+83/83, run 2 failed on the letters game at 2.1m — the same signature. It also
+fails at `2445482`, before any of this work. Nothing here touches those games,
+their canvases, or their input paths.
+
+It wants a scoped fix of its own: those tests poll `localStorage` for 120s with
+no assertion that the pointer landed, so a dropped click is indistinguishable
+from a hang and costs two minutes before it says anything.
 
 ## Goal
 
