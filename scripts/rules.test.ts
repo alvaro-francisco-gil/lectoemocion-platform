@@ -148,8 +148,26 @@ describe("isDeepAdultAreaImport", () => {
     );
   });
 
+  it("accepts the entry point's explicit path", () => {
+    expect(
+      isDeepAdultAreaImport('import { AdultArea } from "./adult/index";')
+    ).toBe(false);
+  });
+
   it("accepts imports that have nothing to do with the adult area", () => {
     expect(isDeepAdultAreaImport('import { Gift } from "./Gift";')).toBe(false);
+  });
+
+  it("flags a dynamic import reaching past the gate", () => {
+    expect(
+      isDeepAdultAreaImport('const mod = await import("./adult/PrizeForm");')
+    ).toBe(true);
+  });
+
+  it("flags a require reaching past the gate", () => {
+    expect(
+      isDeepAdultAreaImport('const { PrizeForm } = require("./adult/PrizeForm");')
+    ).toBe(true);
   });
 });
 

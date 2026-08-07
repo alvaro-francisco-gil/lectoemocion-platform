@@ -67,14 +67,32 @@ export const isStrictTypeEscape = (line) => {
 /** The adult area. Everything in it is reachable only through its gate. */
 export const ADULT_AREA = "apps/player-web/src/app/adult/";
 
+/** `./adult/index` names the same module as `./adult`; both are the gate. */
+const isEntryPointSegment = (segment) => /^index(\.[jt]sx?)?$/.test(segment);
+
+const ADULT_AREA_IMPORT_PATH =
+  /(?:\bfrom\s+|\bimport\(\s*|\brequire\(\s*)["']([^"']*\/adult\/[^"']+)["']/;
+
 /**
  * An adult-only area is exactly the kind of invariant that decays: the next
  * adult-facing screen gets added beside the others and nobody notices it is
- * reachable without the gate. Only `adult/index.tsx` may be imported from
- * outside, and that module wraps the area in `AdultGate`.
+ * reachable without the gate. Only `adult/index.tsx` (imported as `./adult`
+ * or `./adult/index`) may be imported from outside, and that module wraps
+ * the area in `AdultGate`.
+ *
+ * Catches a static `from "..."`, a dynamic `import("...")`, and a
+ * `require("...")` that reach past the entry point. Does not catch a
+ * multi-line `import` whose `from` clause sits on its own source line — the
+ * scanner in `guardrails.mjs` tests each line independently, a limitation it
+ * shares with `isFirebaseImport` and `isProgressImport`.
  */
-export const isDeepAdultAreaImport = (line) =>
-  /from\s+["'][^"']*\/adult\/[^"']+["']/.test(line);
+export const isDeepAdultAreaImport = (line) => {
+  const match = line.match(ADULT_AREA_IMPORT_PATH);
+  if (!match) return false;
+  const importPath = match[1] ?? "";
+  const afterAdult = importPath.split("/adult/").at(-1) ?? "";
+  return !isEntryPointSegment(afterAdult);
+};
 
 export const MEDIA_EXTENSIONS = [
   ".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".heic", ".bmp", ".tiff",
