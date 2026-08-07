@@ -46,6 +46,26 @@ export function StarIcon() {
   );
 }
 
+/**
+ * The wrapped gift, distinct from the chests on purpose.
+ *
+ * `ChestIcon` already means the three chests a child chooses an animal from. A
+ * second thing shaped like a chest would make the two rewards read as one.
+ */
+export function GiftIcon() {
+  return (
+    <svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true">
+      <rect x="10" y="38" width="80" height="52" rx="6" fill="#e05a72" />
+      <rect x="6" y="26" width="88" height="18" rx="6" fill="#f2778c" />
+      <rect x="42" y="26" width="16" height="64" fill="#f4c95d" />
+      <path
+        d="M50 26c-10-14-28-8-22 2 4 6 14 5 22-2Zm0 0c10-14 28-8 22 2-4 6-14 5-22-2Z"
+        fill="#f4c95d"
+      />
+    </svg>
+  );
+}
+
 /** Three bars: the one shape an adult reads as "everything else" without a word. */
 export function MenuIcon() {
   return (
