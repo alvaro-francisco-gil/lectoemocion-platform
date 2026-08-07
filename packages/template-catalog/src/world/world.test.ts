@@ -5,8 +5,9 @@ import {
   parseWorld,
   worldNodes
 } from "@lectoemocion/resource-schema";
-import { templateKind } from "@lectoemocion/template-sdk";
+import { templateKind, templateNeedsRoster } from "@lectoemocion/template-sdk";
 import { defaultVocabulary } from "../fixtures/defaultVocabulary";
+import { syntheticClass } from "../fixtures/syntheticClass";
 import { createResourceForNode, world } from ".";
 
 describe("the authored world", () => {
@@ -26,12 +27,24 @@ describe("the authored world", () => {
    * them never open, so the story is reachable from the very first screen —
    * and it is the only thing on the shelf, which is why this names it.
    */
-  it("keeps the story on the shelf, open from the first screen", () => {
+  it("keeps the books on the shelf, open from the first screen", () => {
     const shelf = worldNodes(world).filter(
       (node) => node.surface === "recursos"
     );
-    expect(shelf.map((node) => node.id)).toEqual(["gallo-rayo"]);
+    expect(shelf.map((node) => node.id)).toEqual(["gallo-rayo", "libro-nombres"]);
     expect(shelf.every((node) => node.unlockedBy.length === 0)).toBe(true);
+  });
+
+  /**
+   * The book of names is gated by whether a roster exists, and by nothing in
+   * the graph. `unlockedBy` describes what a child has played; needing a
+   * roster is a different question with a different answer, asked of the
+   * player rather than of progress — see `templateNeedsRoster`.
+   */
+  it("does not express the roster requirement as a prerequisite", () => {
+    const book = worldNodes(world).find((node) => node.id === "libro-nombres");
+    expect(book?.unlockedBy).toEqual([]);
+    expect(book?.resource.template).toBe("name-book");
   });
 
   /* It is still a chapter of the world: it pays its stars and its chest, and
@@ -47,7 +60,7 @@ describe("the authored world", () => {
 
   it("puts every other chapter under Juegos", () => {
     const games = worldNodes(world).filter((node) => node.surface === "juegos");
-    expect(games).toHaveLength(worldNodes(world).length - 1);
+    expect(games).toHaveLength(worldNodes(world).length - 2);
   });
 
   it("reaches every node from the entry", () => {
@@ -81,15 +94,41 @@ describe("the authored world", () => {
     );
   });
 
-  it("builds a valid manifest for every node, with no roster", () => {
+  /**
+   * Every chapter but one plays with no uploads at all, which is what lets an
+   * institutional pilot ship with no child data present. `name-book` is the
+   * single declared exception — it is the class's own names, so there is
+   * nothing for it to be without them — and `templateNeedsRoster` is where that
+   * exception is declared rather than inferred here.
+   */
+  it("builds a valid manifest for every node that plays on defaults", () => {
     for (const node of worldNodes(world)) {
+      if (templateNeedsRoster(node.resource.template)) continue;
       const manifest = createResourceForNode(node);
       expect(parseResourceManifest(manifest)).toEqual(manifest);
     }
   });
 
+  it("fails closed on the one node that cannot play without a roster", () => {
+    const book = worldNodes(world).find(
+      (node) => node.resource.template === "name-book"
+    );
+    expect(book).toBeDefined();
+    expect(() => createResourceForNode(book!)).toThrow(/needs a roster/);
+  });
+
+  it("builds the book of names once it has one", () => {
+    const book = worldNodes(world).find(
+      (node) => node.resource.template === "name-book"
+    )!;
+    const manifest = createResourceForNode(book, syntheticClass);
+    expect(parseResourceManifest(manifest)).toEqual(manifest);
+  });
+
   it("gives every node a distinct resource", () => {
-    const ids = worldNodes(world).map((node) => createResourceForNode(node).resourceId);
+    const ids = worldNodes(world).map(
+      (node) => createResourceForNode(node, syntheticClass).resourceId
+    );
     expect(new Set(ids).size).toBe(ids.length);
   });
 

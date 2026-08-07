@@ -5,6 +5,7 @@ import { GALLO_RAYO_STORY_ID } from "../fixtures/galloRayo";
 import { createIllustratedStoryResource } from "../illustratedStory";
 import { createInitialsGameResource } from "../initialsGame";
 import { createMemoryAlbumResource } from "../memoryAlbum";
+import { createNameBookResource } from "../nameBook";
 import { createNameStoryResource } from "../nameStory";
 import {
   createInitialLetterGameResource,
@@ -91,6 +92,30 @@ export const world: World = parseWorld({
           animal("gallo", "Gallo"),
           animal("pollito", "Pollito"),
           animal("raton", "Ratón")
+        ]
+      }
+    },
+    /*
+     * The second thing on the shelf, and the only chapter in the world that
+     * cannot be played on defaults. With nobody recorded there is no book at
+     * all, so the player shows it locked with an adult-facing reason rather
+     * than opening it onto nothing — see `templateNeedsRoster`.
+     *
+     * It is on the shelf and not on the path for the same reason the story is:
+     * a book a child has to unlock is a book most of them never open.
+     */
+    {
+      id: "libro-nombres",
+      title: "El libro de los nombres",
+      icon: picture("corazon"),
+      surface: "recursos",
+      unlockedBy: [],
+      resource: { template: "name-book", seed: "libro-nombres" },
+      reward: {
+        choices: [
+          animal("llama", "Llama"),
+          animal("burro", "Burro"),
+          animal("pajaro", "Pájaro")
         ]
       }
     },
@@ -279,6 +304,14 @@ export function createResourceForNode(
       return createNameStoryResource(resource.seed, roster);
     case "illustrated-story":
       return createIllustratedStoryResource(resource.storyId, resource.seed);
+    /*
+     * The one template the default roster cannot satisfy. It throws rather than
+     * returning an empty book, and the player is expected to have refused to
+     * launch it — `templateNeedsRoster` is the gate, this is the proof the gate
+     * is the only way in.
+     */
+    case "name-book":
+      return createNameBookResource(roster, resource.seed);
     case "initials-game":
       return createInitialsGameResource(
         resource.targetInitial,

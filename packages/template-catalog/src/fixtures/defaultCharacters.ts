@@ -1,4 +1,6 @@
+import { mediaAssetId } from "@lectoemocion/domain";
 import type { Character } from "@lectoemocion/resource-schema";
+import { photoUrl, pronunciationUrl } from "../mediaUrl";
 
 /**
  * The product-authored cast that roster templates play with when nobody has
@@ -21,8 +23,8 @@ function character(displayName: string, verifiedInitial: string): Character {
   return {
     displayName,
     verifiedInitial,
-    photoUrl: `/synthetic/character-${slug}.svg`,
-    pronunciationUrl: `/synthetic/silent-${slug}.mp3`
+    photoUrl: photoUrl(mediaAssetId(`character-${slug}`)),
+    pronunciationUrl: pronunciationUrl(mediaAssetId(`silent-${slug}`))
   };
 }
 
