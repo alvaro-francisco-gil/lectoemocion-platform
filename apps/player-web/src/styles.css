@@ -703,15 +703,157 @@ main { height: 100dvh; }
   color: #ffb4b4;
 }
 
-/* ------------------------------------------------ the adult challenge */
+/* ------------------------------------------------------- the adult gate */
 
-.adult-gate { margin-top: 3.5rem; }
-.adult-gate__question {
-  margin: 0 0 1rem;
-  font-size: 1.3rem;
+/*
+ * The lock, over everything.
+ *
+ * `fixed`, not absolute: it is put in front of whichever screen asked for it,
+ * and a lock that only covered the panel that summoned it would be a lock with
+ * the room still open beside it. The highest layer in the app, because nothing
+ * may ever be reachable over the top of it.
+ *
+ * Two columns on a wide screen — the asking on one side, the pad on the other,
+ * so the pad sits under the hand that is already holding the tablet — and one
+ * column when there is not room, with the pad underneath where a thumb reaches.
+ */
+.adult-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-content: center;
+  align-items: center;
+  gap: clamp(1rem, 4vw, 3rem);
+  padding: clamp(1rem, 4vw, 3rem);
+  overflow-y: auto;
+  background: #4034a8;
+  color: #fff;
+}
+/*
+ * Stacked, and stripped to what the gate is for.
+ *
+ * One column has to hold the asking and the pad in a phone's height, and the
+ * pad is the part that must not be pushed off the bottom — a key a thumb
+ * cannot reach is a lock an adult cannot open. So the duende goes: it is
+ * decoration, and it is the only thing here that can be spent.
+ */
+@media (max-width: 46rem) {
+  .adult-gate {
+    grid-template-columns: 1fr;
+    gap: clamp(0.5rem, 2vh, 1rem);
+    padding: clamp(0.75rem, 2vh, 1.5rem);
+  }
+  .adult-gate__duende { display: none; }
+  .adult-gate__title { font-size: clamp(1.3rem, 5vw, 1.8rem); }
+  .adult-gate__prompt { margin-bottom: clamp(0.75rem, 2vh, 1.25rem); }
+  .adult-gate__key {
+    width: clamp(56px, 9vh, 84px);
+    height: clamp(56px, 9vh, 84px);
+  }
+}
+
+.adult-gate__close {
+  position: absolute;
+  top: clamp(0.5rem, 2vh, 1.25rem);
+  right: clamp(0.5rem, 2vw, 1.5rem);
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #2f2585;
+  color: #fff;
+  cursor: pointer;
+}
+.adult-gate__close:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+.adult-gate__ask { justify-self: center; text-align: center; max-width: 26rem; }
+
+.adult-gate__duende {
+  width: clamp(90px, 22vh, 190px);
+  height: auto;
+  margin-bottom: clamp(0.5rem, 2vh, 1.25rem);
+}
+
+.adult-gate__title {
+  margin: 0 0 0.4em;
+  font-size: clamp(1.5rem, 5vw, 2.6rem);
   font-weight: 800;
 }
-.adult-gate__label,
+.adult-gate__prompt {
+  margin: 0 0 clamp(1rem, 4vh, 2rem);
+  font-size: clamp(1rem, 2.4vw, 1.4rem);
+  opacity: 0.85;
+}
+
+/*
+ * Four blanks, so the answer's length is visible before it is typed. A child
+ * who cannot count to four still sees that this wants more than a tap.
+ */
+.adult-gate__digits {
+  display: flex;
+  justify-content: center;
+  gap: clamp(0.6rem, 2.5vw, 1.4rem);
+}
+.adult-gate__digit {
+  width: clamp(2.2rem, 7vw, 3.4rem);
+  padding-bottom: 0.15em;
+  border-bottom: 4px solid rgb(255 255 255 / 0.7);
+  font-size: clamp(1.8rem, 6vw, 3rem);
+  font-weight: 800;
+  line-height: 1.1;
+  /* Holds its height with nothing in it, so the blanks do not jump as the
+     answer arrives. */
+  min-height: 1.2em;
+}
+
+.adult-gate__refused {
+  margin: clamp(0.75rem, 3vh, 1.5rem) 0 0;
+  color: #ffd0d0;
+  font-weight: 700;
+}
+
+/*
+ * The pad. Three columns, with zero and the delete key sharing the last row.
+ *
+ * Deliberately large: this is the one adult control a parent uses while a child
+ * is trying to take the tablet back, and every key is well over the 44px a
+ * thumb needs.
+ */
+.adult-gate__pad {
+  justify-self: center;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(0.5rem, 1.8vw, 1.1rem);
+}
+
+.adult-gate__key {
+  width: clamp(64px, 11vh, 104px);
+  height: clamp(64px, 11vh, 104px);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #5b4bd6;
+  color: #fff;
+  font: inherit;
+  font-size: clamp(1.4rem, 4vh, 2.2rem);
+  font-weight: 800;
+  cursor: pointer;
+}
+.adult-gate__key:hover { background: #6d5ce8; }
+.adult-gate__key:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+/* Zero under the middle column, delete beside it, so the pad reads as a phone's
+   rather than as ten keys in a block. */
+.adult-gate__key--zero { grid-column: 2; }
+.adult-gate__key--back { background: rgb(255 255 255 / 0.14); }
+.adult-gate__key--back:hover { background: rgb(255 255 255 / 0.24); }
+
 .profile-form__label {
   display: block;
   margin-bottom: 0.35rem;
@@ -721,7 +863,6 @@ main { height: 100dvh; }
   letter-spacing: 0.04em;
   opacity: 0.75;
 }
-.adult-gate__answer,
 .profile-form__name {
   width: 100%;
   padding: 0.5em 0.7em;
@@ -731,15 +872,7 @@ main { height: 100dvh; }
   color: #fff;
   font: inherit;
 }
-.adult-gate__answer:focus-visible,
 .profile-form__name:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
-.adult-gate__actions {
-  margin-top: 1rem;
-  display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
-}
-.adult-gate__wrong { margin-top: 0.75rem; color: #ffb4b4; font-weight: 700; }
 
 /* --------------------------------------------------- adding and editing */
 

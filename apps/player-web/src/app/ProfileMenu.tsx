@@ -110,8 +110,11 @@ export function ProfileMenu({
           <CloseGlyph />
         </button>
 
+        {/* Rendered from here but not *within* here: the gate takes the whole
+            screen, so the drawer is behind it rather than around it. */}
         {view.kind === "gate" ? (
           <AdultGate
+            today={today}
             onPass={() => setView({ kind: "edit", target: view.then })}
             onCancel={() => setView({ kind: "list" })}
           />

@@ -114,28 +114,24 @@ async function openProfiles(): Promise<void> {
   fireEvent.click(await screen.findByRole("button", { name: /^Quién juega/ }));
 }
 
+/** Taps a year into the adult gate's pad, digit by digit. */
+function tapYear(year: string): void {
+  for (const digit of year) {
+    fireEvent.click(screen.getByRole("button", { name: digit }));
+  }
+}
+
 /**
- * Answers the adult challenge with the sum it actually asks for.
+ * Gets past the adult gate.
  *
- * Reads the words off the screen rather than knowing the seed, so the test
- * passes only if the question a real adult sees is the one the gate accepts.
+ * A year old enough to be an adult's, typed on the pad the way a parent would
+ * rather than written into state, so these tests fail if the pad stops working.
  */
-const SPELLED: Record<string, number> = {
-  dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9
-};
-
 function passAdultGate(): void {
-  const asked = screen.getByRole("dialog", { name: "Sólo para adultos" });
-  const words = (asked.textContent ?? "").match(
-    /es (\w+) más (\w+)/
-  );
-  expect(words).not.toBeNull();
-  const answer = SPELLED[words![1]!]! + SPELLED[words![2]!]!;
-
-  fireEvent.change(screen.getByLabelText("Respuesta"), {
-    target: { value: String(answer) }
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Comprobar" }));
+  expect(
+    screen.getByRole("dialog", { name: "Sólo para adultos" })
+  ).toBeInTheDocument();
+  tapYear("1988");
 }
 
 /**
@@ -879,7 +875,7 @@ describe("profiles", () => {
     );
   });
 
-  it("asks the adult challenge before it will add a child", async () => {
+  it("asks for an adult's year before it will add a child", async () => {
     await renderApp();
     await openProfiles();
 
@@ -891,7 +887,7 @@ describe("profiles", () => {
     expect(screen.queryByLabelText("Nombre")).toBeNull();
   });
 
-  it("asks the adult challenge before it will edit a child", async () => {
+  it("asks for an adult's year before it will edit a child", async () => {
     await renderApp();
     await openProfiles();
 
@@ -903,15 +899,13 @@ describe("profiles", () => {
     expect(screen.queryByLabelText("Nombre")).toBeNull();
   });
 
-  it("refuses a wrong answer to the challenge", async () => {
+  /* The one year a child might have heard said aloud is their own. */
+  it("refuses a year too recent to be an adult's", async () => {
     await renderApp();
     await openProfiles();
     fireEvent.click(screen.getByRole("button", { name: "Añadir niño" }));
 
-    fireEvent.change(screen.getByLabelText("Respuesta"), {
-      target: { value: "1" }
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Comprobar" }));
+    tapYear("2024");
 
     expect(screen.queryByLabelText("Nombre")).toBeNull();
     expect(await screen.findByRole("alert")).toBeInTheDocument();

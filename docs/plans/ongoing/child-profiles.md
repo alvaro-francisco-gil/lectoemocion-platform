@@ -7,7 +7,7 @@
 - **Branch:** `feat/child-profiles`
 - **Done:** `PlayerProfile`, `Birth` and `ageInYears` in `packages/domain`;
   `LocalProfileStore` with the starter profile that adopts existing progress;
-  the adult challenge; the drawer, the corner swap and the avatar button;
+  the adult gate; the drawer, the corner swap and the avatar button;
   twelve avatars imported with per-file provenance;
   `platform-design.md` and the player's `AGENTS.md` brought in line; idea
   documents for the two placeholder rows. `pnpm check` green (1046 tests).
@@ -113,10 +113,19 @@ on a phone.
 
 ## The adult gate
 
-`Add`, `Edit` and `Delete` sit behind a written-word arithmetic challenge —
-*"¿Cuánto es siete más cuatro?"* — answered on a number pad. The words are
-spelled out rather than written as digits because a five-year-old who can count
-still cannot read `siete`.
+`Add`, `Edit` and `Delete` sit behind a full-screen gate asking for the
+adult's **year of birth**, typed on a large number pad.
+
+It verifies nothing. The app has never been told when any adult was born and has
+nowhere to check, so the rule is plausibility: a year that would make the person
+between 18 and 110. What defeats a preschooler is the shape of the answer rather
+than its truth — four digits is beyond a child still learning letters, their own
+year of birth is refused by construction, and under one per cent of the ten
+thousand four-digit combinations a mashed pad could produce are accepted.
+
+The gate takes the whole screen rather than sitting inside the panel that
+summoned it, so it can be put in front of any feature: the caller says what
+happens on the way through and nothing about how the asking looks.
 
 Switching profile is **not** gated. A child choosing their own face is the
 reason the avatar is in the corner at all, and the worst outcome of a wrong

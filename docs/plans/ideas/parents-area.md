@@ -14,9 +14,10 @@ child uses to pick their own face. That is the right home for profiles and the
 wrong home for everything else: as settings accumulate, a child looking for
 their own avatar has to walk past them.
 
-The adult challenge in `src/app/AdultGate.tsx` already exists and already
-guards add, edit and delete. A parents area is the room that gate should open
-onto, rather than a gate re-asked per control.
+The adult gate in `src/app/AdultGate.tsx` already exists, already guards add,
+edit and delete, and is deliberately built to be reusable — it takes the whole
+screen and knows nothing about what is behind it. A parents area is the room
+that gate should open onto, rather than a gate re-asked per control.
 
 ## What would plausibly live there
 
@@ -37,7 +38,7 @@ onto, rather than a gate re-asked per control.
 2. **How much of it can exist before accounts?** Personalisation uploads need
    storage, Rules, and a privacy review; sound settings need none of that. The
    answer probably splits this into two pieces shipping at different times.
-3. **Is one adult challenge enough for destructive operations?** Deleting a
+3. **Is one adult gate enough for destructive operations?** Deleting a
    child from a parents area is heavier than renaming one from a drawer, and
    may want a stronger gate or a real credential once accounts exist.
 

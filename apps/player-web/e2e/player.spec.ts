@@ -755,3 +755,41 @@ test("the profile drawer fits the viewport and covers the world", async ({
   expect(scrim.width).toBeGreaterThanOrEqual(viewport.width - 1);
   expect(scrim.height).toBeGreaterThanOrEqual(viewport.height - 1);
 });
+
+/*
+ * The gate is the only surface in this app that covers everything, so it is the
+ * only one whose own fit nothing else would catch. On a phone the pad has to
+ * reach the thumb; on an 86-inch panel it must not stretch across the room.
+ */
+test("the adult gate covers the screen and its pad fits", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Quién juega/ }).click();
+  await page.getByRole("button", { name: /^Editar a/ }).click();
+
+  const gate = page.getByRole("dialog", { name: "Sólo para adultos" });
+  await expect(gate).toBeVisible();
+
+  const viewport = await page.evaluate(() => ({
+    width: innerWidth,
+    height: innerHeight
+  }));
+  const box = (await gate.boundingBox())!;
+  expect(box.width).toBeGreaterThanOrEqual(viewport.width - 1);
+  expect(box.height).toBeGreaterThanOrEqual(viewport.height - 1);
+
+  /* Every key inside the viewport, and each one big enough for a thumb. */
+  for (const digit of "0123456789") {
+    const key = (await page.getByRole("button", { name: digit }).boundingBox())!;
+    expect(key.width).toBeGreaterThanOrEqual(44);
+    expect(key.height).toBeGreaterThanOrEqual(44);
+    expect(key.y + key.height).toBeLessThanOrEqual(viewport.height + 1);
+    expect(key.x + key.width).toBeLessThanOrEqual(viewport.width + 1);
+  }
+
+  const scroll = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    scrollHeight: document.documentElement.scrollHeight
+  }));
+  expect(scroll.scrollWidth).toBeLessThanOrEqual(viewport.width);
+  expect(scroll.scrollHeight).toBeLessThanOrEqual(viewport.height);
+});
