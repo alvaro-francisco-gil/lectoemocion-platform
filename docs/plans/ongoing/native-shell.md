@@ -9,9 +9,9 @@
   `playerUrl` resolver with 11 tests; scripted Android emulator workflow
   (`scripts/mobile-emulator.mjs`, 30 tests) that creates the AVD, tunnels the
   ports, and reports what is up; `LectoEmocion_Tablet` AVD created and booting
-- **Next:** decide hosted versus bundled — see "Open questions" — before
-  `packages/firebase/` lands, because auth token handling differs between a
-  remote origin and a local one
+- **Next:** the four seams under "Native feel", and the offline-launch test
+  [ADR 0009](../../decisions/0009-one-hosted-player.md) makes a release
+  criterion
 - **Blockers:** none.
 
 Two things bit during that first run and are now fixed and covered by tests.
@@ -21,9 +21,9 @@ in the store — it failed with `Unable to resolve "expo-modules-core"`, which
 reads as a broken install. And Expo's LAN default made Expo Go fetch over the
 network and fail with `Failed to download remote update`; `--localhost` over the
 `adb reverse` tunnel avoids the network entirely.
-- **Handoff:** the hosted-versus-bundled player decision is deliberately
-  deferred — see "Open questions". Step 1 points at a dev server, which is a
-  development affordance and not the shipping answer.
+- **Handoff:** the hosted-versus-bundled decision is settled — see
+  [ADR 0009](../../decisions/0009-one-hosted-player.md). Step 1 points at a dev
+  server; a release build points the same variable at Firebase Hosting.
 
 The earlier WSL2 NAT blocker recorded here is resolved: `.wslconfig` now sets
 `networkingMode=mirrored`. It stopped mattering anyway — `adb reverse` tunnels
@@ -154,11 +154,12 @@ unbounded content-duplication one, and the whole architecture exists to avoid it
 
 ## Open questions
 
-1. **Hosted or bundled player.** Hosted means the growing template catalogue
-   ships without a store review; bundled means the app works offline and
-   avoids the store-policy risk ADR 0003 lists under "Revisit when". Step 1
-   prejudges neither — it points at a dev server. This must be decided before
-   anything ships.
+1. ~~Hosted or bundled player.~~ **Settled** by
+   [ADR 0009](../../decisions/0009-one-hosted-player.md): one hosted player,
+   cached on the device, with no bundled copy in the shell. The shell keeps
+   pointing at `EXPO_PUBLIC_PLAYER_URL`; only its value changes between a dev
+   server and Firebase Hosting. Offline launch after a first successful launch
+   becomes a release criterion with a test.
 2. **Does the adult panel ever run on the classroom display itself?** If it
    never does, the aged-browser objection to React Native Web disappears and
    option B becomes the better call for the adult UI. Product question.
