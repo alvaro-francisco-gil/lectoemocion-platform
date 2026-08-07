@@ -817,6 +817,38 @@ describe("the chest a chapter is worth", () => {
     ).toBeInTheDocument();
   });
 
+  /*
+   * A content update can retire the animal a chapter granted. The chapter then
+   * honestly owes its chest again — and that offer has to be closable. A claim
+   * the store refused would leave the ceremony pending forever, and because it
+   * is derived from storage it would be the first thing on screen every single
+   * time the app was opened, with the world unreachable behind it.
+   */
+  it("lets a chapter whose animal was retired be paid again", async () => {
+    localStorage.setItem(
+      storageKey(LOCAL_OWNER),
+      JSON.stringify({
+        completedNodes: ["encuentro"],
+        lastPlayedNode: "encuentro",
+        rewards: [{ nodeId: "encuentro", animalId: "un-animal-retirado" }],
+        stars: 3
+      })
+    );
+    await renderApp();
+
+    await openChest();
+    expect(
+      await screen.findByRole("navigation", { name: "Mundo" })
+    ).toBeInTheDocument();
+
+    /* And it stays paid: the ceremony does not come back on the next visit. */
+    cleanup();
+    await renderApp();
+
+    await screen.findByRole("navigation", { name: "Mundo" });
+    expect(screen.queryByRole("button", { name: /Abrir el cofre/ })).toBeNull();
+  });
+
   it("keeps the collection after a reload", async () => {
     await renderApp();
     await finishTheFirstChapter();
