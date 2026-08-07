@@ -1,7 +1,15 @@
 import { defineConfig, devices } from "@playwright/test";
+import { resolvePlayerServer } from "./playerServer";
 
-const port = Number(process.env["PLAYER_PORT"] ?? 4173);
-const baseURL = `http://127.0.0.1:${port}`;
+/**
+ * The same derivation the dev server uses, so the two cannot disagree about
+ * where the player is. `e2eGlobalSetup` then refuses to run against a server
+ * that belongs to another checkout.
+ */
+const { baseURL } = resolvePlayerServer(
+  import.meta.dirname,
+  process.env["PLAYER_PORT"]
+);
 
 /**
  * `bypass.spec.ts` asserts on built bundles, not on anything rendered, so it
@@ -27,13 +35,14 @@ export default defineConfig({
    * suite reports contention as failure.
    */
   timeout: 180_000,
+  globalSetup: "./e2eGlobalSetup.ts",
   use: {
     baseURL
   },
   webServer: {
     command: "pnpm dev",
     url: baseURL,
-    reuseExistingServer: !process.env.CI
+    reuseExistingServer: !process.env["CI"]
   },
   projects: [
     {

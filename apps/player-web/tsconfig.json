@@ -9,6 +9,10 @@
   },
   "include": [
     "src",
+    "e2eGlobalSetup.ts",
+    "playerServer.ts",
+    "playerServer.test.ts",
+    "playwright.config.ts",
     "vite.config.ts",
     "vitest.config.ts"
   ]

@@ -75,10 +75,16 @@ touch, which gives a current desktop browser.
 Run `pnpm test:e2e` from the repo root. Never start `pnpm dev` — that is a
 long-lived server the user owns.
 
-**In a git worktree, set `PLAYER_PORT`.** Playwright reuses an existing server
-on the configured port, so with the primary checkout's dev server running, a
-worktree's suite silently tests the primary checkout's code instead of its own:
+**A worktree gets its own port automatically.** Playwright reuses whatever is
+already listening, so a shared port means a worktree's suite silently reports on
+the primary checkout's code instead of its own — a green run for code it never
+loaded. This used to be a note asking you to remember `PLAYER_PORT`, which is
+not a mechanism.
 
-```bash
-PLAYER_PORT=4273 pnpm test:e2e
-```
+`playerServer.ts` derives the port from the checkout: the primary keeps 4173, a
+worktree takes a stable port in 4174–4273 from its own path. Both the dev server
+and Playwright read that one derivation, and `e2eGlobalSetup.ts` asks the port
+which checkout it is serving before the suite trusts it. A server from another
+checkout fails the run instead of passing it.
+
+`PLAYER_PORT` still overrides, for the case the derivation did not foresee.
