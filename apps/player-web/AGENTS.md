@@ -28,6 +28,14 @@ The shell never reaches into a scene, and a scene never reads application
 state. They communicate through the manifest going in and completion events
 coming out.
 
+The same division holds for the prizes. `prizes.ts` is pure — the ledger, the
+award arithmetic, and `derivePrizeView` — and `prizeStore.ts` persists it.
+Screens receive a `PrizeView` and callbacks, never `Prizes`, so no screen grows
+its own opinion about whether a gift is owed. The adult area is reachable only
+through `src/app/adult/index.tsx`, which is what
+`scripts/check-adult-gate.mjs` enforces. Rationale is in
+[ADR 0008](../../docs/decisions/0008-prizes-and-the-star-meter.md).
+
 ## The map
 
 The map is what a child who cannot read navigates, so it is pictures first.
