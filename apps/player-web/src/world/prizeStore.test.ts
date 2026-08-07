@@ -110,6 +110,62 @@ describe("LocalPrizeStore", () => {
     ]);
   });
 
+  /*
+   * An id is a string the identifier constructor still refuses — empty, or
+   * padded. It throws, and a throw here escapes the whole parse: the ledger
+   * would read as empty and the next write would overwrite every prize an
+   * adult had promised. One entry is the price of a corrupt entry.
+   */
+  it("drops a prize whose id is not an id, and keeps the rest", async () => {
+    const seeded = new LocalPrizeStore(
+      memoryStorage({
+        [prizeStorageKey(LOCAL_OWNER)]: JSON.stringify({
+          goal: 30,
+          prizes: [
+            { id: "", state: "unconfigured", awardedAt: "x", costStars: 30 },
+            { id: " p-2 ", state: "unconfigured", awardedAt: "x", costStars: 30 },
+            { id: "p-3", state: "unconfigured", awardedAt: "x", costStars: 30 }
+          ]
+        })
+      }),
+      LOCAL_OWNER,
+      countingMinter()
+    );
+    const read = await seeded.read();
+    expect(read.prizes.map((prize) => prize.id)).toEqual([prizeId("p-3")]);
+    expect(read.goal).toBe(30);
+  });
+
+  /*
+   * The picture is the optional half of a custom prize. A corrupt image id
+   * costs the picture; the words the adult promised to read aloud survive.
+   */
+  it("keeps a prize whose image id is corrupt, without its picture", async () => {
+    const seeded = new LocalPrizeStore(
+      memoryStorage({
+        [prizeStorageKey(LOCAL_OWNER)]: JSON.stringify({
+          goal: 30,
+          prizes: [
+            {
+              id: "p-1",
+              state: "ready",
+              awardedAt: "x",
+              costStars: 30,
+              content: { kind: "custom", text: "un helado", imageId: "   " }
+            }
+          ]
+        })
+      }),
+      LOCAL_OWNER,
+      countingMinter()
+    );
+    const read = await seeded.read();
+    expect(read.prizes).toHaveLength(1);
+    expect(read.prizes[0]).toMatchObject({
+      content: { kind: "custom", text: "un helado", imageId: null }
+    });
+  });
+
   it("falls back to a goal it can trust when the stored one is nonsense", async () => {
     const seeded = new LocalPrizeStore(
       memoryStorage({

@@ -103,6 +103,31 @@ function parsePrizes(raw: string | null): Prizes {
   };
 }
 
+/*
+ * The identifier constructors throw on a string that is not an identifier —
+ * empty, or padded with whitespace. Storage is untrusted, so `typeof` is not
+ * enough: an unguarded call escapes the whole parse, the read falls back to an
+ * empty ledger, and the next write erases every prize an adult promised.
+ * Guarded, a corrupt id costs exactly what the file's contract says it costs.
+ */
+function parsePrizeId(value: unknown): PrizeId | null {
+  if (typeof value !== "string") return null;
+  try {
+    return prizeId(value);
+  } catch {
+    return null;
+  }
+}
+
+function parsePrizeImageId(value: unknown): PrizeImageId | null {
+  if (typeof value !== "string") return null;
+  try {
+    return prizeImageId(value);
+  } catch {
+    return null;
+  }
+}
+
 /** A goal nobody can explain reads as the default rather than as a broken meter. */
 function parseGoal(value: unknown): number {
   if (typeof value !== "number") return DEFAULT_PRIZE_GOAL;
@@ -129,12 +154,15 @@ function parseContent(value: unknown): PrizeContent | null {
 
   if (record["kind"] === "custom") {
     const text = record["text"];
-    const imageId = record["imageId"];
     if (typeof text !== "string" || text.trim().length === 0) return null;
+    /*
+     * A corrupt image id costs the picture, not the prize: the picture is the
+     * optional half, and the words are what an adult reads aloud.
+     */
     return {
       kind: "custom",
       text,
-      imageId: typeof imageId === "string" ? prizeImageId(imageId) : null
+      imageId: parsePrizeImageId(record["imageId"])
     };
   }
 
@@ -148,15 +176,15 @@ function parsePrizeList(value: unknown): readonly Prize[] {
   for (const entry of value) {
     if (typeof entry !== "object" || entry === null) continue;
     const record = entry as Record<string, unknown>;
-    const id = record["id"];
+    const id = parsePrizeId(record["id"]);
     const awardedAt = record["awardedAt"];
     const costStars = parseCost(record["costStars"]);
-    if (typeof id !== "string" || typeof awardedAt !== "string") continue;
+    if (id === null || typeof awardedAt !== "string") continue;
     if (costStars === null) continue;
 
     const state = record["state"];
     if (state === "unconfigured") {
-      prizes.push({ id: prizeId(id), state, awardedAt, costStars });
+      prizes.push({ id, state, awardedAt, costStars });
       continue;
     }
 
@@ -164,14 +192,14 @@ function parsePrizeList(value: unknown): readonly Prize[] {
     if (content === null) continue;
 
     if (state === "ready") {
-      prizes.push({ id: prizeId(id), state, awardedAt, costStars, content });
+      prizes.push({ id, state, awardedAt, costStars, content });
       continue;
     }
 
     const openedAt = record["openedAt"];
     if (state === "opened" && typeof openedAt === "string") {
       prizes.push({
-        id: prizeId(id),
+        id,
         state,
         awardedAt,
         costStars,
