@@ -90,6 +90,17 @@ async function openChest(which = 1): Promise<string> {
   return won.replace(/[¡!]/g, "");
 }
 
+/** Plays the entry chapter to its end, leaving the letriestrellas screen on. */
+async function playFirstChapter(): Promise<void> {
+  fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
+  completeActiveResource();
+}
+
+/** Opens the first chest and acknowledges the animal inside. */
+async function openFirstChest(): Promise<string> {
+  return openChest(1);
+}
+
 /** The animals on the map, in world order — `null` for a slot still to fill. */
 function collection(container: HTMLElement): (string | null)[] {
   return [...container.querySelectorAll(".collection__slot")].map((slot) =>
@@ -207,35 +218,25 @@ describe("the world shell", () => {
     ]);
   });
 
-  it("opens and closes the menu from the map", () => {
+  it("opens and closes the adult area from the map", () => {
     render(<App />);
-    expect(screen.queryByRole("dialog", { name: "Menú" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Ajustes" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Menú" }));
-    expect(screen.getByRole("dialog", { name: "Menú" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Ajustes" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Cerrar el menú" }));
-    expect(screen.queryByRole("dialog", { name: "Menú" })).toBeNull();
-  });
-
-  /* A panel with no way out is a trap on a device with no back button. */
-  it("closes the menu on Escape", () => {
-    render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: "Menú" }));
-
-    fireEvent.keyDown(document, { key: "Escape" });
-
-    expect(screen.queryByRole("dialog", { name: "Menú" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar los ajustes" }));
+    expect(screen.queryByRole("dialog", { name: "Ajustes" })).toBeNull();
   });
 
   /* One screen at a time: the map is not left underneath to be tapped through. */
-  it("puts the world away while the menu is open", () => {
+  it("puts the world away while the adult area is open", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Menú" }));
 
     expect(screen.queryByRole("navigation", { name: "Mundo" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Cerrar el menú" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar los ajustes" }));
     expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
   });
 
@@ -372,8 +373,7 @@ describe("the chest a chapter is worth", () => {
    * them will miss.
    */
   async function finishTheFirstChapter(): Promise<void> {
-    fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
-    completeActiveResource();
+    await playFirstChapter();
     await collectStars();
   }
 
@@ -594,5 +594,68 @@ describe("the prize meter", () => {
       name: "Letriestrellas hacia el próximo regalo"
     });
     expect(within(meter).queryByRole("button")).toBeNull();
+  });
+});
+
+describe("reaching the goal", () => {
+  /*
+   * Seeds a session one chapter short of the goal: three letriestrellas
+   * already banked from an earlier session, a goal of six, and no chest yet
+   * claimed for "El encuentro" — so the one chapter this test plays is both
+   * what reaches the goal and what still owes its chest.
+   */
+  function nearlyThere(): void {
+    localStorage.setItem(
+      "lectoemocion.progress.local",
+      JSON.stringify({
+        completedNodes: [],
+        lastPlayedNode: null,
+        rewards: [],
+        stars: 3
+      })
+    );
+    localStorage.setItem(
+      "lectoemocion.prizes.local",
+      JSON.stringify({ goal: 6, prizes: [] })
+    );
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    createGame.mockClear();
+  });
+
+  it("puts a gift on screen after the stars, not instead of them", async () => {
+    nearlyThere();
+    render(<App />);
+    await playFirstChapter();
+    await collectStars();
+    await openFirstChest();
+    expect(await screen.findByText("Un regalo te está esperando")).toBeVisible();
+  });
+
+  it("leaves the gift on the map when the child carries on", async () => {
+    nearlyThere();
+    render(<App />);
+    await playFirstChapter();
+    await collectStars();
+    await openFirstChest();
+    fireEvent.click(screen.getByRole("button", { name: "Seguir" }));
+    expect(
+      await screen.findByRole("button", { name: "Tu regalo" })
+    ).toBeVisible();
+  });
+
+  it("starts the meter refilling the moment the gift is awarded", async () => {
+    nearlyThere();
+    render(<App />);
+    await playFirstChapter();
+    await collectStars();
+    await openFirstChest();
+    fireEvent.click(screen.getByRole("button", { name: "Seguir" }));
+    const meter = await screen.findByRole("meter", {
+      name: "Letriestrellas hacia el próximo regalo"
+    });
+    expect(meter).toHaveAttribute("aria-valuenow", "0");
   });
 });

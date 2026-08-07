@@ -12,6 +12,7 @@ import {
   type CollectibleAnimal
 } from "@lectoemocion/resource-schema";
 import { createResourceForNode, world } from "@lectoemocion/template-catalog";
+import type { PrizeContent, PrizeId } from "@lectoemocion/domain";
 import { createGame } from "../game/createGame";
 import {
   deriveMapView,
@@ -25,13 +26,16 @@ import {
 } from "../world/mapView";
 import { LOCAL_OWNER, LocalProgressStore } from "../world/progressStore";
 import { derivePrizeView, EMPTY_PRIZES, type Prizes } from "../world/prizes";
-import { LocalPrizeStore, systemMinter } from "../world/prizeStore";
+import { LocalPrizeStore, systemMinter, systemImageId } from "../world/prizeStore";
+import { LocalPrizeImageStore, downscaleToDataUrl } from "../world/prizeImageStore";
 import { unlockAllEnabled } from "../world/unlockAll";
 import { useDragScroll } from "./useDragScroll";
+import { AdultArea } from "./adult";
+import { Gift } from "./Gift";
 import {
   BackArrow,
   ChestIcon,
-  CloseIcon,
+  GiftIcon,
   MenuIcon,
   StarIcon
 } from "./icons";
@@ -43,6 +47,16 @@ const storage =
 
 const store = new LocalProgressStore(storage, LOCAL_OWNER);
 const prizeStore = new LocalPrizeStore(storage, LOCAL_OWNER, systemMinter());
+const imageStore = new LocalPrizeImageStore(
+  typeof localStorage === "undefined"
+    ? {
+        getItem: () => null,
+        setItem: () => undefined,
+        removeItem: () => undefined
+      }
+    : localStorage,
+  LOCAL_OWNER
+);
 
 /**
  * The world shell.
@@ -58,8 +72,9 @@ const prizeStore = new LocalPrizeStore(storage, LOCAL_OWNER, systemMinter());
  *
  * Exactly one screen is on at a time: a playing resource, the letriestrellas
  * just won, the animal just revealed, the chests owed for a first finish, the
- * menu, or the map. They are exclusive rather than layered so that nothing a
- * child can touch is ever hidden behind something else.
+ * gift ceremony, the adult area, or the map. They are exclusive rather than
+ * layered so that nothing a child can touch is ever hidden behind something
+ * else.
  */
 export function App() {
   const [progress, setProgress] = useState<Progress>(EMPTY_PROGRESS);
@@ -77,8 +92,12 @@ export function App() {
    * this the reveal would vanish in the same frame the chest opened.
    */
   const [revealed, setRevealed] = useState<CollectibleAnimal | null>(null);
-  /* The menu is a screen of its own, so whether it is on is part of which one. */
-  const [menuOpen, setMenuOpen] = useState(false);
+  /*
+   * The adult area and the gift are screens of their own rather than layers, so
+   * which one is on is one fact. A pair of booleans could say "both", and both is
+   * not a state this shell has.
+   */
+  const [detour, setDetour] = useState<"none" | "adult" | "gift">("none");
   /*
    * Where the child is standing. Session state, deliberately not stored: the
    * farm holds the entry chapter and everything the forest leads back to, so
@@ -159,6 +178,83 @@ export function App() {
     void store.claimReward(nodeId, animal.animalId).then(setProgress);
   }, []);
 
+  /*
+   * Awarding is a write — a prize needs an identity and a moment — so it cannot
+   * be derived the way the meter is. It runs off `due`, which is derived, so a
+   * tab closed between the last frame of a game and this effect still finds the
+   * prize owed on the next read.
+   */
+  useEffect(() => {
+    if (prizeView.due === 0) return;
+    void prizeStore.awardDue(view.stars).then(setPrizes);
+  }, [prizeView.due, view.stars]);
+
+  /** Awarded and not yet opened, oldest first — the one the child is owed next. */
+  const waiting = prizeView.pending[0] ?? null;
+
+  /*
+   * The gift takes the screen the first time it exists, because a wrapped box
+   * appearing quietly in the corner of a busy map is a thing a child does not
+   * find. Once dismissed it waits on the map instead — `shown` is what keeps the
+   * ceremony from re-entering every render.
+   */
+  const shown = useRef<PrizeId | null>(null);
+  useEffect(() => {
+    if (!waiting || shown.current === waiting.id) return;
+    shown.current = waiting.id;
+    setDetour("gift");
+  }, [waiting]);
+
+  const openGift = useCallback((id: PrizeId) => {
+    void prizeStore.open(id).then(setPrizes);
+  }, []);
+
+  const setPrizeGoal = useCallback((goal: number) => {
+    void prizeStore.setGoal(goal).then(setPrizes);
+  }, []);
+
+  const configure = useCallback((id: PrizeId, content: PrizeContent) => {
+    void prizeStore.configure(id, content).then(setPrizes);
+  }, []);
+
+  /**
+   * Takes what an adult picked, shrinks it, and keeps it under its own key.
+   *
+   * Returns `null` when the picture could not be decoded or storage refused it,
+   * and the form then saves the prize with its words alone — the half an adult
+   * actually reads to the child.
+   */
+  const pickImage = useCallback(async (file: File) => {
+    const id = systemImageId();
+    try {
+      const dataUrl = await downscaleToDataUrl(file);
+      return (await imageStore.save(id, dataUrl)) ? id : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  /*
+   * `giftImage` is the custom picture, read from the image store when the
+   * waiting gift has one. Unconfigured prizes have no content to read, so they
+   * read as no picture rather than reaching into a field they do not have.
+   */
+  const [giftImage, setGiftImage] = useState<string | null>(null);
+  useEffect(() => {
+    const content = waiting?.state === "unconfigured" ? null : waiting?.content;
+    if (content?.kind !== "custom" || content.imageId === null) {
+      setGiftImage(null);
+      return;
+    }
+    let cancelled = false;
+    void imageStore.read(content.imageId).then((url) => {
+      if (!cancelled) setGiftImage(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [waiting]);
+
   useEffect(() => {
     const parent = host.current;
     if (!activeNode || !parent) return;
@@ -197,8 +293,29 @@ export function App() {
     return <Chests reward={view.pendingReward} onOpen={openChest} />;
   }
 
-  if (menuOpen) {
-    return <Menu onClose={() => setMenuOpen(false)} />;
+  if (detour === "gift" && waiting) {
+    return (
+      <Gift
+        prize={waiting}
+        imageUrl={giftImage}
+        onOpen={openGift}
+        onPrepare={() => setDetour("adult")}
+        onContinue={() => setDetour("none")}
+      />
+    );
+  }
+
+  if (detour === "adult") {
+    return (
+      <AdultArea
+        view={prizeView}
+        currentYear={new Date().getFullYear()}
+        onSetGoal={setPrizeGoal}
+        onConfigure={configure}
+        onPickImage={pickImage}
+        onClose={() => setDetour("none")}
+      />
+    );
   }
 
   const before = view.regions[regionIndex - 1];
@@ -219,10 +336,20 @@ export function App() {
         type="button"
         className="menu-button"
         aria-label="Menú"
-        onClick={() => setMenuOpen(true)}
+        onClick={() => setDetour("adult")}
       >
         <MenuIcon />
       </button>
+      {waiting ? (
+        <button
+          type="button"
+          className="map__gift"
+          aria-label="Tu regalo"
+          onClick={() => setDetour("gift")}
+        >
+          <GiftIcon />
+        </button>
+      ) : null}
       {/*
         An ordered list because the world is a sequence: that is what a screen
         reader should hear, and it is what the connecting line draws.
@@ -295,38 +422,6 @@ function PrizeMeter({ filled, goal }: { filled: number; goal: number }) {
         />
       </span>
     </section>
-  );
-}
-
-/**
- * The adult's way in, in the map's top-right corner.
- *
- * Empty for now: it is the place the app's own settings will live, kept apart
- * from the world so that nothing on the map is about the app rather than about
- * playing. It takes the screen rather than floating over the map, like every
- * other screen here — a panel a child can tap through is a way to leave the
- * world by accident.
- */
-function Menu({ onClose }: { onClose: () => void }) {
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-
-  return (
-    <main className="menu" role="dialog" aria-modal="true" aria-label="Menú">
-      <button
-        type="button"
-        className="menu__close"
-        aria-label="Cerrar el menú"
-        onClick={onClose}
-      >
-        <CloseIcon />
-      </button>
-    </main>
   );
 }
 

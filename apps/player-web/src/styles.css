@@ -775,6 +775,34 @@ main { height: 100dvh; }
 }
 .gift__prepare:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
 
+/*
+ * The gift waiting on the map, low in the reach band.
+ *
+ * Everything else in a map corner — the meter, the menu button — is chrome a
+ * child never needs to touch, so it lives up where an 86-inch panel is out of
+ * reach. This is the one control down here that a child does touch, so it sits
+ * where their hands actually land, with a touch target no smaller than the
+ * chests they already tap to choose an animal.
+ */
+.map__gift {
+  position: absolute;
+  bottom: 2rem;
+  left: 2rem;
+  z-index: 1;
+  min-width: 6rem;
+  min-height: 6rem;
+  display: grid;
+  place-items: center;
+  padding: 0.5rem;
+  border: 2px solid #7b2cbf;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.9);
+  cursor: pointer;
+}
+.map__gift:hover { background: #fff; }
+.map__gift:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
+.map__gift > svg { width: 3.5rem; height: 3.5rem; }
+
 /* Announced, never drawn. */
 .visually-hidden {
   position: absolute;
