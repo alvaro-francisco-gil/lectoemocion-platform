@@ -399,6 +399,52 @@ main { height: 100dvh; }
 }
 .menu__close:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
 
+/* Same reason as `.menu`: a screen, not a layer, so there is nothing under it
+   for a child to tap through while an adult is in it. */
+.adult {
+  position: relative;
+  background: #f6f2fb;
+  padding: clamp(1rem, 4vh, 3rem) clamp(1rem, 4vw, 3rem);
+  overflow-y: auto;
+}
+
+/* The gate itself, shown in place of the area it guards until it is passed. */
+.adult-gate {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+  max-width: 24rem;
+  margin: clamp(3rem, 20vh, 8rem) auto 0;
+}
+
+.adult-gate__field {
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  border: 2px solid #7b2cbf;
+  border-radius: 0.75rem;
+  font: inherit;
+  font-size: 1.1rem;
+}
+.adult-gate__field:focus-visible { outline: 3px solid #402060; outline-offset: 2px; }
+
+.adult-gate__refusal {
+  margin: 0;
+  color: #b3261e;
+  font-weight: 700;
+}
+
+.adult-gate__submit {
+  padding: 0.6rem 1.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: #7b2cbf;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.adult-gate__submit:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
+
 /* ------------------------------------------------------------ collection */
 
 /*
