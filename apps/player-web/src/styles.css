@@ -85,7 +85,7 @@ main { height: 100dvh; }
    * row is a middle band with the bar under it, and a card sized off width
    * alone would push that bar off a laptop in landscape.
    */
-  --card-width: clamp(150px, min(38vw, 34vh), 300px);
+  --card-width: clamp(190px, min(48vw, 44vh), 400px);
   position: relative;
   display: grid;
   grid-template-rows: 1fr;
@@ -211,15 +211,31 @@ main { height: 100dvh; }
   background: #4a2a75;
   box-shadow: 0 8px 0 rgb(0 0 0 / 0.22);
 }
-/* `*` and `::after` both: the completed star is a pseudo-element, which `> *`
-   does not match, and without this it lands in a row of its own. */
-.world-node__marker > *,
-.world-node__marker::after {
+.world-node__marker > * {
   grid-area: 1 / 1;
   place-self: center;
   min-width: 0;
   min-height: 0;
 }
+
+/*
+ * A colour per card, cycled by position so no two neighbours match.
+ *
+ * The picture is what a child navigates by; the colour is what carries it
+ * across a classroom, where an 86-inch panel is far enough away that a bee and
+ * a butterfly are both "small dark thing". Each is a saturated field the
+ * cut-out illustration sits on, and every one of them is dark enough to hold
+ * white text and light enough to separate from the background.
+ *
+ * Decoration only. Nothing here is the sole carrier of any state: locked says
+ * so with a padlock, and every card's state is spoken.
+ */
+.world-node[data-tint="0"] .world-node__marker { background: #e05299; }
+.world-node[data-tint="1"] .world-node__marker { background: #2a9d8f; }
+.world-node[data-tint="2"] .world-node__marker { background: #e07a3f; }
+.world-node[data-tint="3"] .world-node__marker { background: #4361c9; }
+.world-node[data-tint="4"] .world-node__marker { background: #7a4fc7; }
+.world-node[data-tint="5"] .world-node__marker { background: #d64550; }
 
 /*
  * `contain`, not `cover`.
@@ -279,25 +295,14 @@ main { height: 100dvh; }
 }
 
 /*
- * A finished chapter wears a star in its corner rather than changing colour:
- * the picture is the landmark a child navigates by, and repainting the card
- * would move that landmark every time they finished something.
+ * A finished chapter is not marked on the card at all.
+ *
+ * Nothing is hidden by that: a completed chapter stays playable, so "finished"
+ * changes nothing a child can do with it, and the one place it mattered — the
+ * connecting line, which fills in behind them — already says how far they have
+ * got. A badge on every card a child has played would end up on all of them,
+ * which is a mark that stops meaning anything. The state is still spoken.
  */
-.world-node[data-state="completed"] .world-node__marker::after {
-  content: "★";
-  place-self: start end;
-  z-index: 1;
-  width: 1.9em;
-  height: 1.9em;
-  margin: 0.55rem;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: #f4c95d;
-  color: #6b4a05;
-  font-size: clamp(0.8rem, 1.5vw, 1.1rem);
-  line-height: 1;
-}
 
 /*
  * A locked chapter still shows its picture, dimmed, with the padlock over it:

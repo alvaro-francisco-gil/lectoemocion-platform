@@ -54,11 +54,24 @@ Rewards belong to the world. `WorldView.collection` and
 `WorldView.pendingReward` stay world-wide, so a chest owed for the story
 interrupts whichever section the child is standing in.
 
-**A chapter is a card.** 4:3, rounded, the picture `contain`ed on the card's own
-colour with the title on a chip over the bottom-left corner. `contain`, not
-`cover`: the icons are cut-out illustrations, most of them taller than they are
-wide, and covering a 4:3 rectangle cropped the rooster down to a patch of
+**A chapter is a card.** 4:3, rounded, the picture `contain`ed on a saturated
+colour field with the title on a chip over the bottom-left corner. `contain`,
+not `cover`: the icons are cut-out illustrations, most of them taller than they
+are wide, and covering a 4:3 rectangle cropped the rooster down to a patch of
 yellow. The whole subject has to survive.
+
+**The colour is a card's second landmark, and it lives in CSS.** Six tints
+cycled by the card's position in the row, so no two neighbours ever match. It is
+positional rather than authored because what colour a chapter is is not a fact
+about the chapter — content stays engine-neutral, and the stylesheet keeps the
+palette. On an 86-inch panel at classroom distance a bee and a butterfly are
+both "small dark thing"; the colour is what carries the card across the room.
+
+Nothing marks a chapter as finished on the card itself. A completed chapter
+stays playable, so "finished" changes nothing a child can do with it, and the
+connecting line already fills in behind them. A badge that ends up on every card
+is a mark that has stopped meaning anything. The state is still spoken to a
+screen reader, so nothing is carried by colour alone.
 
 **The collection is a screen**, reached by a button in the bottom-right corner
 on every section. The app's rule is unchanged and now covers one more case:

@@ -44,6 +44,16 @@ const store = new LocalProgressStore(
 type TabId = "juegos" | "recursos";
 
 /**
+ * How many card colours the row cycles through.
+ *
+ * It agrees with `.world-node[data-tint="N"]` in `styles.css`, and this is the
+ * only number that has to: the palette itself is the stylesheet's business.
+ * Six, because a row long enough to repeat has put four cards between the
+ * repeats, which is further than a child compares.
+ */
+const CARD_TINTS = 6;
+
+/**
  * The world shell.
  *
  * It owns progression: it reads progress, derives the world, routes into a
@@ -217,9 +227,19 @@ export function App() {
       */}
       <nav aria-label="Mundo" className="world__row" ref={panWorld}>
         <ol className="world-path">
-          {standing.map((node) => (
+          {/*
+            The tint comes from the card's place in the row rather than from
+            the node, because it is decoration: what colour a chapter is is not
+            a fact about the chapter, and the stylesheet is where colour lives.
+            Cycling by position is also what guarantees no two neighbours match.
+          */}
+          {standing.map((node, index) => (
             <li key={node.id}>
-              <WorldNode node={node} onSelect={select} />
+              <WorldNode
+                node={node}
+                tint={index % CARD_TINTS}
+                onSelect={select}
+              />
             </li>
           ))}
         </ol>
@@ -579,9 +599,11 @@ function Reveal({
  */
 function WorldNode({
   node,
+  tint,
   onSelect
 }: {
   node: WorldNodeView;
+  tint: number;
   onSelect: (nodeId: string) => void;
 }) {
   const titleId = useId();
@@ -591,6 +613,7 @@ function WorldNode({
       type="button"
       className="world-node"
       data-state={node.state}
+      data-tint={tint}
       disabled={!node.playable}
       /*
        * The node is named by its title alone and described by its state, so a

@@ -267,6 +267,32 @@ describe("the world shell", () => {
     expect(collection(container)).toEqual(worldNodes(world).map(() => null));
   });
 
+  /*
+   * Each card is its own colour, and no two beside each other share one. The
+   * picture is what a child navigates by and the colour is what makes it carry
+   * across a room, so two neighbours in the same tint would cost a landmark.
+   */
+  it("gives neighbouring cards different colours", () => {
+    render(<App />);
+    const tints = worldButtons().map((button) =>
+      button.getAttribute("data-tint")
+    );
+
+    expect(tints.every((tint) => tint !== null)).toBe(true);
+    for (const [index, tint] of tints.entries()) {
+      if (index > 0) expect(tint).not.toBe(tints[index - 1]);
+    }
+  });
+
+  /* Colour is decoration over a card that already says what it is. */
+  it("never lets colour be the only thing that says a card is finished", () => {
+    render(<App />);
+    const entry = screen.getByRole("button", { name: "El encuentro" });
+    expect(entry.querySelector(".world-node__state")?.textContent).toBe(
+      "Historia"
+    );
+  });
+
   it("marks each node's state without relying on colour", () => {
     render(<App />);
     const states = worldButtons().map(
