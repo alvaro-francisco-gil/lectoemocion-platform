@@ -40,12 +40,14 @@ export {
   CollectibleAnimalSchema,
   WorldNodeSchema,
   WorldSchema,
-  parseWorld
+  parseWorld,
+  worldNodes
 } from "./worldSchema";
 export type {
   CollectibleAnimal,
   NodeResource,
   NodeReward,
   World,
-  WorldNode
+  WorldNode,
+  WorldRegion
 } from "./worldSchema";

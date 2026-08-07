@@ -28,6 +28,24 @@ The shell never reaches into a scene, and a scene never reads application
 state. They communicate through the manifest going in and completion events
 coming out.
 
+## The map
+
+The map is what a child who cannot read navigates, so it is pictures first.
+
+- **A chapter is its own illustration, never a glyph.** No numbers, no letters,
+  no ordinal on the marker. The picture is authored per node as `icon` in the
+  world schema; the title under it is for the adult and the screen reader.
+- **One region is on screen at a time**, with its backdrop behind it and a door
+  at each end leading to the region beside it. `--map-scene` carries the
+  backdrop from the shell into the stylesheet — which place a child is standing
+  in is content, not CSS.
+- **A door is open when something inside the region it leads to is open.**
+  Derived by `deriveMapView` from the same `unlockedBy` rule as the nodes;
+  there is no second progression counting chapters. The way back is always
+  open.
+- **Which region a child is in is session state, not stored progress.** The app
+  opens where the world begins.
+
 ## Rendering rules
 
 - **Render at a 1080p logical resolution** and let large panels upscale.

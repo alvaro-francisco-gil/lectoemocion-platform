@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseWorld, type World } from "@lectoemocion/resource-schema";
+import {
+  parseWorld,
+  worldNodes,
+  type World
+} from "@lectoemocion/resource-schema";
 import { world } from "@lectoemocion/template-catalog";
 import {
   deriveMapView,
@@ -17,35 +21,60 @@ const chestsFor = (node: string) => ({
   }))
 });
 
+/**
+ * A four-chapter world in two places.
+ *
+ * Two regions rather than one, because the region is now part of what
+ * `deriveMapView` projects: a fixture with a single place could not tell a
+ * door that opens from a door that does not.
+ */
 const chain: World = parseWorld({
-  nodes: [
+  regions: [
     {
-      id: "one",
-      title: "Uno",
-      unlockedBy: [],
-      resource: { template: "name-story", seed: "one" },
-      reward: chestsFor("one")
+      id: "casa",
+      title: "La casa",
+      background: "/world/granero.webp",
+      nodes: [
+        {
+          id: "one",
+          title: "Uno",
+          icon: "/vocabulary/gato.webp",
+          unlockedBy: [],
+          resource: { template: "name-story", seed: "one" },
+          reward: chestsFor("one")
+        },
+        {
+          id: "two",
+          title: "Dos",
+          icon: "/vocabulary/luna.webp",
+          unlockedBy: ["one"],
+          resource: { template: "pairs-game", seed: "two", pairCount: 3 },
+          reward: chestsFor("two")
+        }
+      ]
     },
     {
-      id: "two",
-      title: "Dos",
-      unlockedBy: ["one"],
-      resource: { template: "pairs-game", seed: "two", pairCount: 3 },
-      reward: chestsFor("two")
-    },
-    {
-      id: "three",
-      title: "Tres",
-      unlockedBy: ["one"],
-      resource: { template: "pairs-game", seed: "three", pairCount: 3 },
-      reward: chestsFor("three")
-    },
-    {
-      id: "four",
-      title: "Cuatro",
-      unlockedBy: ["two", "three"],
-      resource: { template: "memory-album", seed: "four" },
-      reward: chestsFor("four")
+      id: "fuera",
+      title: "Fuera",
+      background: "/world/bosque.webp",
+      nodes: [
+        {
+          id: "three",
+          title: "Tres",
+          icon: "/vocabulary/sol.webp",
+          unlockedBy: ["one"],
+          resource: { template: "pairs-game", seed: "three", pairCount: 3 },
+          reward: chestsFor("three")
+        },
+        {
+          id: "four",
+          title: "Cuatro",
+          icon: "/vocabulary/pato.webp",
+          unlockedBy: ["two", "three"],
+          resource: { template: "memory-album", seed: "four" },
+          reward: chestsFor("four")
+        }
+      ]
     }
   ]
 });
@@ -112,7 +141,7 @@ describe("deriving the map from progress", () => {
       completedNodes: ["one", "a-node-from-an-older-content-release"],
       lastPlayedNode: "a-node-from-an-older-content-release"
     });
-    expect(view.nodes).toHaveLength(chain.nodes.length);
+    expect(view.nodes).toHaveLength(worldNodes(chain).length);
     expect(stateOf(view, "two")).toBe("unlocked");
   });
 
@@ -139,6 +168,58 @@ describe("deriving the map from progress", () => {
   it("opens everything when the development bypass is on", () => {
     const view = deriveMapView(chain, EMPTY_PROGRESS, { unlockAll: true });
     expect(view.nodes.every((node) => node.playable)).toBe(true);
+  });
+});
+
+describe("the world's places", () => {
+  const regionOf = (view: ReturnType<typeof deriveMapView>, id: string) =>
+    view.regions.find((region) => region.id === id);
+
+  it("keeps each region's chapters in it, in order", () => {
+    const view = deriveMapView(chain, EMPTY_PROGRESS);
+    expect(view.regions.map((region) => region.id)).toEqual(["casa", "fuera"]);
+    expect(regionOf(view, "fuera")?.nodes.map((node) => node.id)).toEqual([
+      "three",
+      "four"
+    ]);
+  });
+
+  it("carries each region's backdrop, so the map does not name files", () => {
+    const view = deriveMapView(chain, EMPTY_PROGRESS);
+    expect(regionOf(view, "fuera")?.background).toBe("/world/bosque.webp");
+  });
+
+  /*
+   * The door into a place is the place having something open in it. This is the
+   * whole rule — there is no second progression counting chapters — so a child
+   * cannot walk into a region and find every chapter in it locked.
+   */
+  it("shuts a region whose chapters are all still locked", () => {
+    const view = deriveMapView(chain, EMPTY_PROGRESS);
+    expect(regionOf(view, "casa")?.reachable).toBe(true);
+    expect(regionOf(view, "fuera")?.reachable).toBe(false);
+  });
+
+  it("opens a region as soon as one chapter inside it opens", () => {
+    const view = deriveMapView(chain, progressAfter("one"));
+    expect(regionOf(view, "fuera")?.reachable).toBe(true);
+  });
+
+  it("opens every region when the development bypass is on", () => {
+    const view = deriveMapView(chain, EMPTY_PROGRESS, { unlockAll: true });
+    expect(view.regions.every((region) => region.reachable)).toBe(true);
+  });
+
+  /* The flat list is the same chapters, so nothing that reads it — the
+     collection, the ceremony — has to learn about regions. */
+  it("flattens to every chapter in the world, in walking order", () => {
+    const view = deriveMapView(chain, EMPTY_PROGRESS);
+    expect(view.nodes.map((node) => node.id)).toEqual([
+      "one",
+      "two",
+      "three",
+      "four"
+    ]);
   });
 });
 

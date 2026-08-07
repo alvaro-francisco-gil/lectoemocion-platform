@@ -69,21 +69,34 @@ main { height: 100dvh; }
  * path off the middle of the display every time it changed height. The path is
  * the thing a child aims at, so it is the thing that stays put.
  *
- * The barn is the hub the framing story puts a child in, so it is the map's
- * background rather than a picture on it: `cover` from the centre, because the
- * composition is a room and the walls are what may be cropped, never the floor
- * the path stands on. The white wash above it is what buys the contrast — the
- * straw floor is a light mid-tone and the labels are dark ink, and without it
- * the locked ones sit too close to the ground they are drawn on.
+ * The region a child is standing in is the map's background rather than a
+ * picture on it: `cover` from the centre, because each composition is a place
+ * and its edges are what may be cropped, never the ground the path stands on.
+ * The white wash above it is what buys the contrast — the barn's straw floor
+ * and the forest's grass are both mid-tones under dark ink labels, and without
+ * it the locked ones sit too close to the ground they are drawn on.
  */
 .map {
+  /*
+   * How big a chapter is, in one place.
+   *
+   * The marker, the gap between markers and the height the connecting line is
+   * drawn at are all derived from it, so the path stays one row rather than
+   * three measurements that have to be kept in agreement by hand.
+   *
+   * Bounded by the shorter side of the viewport as well as the wider one: the
+   * path is a middle band with the collection under it, and a marker sized off
+   * width alone would push that row off a laptop in landscape.
+   */
+  --node-size: clamp(112px, min(30vw, 26vh), 224px);
   position: relative;
   display: grid;
   grid-template-rows: 1fr;
   overflow: hidden;
+  /* `--map-scene` is set per region by the shell; the wash is the same for all. */
   background:
     linear-gradient(rgb(255 255 255 / 0.34), rgb(255 255 255 / 0.34)),
-    url("/world/granero.webp") center / cover no-repeat;
+    var(--map-scene) center / cover no-repeat;
 }
 
 /*
@@ -147,7 +160,8 @@ main { height: 100dvh; }
 .world-path > li + li::before {
   content: "";
   position: absolute;
-  top: 46px;
+  /* Half a marker down, less half the line's own thickness: the middle of it. */
+  top: calc(var(--node-size) / 2 - 3px);
   right: 100%;
   width: clamp(0.5rem, 3vw, 2.5rem);
   height: 6px;
@@ -159,7 +173,8 @@ main { height: 100dvh; }
 }
 
 .world-node {
-  width: clamp(104px, 15vw, 168px);
+  /* Wider than the marker, so a two-line title does not force the disc narrow. */
+  width: calc(var(--node-size) + 1.5rem);
   display: grid;
   justify-items: center;
   gap: 0.4rem;
@@ -174,25 +189,91 @@ main { height: 100dvh; }
    is told apart by its padlock and its label, never by being faint. */
 .world-node[disabled] { cursor: not-allowed; color: #3f3350; }
 
+/*
+ * The disc a chapter's picture sits in.
+ *
+ * `grid` with one cell, so the padlock stacks over the picture rather than
+ * beside it. The picture is inset from the ring: an illustration drawn to the
+ * edge of a circle loses its silhouette, which is the part a child recognises.
+ */
 .world-node__marker {
-  width: 92px;
-  height: 92px;
+  width: var(--node-size);
+  height: var(--node-size);
+  /*
+   * One definite cell, not `place-items`: the picture has to resolve its
+   * height against the disc rather than against itself, or a tall illustration
+   * sizes the cell to its own natural height and walks out of the circle and
+   * over the title beneath it.
+   */
   display: grid;
-  place-items: center;
+  grid-template: 1fr / 1fr;
+  padding: 8%;
   border: 6px solid #7b2cbf;
   border-radius: 50%;
   background: #fff;
-  font-size: 2.2rem;
-  font-weight: 800;
 }
+.world-node__marker > * {
+  grid-area: 1 / 1;
+  place-self: center;
+  min-width: 0;
+  min-height: 0;
+}
+
+.world-node__icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .world-node[data-state="completed"] .world-node__marker {
   background: #95d5b2;
   border-color: #4a3a63;
 }
+
+/*
+ * A locked chapter still shows its picture, faded, with the padlock over it:
+ * what is behind the lock is the reason to come back for it. Faded, never
+ * hidden — the state is also written under the node and read aloud, so the
+ * dimming is never what carries it.
+ */
 .world-node[data-state="locked"] .world-node__marker {
   background: #e7e1ef;
   border-color: #b9a7c9;
-  font-size: 1.8rem;
+}
+.world-node[data-state="locked"] .world-node__icon { opacity: 0.4; }
+
+.world-node__lock {
+  width: 45%;
+  height: 45%;
+}
+
+/*
+ * The door into the region beside this one.
+ *
+ * Built as a chapter and then dressed as a place: the picture is a backdrop, a
+ * wide rectangle, so it fills the disc rather than sitting inside it the way a
+ * cut-out illustration does. Same size and same row as a chapter, because it is
+ * the same gesture — the next thing along the road.
+ */
+.region-door .world-node__marker { padding: 0; overflow: hidden; }
+.region-door .world-node__icon { object-fit: cover; border-radius: 50%; }
+.region-door[data-state="locked"] .world-node__icon { opacity: 0.35; }
+
+.region-door__way {
+  place-self: end center;
+  display: grid;
+  place-items: center;
+  width: 38%;
+  height: 38%;
+  margin-bottom: 6%;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.92);
+  color: #402060;
+}
+.region-door__way > svg { width: 70%; height: 70%; }
+/* The same arrow, turned around: one drawing, two directions. */
+.region-door[data-direction="on"] .region-door__way > svg {
+  transform: scaleX(-1);
 }
 
 .world-node__title { font-weight: 700; font-size: 1rem; line-height: 1.2; }

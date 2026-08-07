@@ -7,6 +7,7 @@ import {
   within
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { worldNodes } from "@lectoemocion/resource-schema";
 import { world } from "@lectoemocion/template-catalog";
 import { App } from "./App";
 
@@ -62,6 +63,13 @@ function starTotal(): string {
 function worldButtons(): HTMLElement[] {
   return within(screen.getByRole("navigation", { name: "Mundo" })).getAllByRole(
     "button"
+  );
+}
+
+/** What the current region's path reads as, doors included, left to right. */
+function pathTitles(): (string | null | undefined)[] {
+  return worldButtons().map(
+    (button) => button.querySelector(".world-node__title")?.textContent
   );
 }
 
@@ -174,22 +182,23 @@ describe("the world shell", () => {
     );
   });
 
-  it("shows the world as one ordered path", () => {
+  /*
+   * One region at a time, and the door to the next at the end of it. The
+   * chapters that stand in the forest are not on this path — that is what
+   * makes the forest somewhere to go rather than a change of wallpaper.
+   */
+  it("shows one region as an ordered path, with the way on at its end", () => {
     render(<App />);
-    const titles = worldButtons().map(
-      (button) => button.querySelector(".world-node__title")?.textContent
-    );
-    expect(titles).toEqual([
+    expect(pathTitles()).toEqual([
       "El encuentro",
       "El gallo Rayo",
       "Las iniciales",
-      "El bosque de parejas",
-      "¿Cuál es?",
       "Las primeras letras",
       "El puente de sílabas",
       "El taller de letras",
       "Empieza igual",
-      "Nuestro álbum"
+      "Nuestro álbum",
+      "El bosque"
     ]);
   });
 
@@ -258,7 +267,7 @@ describe("the world shell", () => {
     /* Slots are a record, not a route: nothing in the row is pressable. */
     expect(container.querySelectorAll(".collection button")).toHaveLength(0);
     /* One slot per chapter, counted from the world rather than listed here. */
-    expect(collection(container)).toEqual(world.nodes.map(() => null));
+    expect(collection(container)).toEqual(worldNodes(world).map(() => null));
   });
 
   it("marks each node's state without relying on colour", () => {
@@ -266,11 +275,82 @@ describe("the world shell", () => {
     const states = worldButtons().map(
       (button) => button.querySelector(".world-node__state")?.textContent
     );
+    /* The farm's chapters, then the door out of it — shut, because nothing in
+       the forest has opened yet. */
+    const farm = world.regions[0]!.nodes;
     expect(states).toEqual([
       "Historia",
-      ...world.nodes.slice(1).map(() => "Bloqueado")
+      ...farm.slice(1).map(() => "Bloqueado"),
+      "Bloqueado"
     ]);
   });
+});
+
+/**
+ * Walking between the world's places.
+ *
+ * The map shows one region at a time and the doors at its ends are how a child
+ * moves between them. A door with nothing open behind it is shut, for the same
+ * reason a locked chapter is: it would be a way to end up somewhere with
+ * nothing to do.
+ */
+describe("the doors between regions", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    createGame.mockClear();
+  });
+
+  it("keeps the way on shut while every chapter behind it is locked", () => {
+    render(<App />);
+
+    const door = screen.getByRole("button", { name: "El bosque" });
+    expect(door).toBeDisabled();
+
+    fireEvent.click(door);
+    /* Still on the farm: a shut door is refused, not merely dimmed. */
+    expect(pathTitles()).toContain("El encuentro");
+  });
+
+  it("opens the way on once a chapter in the forest opens", async () => {
+    render(<App />);
+    await finishTheFarmUpToTheForest();
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "El bosque" })).toBeEnabled()
+    );
+  });
+
+  it("walks into the forest and back to the farm", async () => {
+    render(<App />);
+    await finishTheFarmUpToTheForest();
+
+    fireEvent.click(await screen.findByRole("button", { name: "El bosque" }));
+
+    /* The forest: its two chapters, and the way home in front of them. */
+    expect(pathTitles()).toEqual([
+      "La granja",
+      "El bosque de parejas",
+      "¿Cuál es?"
+    ]);
+
+    /* The way back is never shut — the chapters that wait on the forest are
+       on the farm, and a child who could not walk home would be stuck. */
+    const back = screen.getByRole("button", { name: "La granja" });
+    expect(back).toBeEnabled();
+
+    fireEvent.click(back);
+    expect(pathTitles()).toContain("El encuentro");
+  });
+
+  /** Plays the farm as far as the forest: the entry, then the initials game. */
+  async function finishTheFarmUpToTheForest(): Promise<void> {
+    for (const title of ["El encuentro", "Las iniciales"]) {
+      fireEvent.click(await screen.findByRole("button", { name: title }));
+      completeActiveResource();
+      await collectStars();
+      await openChest();
+    }
+  }
 });
 
 describe("the chest a chapter is worth", () => {
@@ -336,7 +416,7 @@ describe("the chest a chapter is worth", () => {
     await waitFor(() =>
       expect(collection(container)).toEqual([
         won,
-        ...world.nodes.slice(1).map(() => null)
+        ...worldNodes(world).slice(1).map(() => null)
       ])
     );
   });
@@ -404,7 +484,7 @@ describe("the chest a chapter is worth", () => {
     await waitFor(() =>
       expect(collection(remounted.container)).toEqual([
         won,
-        ...world.nodes.slice(1).map(() => null)
+        ...worldNodes(world).slice(1).map(() => null)
       ])
     );
   });

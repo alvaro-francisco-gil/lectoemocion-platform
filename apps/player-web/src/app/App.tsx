@@ -4,9 +4,13 @@ import {
   useId,
   useMemo,
   useRef,
-  useState
+  useState,
+  type CSSProperties
 } from "react";
-import type { CollectibleAnimal } from "@lectoemocion/resource-schema";
+import {
+  worldNodes,
+  type CollectibleAnimal
+} from "@lectoemocion/resource-schema";
 import { createResourceForNode, world } from "@lectoemocion/template-catalog";
 import { createGame } from "../game/createGame";
 import {
@@ -15,6 +19,7 @@ import {
   STARS_PER_COMPLETION,
   type CollectionSlotView,
   type MapNodeView,
+  type MapRegionView,
   type PendingRewardView,
   type Progress
 } from "../world/mapView";
@@ -63,6 +68,13 @@ export function App() {
   const [revealed, setRevealed] = useState<CollectibleAnimal | null>(null);
   /* The menu is a screen of its own, so whether it is on is part of which one. */
   const [menuOpen, setMenuOpen] = useState(false);
+  /*
+   * Where the child is standing. Session state, deliberately not stored: the
+   * farm holds the entry chapter and everything the forest leads back to, so
+   * opening the app in the room a child happened to wander into last week is a
+   * worse start than opening it where the world begins.
+   */
+  const [regionIndex, setRegionIndex] = useState(0);
   const host = useRef<HTMLDivElement>(null);
   const panWorld = useDragScroll();
 
@@ -82,9 +94,16 @@ export function App() {
   );
 
   const activeNode = useMemo(
-    () => world.nodes.find((node) => node.id === activeNodeId) ?? null,
+    () => worldNodes(world).find((node) => node.id === activeNodeId) ?? null,
     [activeNodeId]
   );
+
+  /*
+   * The world always has a first region, so a stored or stale index that no
+   * longer exists lands the child at the beginning rather than on a blank
+   * screen. Fails to the entry, not to nothing.
+   */
+  const region = view.regions[regionIndex] ?? view.regions[0]!;
 
   const select = useCallback(
     (nodeId: string) => {
@@ -163,8 +182,19 @@ export function App() {
     return <Menu onClose={() => setMenuOpen(false)} />;
   }
 
+  const before = view.regions[regionIndex - 1];
+  const after = view.regions[regionIndex + 1];
+
   return (
-    <main className="map">
+    /*
+     * The scene is the region's, passed as a custom property rather than set
+     * in the stylesheet: which place a child is standing in is content, and the
+     * stylesheet is not where the world's geography should be written down.
+     */
+    <main
+      className="map"
+      style={{ "--map-scene": `url("${region.background}")` } as CSSProperties}
+    >
       <StarCounter stars={view.stars} />
       <button
         type="button"
@@ -177,14 +207,36 @@ export function App() {
       {/*
         An ordered list because the world is a sequence: that is what a screen
         reader should hear, and it is what the connecting line draws.
+
+        Named "Mundo" whichever region is on screen: it is one map showing one
+        place at a time, not two navigations. Which place that is comes from the
+        doors at its ends, which say where they lead.
       */}
       <nav aria-label="Mundo" className="map__world" ref={panWorld}>
         <ol className="world-path">
-          {view.nodes.map((node, index) => (
+          {before ? (
+            <li>
+              <RegionDoor
+                region={before}
+                direction="back"
+                onEnter={() => setRegionIndex(regionIndex - 1)}
+              />
+            </li>
+          ) : null}
+          {region.nodes.map((node) => (
             <li key={node.id}>
-              <WorldNode node={node} index={index} onSelect={select} />
+              <WorldNode node={node} onSelect={select} />
             </li>
           ))}
+          {after ? (
+            <li>
+              <RegionDoor
+                region={after}
+                direction="on"
+                onEnter={() => setRegionIndex(regionIndex + 1)}
+              />
+            </li>
+          ) : null}
         </ol>
       </nav>
       <Collection slots={view.collection} />
@@ -408,13 +460,79 @@ function Reveal({
   );
 }
 
+/**
+ * The way out of a region and into the one beside it.
+ *
+ * It stands at the end of the path like a chapter and is built like one — same
+ * disc, same size, same picture-first rule — because to a child it is the same
+ * gesture: the next thing along the road. What it shows is the place it leads
+ * to, so the door out of the farm is a window onto the forest.
+ *
+ * A door with nothing open behind it is locked and says so, exactly as a
+ * chapter does. The way back is never locked: a child who walked here has to
+ * be able to walk home, and the chapters that wait on this region are there.
+ */
+function RegionDoor({
+  region,
+  direction,
+  onEnter
+}: {
+  region: MapRegionView;
+  direction: "back" | "on";
+  onEnter: () => void;
+}) {
+  const titleId = useId();
+  const stateId = useId();
+  const open = direction === "back" || region.reachable;
+
+  return (
+    <button
+      type="button"
+      className="world-node region-door"
+      data-direction={direction}
+      data-state={open ? "unlocked" : "locked"}
+      disabled={!open}
+      aria-labelledby={titleId}
+      aria-describedby={stateId}
+      onClick={onEnter}
+    >
+      <span className="world-node__marker" aria-hidden="true">
+        <img className="world-node__icon" src={region.background} alt="" />
+        {open ? (
+          /* Which way the road goes, for a child who reads neither the title
+             nor the position of the door on a path they have to scroll. */
+          <span className="region-door__way">
+            <BackArrow />
+          </span>
+        ) : (
+          <LockIcon />
+        )}
+      </span>
+      <span className="world-node__title" id={titleId}>
+        {region.title}
+      </span>
+      <span className="world-node__state" id={stateId}>
+        {open ? "Ir" : "Bloqueado"}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * One chapter on the path.
+ *
+ * The marker is the chapter's own picture, as large as the row allows. A child
+ * of three does not read the title and cannot count, so a numbered disc named
+ * nothing: the picture is what they remember a chapter by and what they aim a
+ * finger at. Nothing on the marker is a glyph — the number is gone, and a
+ * locked chapter says so with a padlock over its picture rather than by hiding
+ * it, because what is behind the lock is the reason to come back.
+ */
 function WorldNode({
   node,
-  index,
   onSelect
 }: {
   node: MapNodeView;
-  index: number;
   onSelect: (nodeId: string) => void;
 }) {
   const titleId = useId();
@@ -435,7 +553,12 @@ function WorldNode({
       onClick={() => onSelect(node.id)}
     >
       <span className="world-node__marker" aria-hidden="true">
-        {node.state === "locked" ? "🔒" : index + 1}
+        {/*
+          Empty `alt`: the title beside it is the accessible name, and a screen
+          reader announcing the picture as well would say the chapter twice.
+        */}
+        <img className="world-node__icon" src={node.icon} alt="" />
+        {node.state === "locked" ? <LockIcon /> : null}
       </span>
       <span className="world-node__title" id={titleId}>
         {node.title}
@@ -490,6 +613,34 @@ function StarIcon() {
         strokeWidth="5"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+/**
+ * The padlock over a chapter that has not opened yet.
+ *
+ * Drawn rather than the emoji it replaced: an emoji is a glyph a font decides
+ * the shape of, and this one sits over an illustration at a size where a
+ * platform's stray colour scheme would show.
+ */
+function LockIcon() {
+  return (
+    <svg
+      className="world-node__lock"
+      viewBox="0 0 100 100"
+      aria-hidden="true"
+    >
+      <path
+        d="M32 46V34a18 18 0 0 1 36 0v12"
+        fill="none"
+        stroke="#4a3a63"
+        strokeWidth="11"
+        strokeLinecap="round"
+      />
+      <rect x="22" y="44" width="56" height="44" rx="9" fill="#4a3a63" />
+      <circle cx="50" cy="63" r="7" fill="#e7e1ef" />
+      <rect x="46" y="63" width="8" height="15" rx="4" fill="#e7e1ef" />
     </svg>
   );
 }

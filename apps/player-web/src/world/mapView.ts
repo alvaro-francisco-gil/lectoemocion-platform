@@ -1,4 +1,9 @@
-import type { CollectibleAnimal, World } from "@lectoemocion/resource-schema";
+import {
+  worldNodes,
+  type CollectibleAnimal,
+  type World,
+  type WorldNode
+} from "@lectoemocion/resource-schema";
 import { templateKind, type ResourceKind } from "@lectoemocion/template-sdk";
 
 /** Which animal a child chose out of a node's three chests. */
@@ -47,10 +52,28 @@ export type NodeState = "locked" | "unlocked" | "completed";
 export interface MapNodeView {
   readonly id: string;
   readonly title: string;
+  /** The picture that stands for the chapter, and what a child navigates by. */
+  readonly icon: string;
   readonly kind: ResourceKind;
   readonly state: NodeState;
   /** Completed nodes stay playable: progression paces discovery, it is not a gate. */
   readonly playable: boolean;
+}
+
+/**
+ * One place in the world, with the chapters standing in it.
+ *
+ * `reachable` is what the door into this region is: a region nothing inside is
+ * open in yet is a room with nothing to do, and walking into it would be a way
+ * to get lost rather than a way on. It is derived from the same unlock rule as
+ * the nodes, so there is no second progression to keep in agreement.
+ */
+export interface MapRegionView {
+  readonly id: string;
+  readonly title: string;
+  readonly background: string;
+  readonly nodes: readonly MapNodeView[];
+  readonly reachable: boolean;
 }
 
 /**
@@ -75,6 +98,14 @@ export interface PendingRewardView {
 }
 
 export interface MapView {
+  /**
+   * The world's places, in walking order.
+   *
+   * The map shows one at a time and the doors at its ends lead to its
+   * neighbours, so the order here *is* the geography.
+   */
+  readonly regions: readonly MapRegionView[];
+  /** Every chapter in the world, region order flattened. */
   readonly nodes: readonly MapNodeView[];
   readonly collection: readonly CollectionSlotView[];
   /**
@@ -108,7 +139,8 @@ export function deriveMapView(
   progress: Progress,
   options: MapViewOptions = {}
 ): MapView {
-  const known = new Set(world.nodes.map((node) => node.id));
+  const nodes = worldNodes(world);
+  const known = new Set(nodes.map((node) => node.id));
   const completed = new Set(
     progress.completedNodes.filter((id) => known.has(id))
   );
@@ -122,18 +154,51 @@ export function deriveMapView(
    * id: stored client state outlives a content update, and the honest recovery
    * is to hand the reward out again rather than to leave a hole in the row.
    */
-  const earned = (node: World["nodes"][number]): CollectibleAnimal | null =>
+  const earned = (node: WorldNode): CollectibleAnimal | null =>
     node.reward.choices.find(
       (choice) => choice.animalId === claimed.get(node.id)
     ) ?? null;
 
-  const owed = world.nodes.find(
+  const owed = nodes.find(
     (node) => completed.has(node.id) && earned(node) === null
   );
 
+  const project = (node: WorldNode): MapNodeView => {
+    const unlocked =
+      options.unlockAll === true ||
+      node.unlockedBy.every((required) => completed.has(required));
+    const state: NodeState = completed.has(node.id)
+      ? "completed"
+      : unlocked
+        ? "unlocked"
+        : "locked";
+
+    return {
+      id: node.id,
+      title: node.title,
+      icon: node.icon,
+      kind: templateKind(node.resource.template),
+      state,
+      playable: state !== "locked"
+    };
+  };
+
+  const regions = world.regions.map((region) => {
+    const projected = region.nodes.map(project);
+    return {
+      id: region.id,
+      title: region.title,
+      background: region.background,
+      nodes: projected,
+      reachable: projected.some((node) => node.playable)
+    };
+  });
+
   return {
     stars: progress.stars,
-    collection: world.nodes.map((node) => ({
+    regions,
+    nodes: regions.flatMap((region) => region.nodes),
+    collection: nodes.map((node) => ({
       nodeId: node.id,
       title: node.title,
       animal: earned(node)
@@ -145,24 +210,6 @@ export function deriveMapView(
             nodeId: owed.id,
             title: owed.title,
             choices: owed.reward.choices
-          },
-    nodes: world.nodes.map((node) => {
-      const unlocked =
-        options.unlockAll === true ||
-        node.unlockedBy.every((required) => completed.has(required));
-      const state: NodeState = completed.has(node.id)
-        ? "completed"
-        : unlocked
-          ? "unlocked"
-          : "locked";
-
-      return {
-        id: node.id,
-        title: node.title,
-        kind: templateKind(node.resource.template),
-        state,
-        playable: state !== "locked"
-      };
-    })
+          }
   };
 }

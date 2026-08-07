@@ -181,6 +181,15 @@ export const WorldNodeSchema = Type.Object(
   {
     id: Type.String({ minLength: 1 }),
     title: Type.String({ minLength: 1, maxLength: 60 }),
+    /**
+     * The picture that stands for this chapter on the map.
+     *
+     * Required, because it is how a child who cannot read finds a chapter
+     * again: the map is a row of pictures, not a row of numbered buttons, and a
+     * node without one would be a hole a three-year-old cannot navigate. The
+     * title stays for the adult and for the screen reader.
+     */
+    icon: Type.String({ minLength: 1 }),
     /** Every listed node must be completed before this one opens. */
     unlockedBy: Type.Array(Type.String({ minLength: 1 })),
     resource: NodeResourceSchema,
@@ -189,9 +198,36 @@ export const WorldNodeSchema = Type.Object(
   { additionalProperties: false }
 );
 
+/**
+ * One place the world is made of.
+ *
+ * A region is a backdrop and the chapters standing on it — the farm, the
+ * forest. It exists so the map can be somewhere rather than one endless row: a
+ * child walks off the end of the farm into the forest and back again, and the
+ * scene behind them changes with them.
+ *
+ * A region is *not* a stage of difficulty and holds no unlock rule of its own.
+ * What may be played is still `unlockedBy`, node by node, and prerequisites
+ * cross regions freely — the walk between them is the point.
+ */
+const WorldRegionSchema = Type.Object(
+  {
+    id: Type.String({ minLength: 1 }),
+    title: Type.String({ minLength: 1, maxLength: 60 }),
+    /** The scene behind the path. Also the picture on the door into here. */
+    background: Type.String({ minLength: 1 }),
+    nodes: Type.Array(WorldNodeSchema, { minItems: 1 })
+  },
+  { additionalProperties: false }
+);
+
 export const WorldSchema = Type.Object(
   {
-    nodes: Type.Array(WorldNodeSchema, { minItems: 1 })
+    /**
+     * In walking order: the door at the end of one region opens on the next.
+     * The child starts in the first.
+     */
+    regions: Type.Array(WorldRegionSchema, { minItems: 1 })
   },
   { additionalProperties: false }
 );
@@ -200,7 +236,20 @@ export type CollectibleAnimal = Static<typeof CollectibleAnimalSchema>;
 export type NodeReward = Static<typeof NodeRewardSchema>;
 export type NodeResource = Static<typeof NodeResourceSchema>;
 export type WorldNode = Static<typeof WorldNodeSchema>;
+export type WorldRegion = Static<typeof WorldRegionSchema>;
 export type World = Static<typeof WorldSchema>;
+
+/**
+ * Every chapter in the world, in walking order.
+ *
+ * Which region a chapter stands in is the map's business, and almost nothing
+ * else's: progress, the collection and the reward ceremony are all about the
+ * whole world. This is the one flattening, so those callers never learn the
+ * shape of the regions.
+ */
+export function worldNodes(world: World): readonly WorldNode[] {
+  return world.regions.flatMap((region) => region.nodes);
+}
 
 const validate = new Ajv({ allErrors: true }).compile(WorldSchema);
 
@@ -216,9 +265,18 @@ export function parseWorld(value: unknown): World {
     throw new Error(`Invalid world: ${JSON.stringify(validate.errors)}`);
   }
   const world = value as World;
+  const nodes = worldNodes(world);
+
+  const regionIds = new Set<string>();
+  for (const region of world.regions) {
+    if (regionIds.has(region.id)) {
+      throw new Error(`Duplicate world region id: ${region.id}`);
+    }
+    regionIds.add(region.id);
+  }
 
   const ids = new Set<string>();
-  for (const node of world.nodes) {
+  for (const node of nodes) {
     if (ids.has(node.id)) {
       throw new Error(`Duplicate world node id: ${node.id}`);
     }
@@ -230,14 +288,14 @@ export function parseWorld(value: unknown): World {
    * one turns a choice into a trick: the child weighs three doors and two of
    * them were never distinct.
    */
-  for (const node of world.nodes) {
+  for (const node of nodes) {
     const animals = new Set(node.reward.choices.map((choice) => choice.animalId));
     if (animals.size !== node.reward.choices.length) {
       throw new Error(`Node ${node.id} offers the same animal in two chests`);
     }
   }
 
-  for (const node of world.nodes) {
+  for (const node of nodes) {
     for (const required of node.unlockedBy) {
       if (!ids.has(required)) {
         throw new Error(`Node ${node.id} is unlocked by unknown node ${required}`);
@@ -245,7 +303,7 @@ export function parseWorld(value: unknown): World {
     }
   }
 
-  const entries = world.nodes.filter((node) => node.unlockedBy.length === 0);
+  const entries = nodes.filter((node) => node.unlockedBy.length === 0);
   if (entries.length === 0) {
     throw new Error("The world has no entry node: nothing is playable");
   }
@@ -258,7 +316,7 @@ export function parseWorld(value: unknown): World {
   let grew = true;
   while (grew) {
     grew = false;
-    for (const node of world.nodes) {
+    for (const node of nodes) {
       if (reachable.has(node.id)) continue;
       if (node.unlockedBy.every((id) => reachable.has(id))) {
         reachable.add(node.id);
@@ -267,7 +325,7 @@ export function parseWorld(value: unknown): World {
     }
   }
 
-  const stranded = world.nodes.filter((node) => !reachable.has(node.id));
+  const stranded = nodes.filter((node) => !reachable.has(node.id));
   if (stranded.length > 0) {
     throw new Error(
       `Unreachable world nodes: ${stranded.map((node) => node.id).join(", ")}`

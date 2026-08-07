@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { worldNodes } from "@lectoemocion/resource-schema";
 import { createResourceForNode, world } from "@lectoemocion/template-catalog";
 import {
   createInitialLetterRound,
@@ -32,7 +33,7 @@ const ALBUM = "Nuestro álbum";
  */
 async function withProgress(page: Page, completedNodes: string[]) {
   const rewards = completedNodes.map((nodeId) => {
-    const node = world.nodes.find((candidate) => candidate.id === nodeId);
+    const node = worldNodes(world).find((candidate) => candidate.id === nodeId);
     if (!node) throw new Error(`No such world node: ${nodeId}`);
     return { nodeId, animalId: node.reward.choices[0]!.animalId };
   });
@@ -51,6 +52,32 @@ async function withProgress(page: Page, completedNodes: string[]) {
     },
     { nodes: completedNodes, rewards }
   );
+}
+
+/**
+ * Walks to the region a chapter stands in and opens it.
+ *
+ * The map shows one place at a time, so a chapter in the forest is not on the
+ * screen until a child has walked there. This retraces that walk rather than
+ * assuming where the map happens to be: back through every door home, then
+ * forward through the doors to the region the chapter is in.
+ */
+async function openChapter(page: Page, nodeId: string) {
+  const target = world.regions.findIndex((region) =>
+    region.nodes.some((node) => node.id === nodeId)
+  );
+  if (target < 0) throw new Error(`No such world node: ${nodeId}`);
+
+  const back = page.locator('.region-door[data-direction="back"]');
+  while ((await back.count()) > 0) await back.click();
+  for (let step = 0; step < target; step += 1) {
+    await page.locator('.region-door[data-direction="on"]').click();
+  }
+
+  const node = world.regions[target]!.nodes.find(
+    (candidate) => candidate.id === nodeId
+  )!;
+  await page.getByRole("button", { name: node.title, exact: true }).click();
 }
 
 /**
@@ -140,7 +167,7 @@ test("finishing a chapter hands out an animal for the collection", async ({
   /* One slot per chapter, counted from the world so a new one does not fail
      this test for having been added. */
   const empty = page.locator('.collection__slot[data-filled="false"]');
-  await expect(empty).toHaveCount(world.nodes.length);
+  await expect(empty).toHaveCount(worldNodes(world).length);
 
   await page.getByRole("button", { name: ENTRY }).click();
   await completed(page, "encuentro");
@@ -155,7 +182,7 @@ test("finishing a chapter hands out an animal for the collection", async ({
   const filled = page.locator('.collection__slot[data-filled="true"]');
   await expect(filled).toHaveCount(1);
   await expect(filled.locator("img")).toBeVisible();
-  await expect(empty).toHaveCount(world.nodes.length - 1);
+  await expect(empty).toHaveCount(worldNodes(world).length - 1);
 });
 
 test("the collection sits below the path, and the path is centred", async ({
@@ -198,7 +225,7 @@ test("the non-interactive resource plays to its end", async ({ page }) => {
      leave this test locked out the next time a chapter is added before it. */
   await withProgress(
     page,
-    world.nodes.map((node) => node.id).filter((id) => id !== "album")
+    worldNodes(world).map((node) => node.id).filter((id) => id !== "album")
   );
   await page.goto("/");
 
@@ -226,7 +253,7 @@ test("the non-interactive resource plays to its end", async ({ page }) => {
 test("the world and every resource fit the viewport", async ({ page }) => {
   await withProgress(
     page,
-    world.nodes.map((node) => node.id)
+    worldNodes(world).map((node) => node.id)
   );
   await page.goto("/");
 
@@ -247,11 +274,13 @@ test("the world and every resource fit the viewport", async ({ page }) => {
   expect(page_.scrollWidth).toBeLessThanOrEqual(viewport.width);
   expect(page_.scrollHeight).toBeLessThanOrEqual(viewport.height);
 
-  for (const title of world.nodes.map((node) => node.title)) {
-    await page.getByRole("button", { name: title, exact: true }).click();
+  for (const node of worldNodes(world)) {
+    await openChapter(page, node.id);
     const box = await canvasBox(page);
-    expect(box.width, `${title} fits`).toBeLessThanOrEqual(viewport.width);
-    expect(box.height, `${title} fits`).toBeLessThanOrEqual(viewport.height);
+    expect(box.width, `${node.title} fits`).toBeLessThanOrEqual(viewport.width);
+    expect(box.height, `${node.title} fits`).toBeLessThanOrEqual(
+      viewport.height
+    );
     await page.getByRole("button", { name: "Volver al mapa" }).click();
   }
 });
@@ -294,7 +323,7 @@ test("a playing resource holds still and the page never scrolls", async ({
    */
   await withProgress(page, ["encuentro", "iniciales"]);
   await page.goto("/");
-  await page.getByRole("button", { name: "El bosque de parejas" }).click();
+  await openChapter(page, "parejas");
   await expect(page.locator("canvas")).toBeVisible();
 
   await holdsStill(page);
@@ -306,7 +335,7 @@ test("a minigame survives taps in the child reach band", async ({ page }) => {
 
   await withProgress(page, ["encuentro", "iniciales"]);
   await page.goto("/");
-  await page.getByRole("button", { name: "El bosque de parejas" }).click();
+  await openChapter(page, "parejas");
 
   const box = await canvasBox(page);
   for (const fraction of [0.25, 0.5, 0.75]) {
@@ -327,7 +356,7 @@ test("the world list is gone while a resource plays", async ({ page }) => {
   const worldList = page.getByRole("navigation", { name: "Mundo" });
   await expect(worldList).toBeVisible();
 
-  await page.getByRole("button", { name: "El bosque de parejas" }).click();
+  await openChapter(page, "parejas");
   await expect(page.locator("canvas")).toBeVisible();
   await expect(worldList).toBeHidden();
   await expect(page.getByRole("button", { name: SECOND })).toHaveCount(0);
@@ -350,11 +379,13 @@ test("the world reads as one horizontal path, with no page header", async ({
   await expect(page.locator("header")).toHaveCount(0);
   await expect(page.locator("h1")).toHaveCount(0);
 
-  /* Derived, not written down: adding a chapter must not fail this test. */
+  /* Derived, not written down: adding a chapter must not fail this test. The
+     first region's chapters, plus the door standing at the end of them. */
   const nodes = page.locator(".world-node");
-  await expect(nodes).toHaveCount(world.nodes.length);
+  await expect(nodes).toHaveCount(world.regions[0]!.nodes.length + 1);
 
-  /* Every node shares a row: same top edge, strictly increasing left edge. */
+  /* Every node shares a row, doors included: same top edge, strictly
+     increasing left edge. */
   const boxes = await nodes.evaluateAll((elements) =>
     elements.map((element) => {
       const { x, y } = element.getBoundingClientRect();
@@ -367,6 +398,93 @@ test("the world reads as one horizontal path, with no page header", async ({
     expect(Math.abs(box.y - first!.y), "shares the row").toBeLessThan(2);
     if (index > 0) expect(box.x).toBeGreaterThan(boxes[index - 1]!.x);
   }
+});
+
+/*
+ * The marker is a picture, and only a picture.
+ *
+ * A child of three cannot read the title and cannot count, so what tells one
+ * chapter from another has to be the illustration — and a digit or a letter
+ * inside the disc is a thing on the map that says nothing to the person the
+ * map is for. Big enough to aim a finger at, too: a marker measured here so
+ * that a layout change cannot quietly shrink it back to a bullet.
+ */
+test("every chapter is a picture, drawn large and with no glyph on it", async ({
+  page
+}) => {
+  await withProgress(page, ["encuentro"]);
+  await page.goto("/");
+
+  /* The chapters only: a door carries a backdrop, which is measured with the
+     regions rather than here. */
+  const markers = page.locator(".world-node:not(.region-door) .world-node__marker");
+  await expect(markers).toHaveCount(world.regions[0]!.nodes.length);
+
+  const drawn = await markers.evaluateAll((elements) =>
+    elements.map((element) => ({
+      text: element.textContent?.trim() ?? "",
+      hasPicture: element.querySelector("img") !== null,
+      size: element.getBoundingClientRect().width
+    }))
+  );
+
+  for (const marker of drawn) {
+    expect(marker.text, "no digit or letter on the marker").toBe("");
+    expect(marker.hasPicture, "the chapter's own picture").toBe(true);
+    expect(marker.size).toBeGreaterThanOrEqual(96);
+  }
+});
+
+/*
+ * The world is two places, and the door between them is a real move: the path
+ * changes, and so does the ground it is drawn on. The scene is what a child
+ * actually reads as "somewhere else" — the titles under the markers are for
+ * the adult — so it is what this measures.
+ */
+test("walking through the door changes the place, and the way back leads home", async ({
+  page
+}) => {
+  const [farm, forest] = world.regions;
+  /* Enough to open the forest: its first chapter waits on the initials game. */
+  await withProgress(page, ["encuentro", "iniciales"]);
+  await page.goto("/");
+
+  const scene = () =>
+    page
+      .locator(".map")
+      .evaluate((element) => getComputedStyle(element).backgroundImage);
+
+  expect(await scene()).toContain(farm!.background);
+
+  const door = page.getByRole("button", { name: forest!.title, exact: true });
+  await expect(door).toBeEnabled();
+  await door.click();
+
+  expect(await scene()).toContain(forest!.background);
+  for (const node of forest!.nodes) {
+    await expect(
+      page.getByRole("button", { name: node.title, exact: true })
+    ).toBeVisible();
+  }
+  /* The farm's chapters are not merely dimmed here: they are somewhere else. */
+  await expect(page.getByRole("button", { name: ENTRY })).toHaveCount(0);
+
+  await page.getByRole("button", { name: farm!.title, exact: true }).click();
+  expect(await scene()).toContain(farm!.background);
+  await expect(page.getByRole("button", { name: ENTRY })).toBeVisible();
+});
+
+/* A door with nothing open behind it is refused, exactly as a locked chapter
+   is: walking into a region where everything is locked is a way to get lost. */
+test("the door to a region with nothing open in it stays shut", async ({
+  page
+}) => {
+  const [, forest] = world.regions;
+  await page.goto("/");
+
+  const door = page.getByRole("button", { name: forest!.title, exact: true });
+  await expect(door).toBeDisabled();
+  await expect(door).toHaveAttribute("data-state", "locked");
 });
 
 test("playing shows only the way back", async ({ page }) => {
@@ -454,7 +572,7 @@ test("the letters game is won by dragging each letter into its slot", async ({
   await page.getByRole("button", { name: "El taller de letras" }).click();
 
   const box = await canvasBox(page);
-  const node = world.nodes.find((candidate) => candidate.id === "letras")!;
+  const node = worldNodes(world).find((candidate) => candidate.id === "letras")!;
   const resource = createResourceForNode(node);
   if (resource.template.id !== "letters-game") {
     throw new Error("The letters chapter no longer plays the letters game");
@@ -511,7 +629,7 @@ test("the initial-letter game is won by tapping each picture and its letter", as
   await page.getByRole("button", { name: "Las primeras letras" }).click();
 
   const box = await canvasBox(page);
-  const node = world.nodes.find(
+  const node = worldNodes(world).find(
     (candidate) => candidate.id === "primeras-letras"
   )!;
   const resource = createResourceForNode(node);
@@ -578,7 +696,7 @@ test("the initial-syllable game is won by dragging the match onto the target", a
   /* Everything up to it, so the chapter is open without being played. */
   await withProgress(
     page,
-    world.nodes
+    worldNodes(world)
       .map((node) => node.id)
       .filter((id) => id !== "empieza-igual" && id !== "album")
   );
@@ -586,7 +704,7 @@ test("the initial-syllable game is won by dragging the match onto the target", a
   await page.getByRole("button", { name: "Empieza igual" }).click();
 
   const box = await canvasBox(page);
-  const node = world.nodes.find((candidate) => candidate.id === "empieza-igual")!;
+  const node = worldNodes(world).find((candidate) => candidate.id === "empieza-igual")!;
   const resource = createResourceForNode(node);
   if (resource.template.id !== "initial-syllable-game") {
     throw new Error("The Empieza igual chapter no longer plays this game");
