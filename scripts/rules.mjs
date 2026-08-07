@@ -64,6 +64,18 @@ export const isStrictTypeEscape = (line) => {
   return STRICT_TYPE_ESCAPES.some((pattern) => pattern.test(line));
 };
 
+/** The adult area. Everything in it is reachable only through its gate. */
+export const ADULT_AREA = "apps/player-web/src/app/adult/";
+
+/**
+ * An adult-only area is exactly the kind of invariant that decays: the next
+ * adult-facing screen gets added beside the others and nobody notices it is
+ * reachable without the gate. Only `adult/index.tsx` may be imported from
+ * outside, and that module wraps the area in `AdultGate`.
+ */
+export const isDeepAdultAreaImport = (line) =>
+  /from\s+["'][^"']*\/adult\/[^"']+["']/.test(line);
+
 export const MEDIA_EXTENSIONS = [
   ".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".heic", ".bmp", ".tiff",
   ".mp3", ".m4a", ".wav", ".aac", ".ogg", ".opus", ".flac",

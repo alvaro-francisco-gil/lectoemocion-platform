@@ -4,6 +4,7 @@ import * as rules from "./rules.mjs";
 
 const {
   isConsoleCall,
+  isDeepAdultAreaImport,
   isFirebaseImport,
   isForbiddenInSharedPackage,
   isMediaFile,
@@ -13,6 +14,7 @@ const {
   isStrictTypeEscape
 } = rules as {
   isConsoleCall: (line: string) => boolean;
+  isDeepAdultAreaImport: (line: string) => boolean;
   isFirebaseImport: (line: string) => boolean;
   isForbiddenInSharedPackage: (line: string) => boolean;
   isMediaFile: (name: string) => boolean;
@@ -125,6 +127,29 @@ describe("media rule", () => {
 
   it("allows generated vector art", () => {
     expect(isMediaFile("avatar.svg")).toBe(false);
+  });
+});
+
+describe("isDeepAdultAreaImport", () => {
+  it("flags a screen reaching past the gate", () => {
+    expect(
+      isDeepAdultAreaImport('import { PrizeForm } from "./adult/PrizeForm";')
+    ).toBe(true);
+    expect(
+      isDeepAdultAreaImport(
+        'import { AdultGate } from "../app/adult/AdultGate";'
+      )
+    ).toBe(true);
+  });
+
+  it("accepts the gate's own entry point", () => {
+    expect(isDeepAdultAreaImport('import { AdultArea } from "./adult";')).toBe(
+      false
+    );
+  });
+
+  it("accepts imports that have nothing to do with the adult area", () => {
+    expect(isDeepAdultAreaImport('import { Gift } from "./Gift";')).toBe(false);
   });
 });
 
