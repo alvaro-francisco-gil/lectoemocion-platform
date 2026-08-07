@@ -49,31 +49,17 @@ export const EMPTY_PROGRESS: Progress = {
 
 export type NodeState = "locked" | "unlocked" | "completed";
 
-export interface MapNodeView {
+export interface WorldNodeView {
   readonly id: string;
   readonly title: string;
   /** The picture that stands for the chapter, and what a child navigates by. */
   readonly icon: string;
+  /** Which of the shell's sections this chapter stands in. */
+  readonly surface: "juegos" | "recursos";
   readonly kind: ResourceKind;
   readonly state: NodeState;
   /** Completed nodes stay playable: progression paces discovery, it is not a gate. */
   readonly playable: boolean;
-}
-
-/**
- * One place in the world, with the chapters standing in it.
- *
- * `reachable` is what the door into this region is: a region nothing inside is
- * open in yet is a room with nothing to do, and walking into it would be a way
- * to get lost rather than a way on. It is derived from the same unlock rule as
- * the nodes, so there is no second progression to keep in agreement.
- */
-export interface MapRegionView {
-  readonly id: string;
-  readonly title: string;
-  readonly background: string;
-  readonly nodes: readonly MapNodeView[];
-  readonly reachable: boolean;
 }
 
 /**
@@ -97,16 +83,19 @@ export interface PendingRewardView {
   readonly choices: readonly CollectibleAnimal[];
 }
 
-export interface MapView {
+export interface WorldView {
   /**
-   * The world's places, in walking order.
+   * The chapters on the path, in authored order.
    *
-   * The map shows one at a time and the doors at its ends lead to its
-   * neighbours, so the order here *is* the geography.
+   * Split here rather than in the shell so that "which section is this in" has
+   * one answer, sitting next to the rule that decides what may be played at
+   * all.
    */
-  readonly regions: readonly MapRegionView[];
-  /** Every chapter in the world, region order flattened. */
-  readonly nodes: readonly MapNodeView[];
+  readonly games: readonly WorldNodeView[];
+  /** The chapters on the shelf: books, and whatever else is there to browse. */
+  readonly resources: readonly WorldNodeView[];
+  /** Every chapter in the world, both sections in authored order. */
+  readonly nodes: readonly WorldNodeView[];
   readonly collection: readonly CollectionSlotView[];
   /**
    * The ceremony owed to the child, if any.
@@ -119,7 +108,7 @@ export interface MapView {
   readonly stars: number;
 }
 
-export interface MapViewOptions {
+export interface WorldViewOptions {
   /** Development bypass only. Never reachable in a production build. */
   readonly unlockAll?: boolean;
 }
@@ -127,18 +116,18 @@ export interface MapViewOptions {
 /**
  * Projects progress onto the world.
  *
- * Pure, and the only place that decides what a child may reach. The map scene
- * receives the result and never sees `Progress` itself, which is what keeps
- * the renderer from growing an opinion about progression.
+ * Pure, and the only place that decides what a child may reach. The shell
+ * receives the result and never hands `Progress` on, which is what keeps the
+ * renderer from growing an opinion about progression.
  *
  * Stored ids the world no longer contains are ignored rather than fatal: a
  * content update that removes a node must not brick a saved profile.
  */
-export function deriveMapView(
+export function deriveWorldView(
   world: World,
   progress: Progress,
-  options: MapViewOptions = {}
-): MapView {
+  options: WorldViewOptions = {}
+): WorldView {
   const nodes = worldNodes(world);
   const known = new Set(nodes.map((node) => node.id));
   const completed = new Set(
@@ -163,7 +152,7 @@ export function deriveMapView(
     (node) => completed.has(node.id) && earned(node) === null
   );
 
-  const project = (node: WorldNode): MapNodeView => {
+  const project = (node: WorldNode): WorldNodeView => {
     const unlocked =
       options.unlockAll === true ||
       node.unlockedBy.every((required) => completed.has(required));
@@ -177,27 +166,20 @@ export function deriveMapView(
       id: node.id,
       title: node.title,
       icon: node.icon,
+      surface: node.surface,
       kind: templateKind(node.resource.template),
       state,
       playable: state !== "locked"
     };
   };
 
-  const regions = world.regions.map((region) => {
-    const projected = region.nodes.map(project);
-    return {
-      id: region.id,
-      title: region.title,
-      background: region.background,
-      nodes: projected,
-      reachable: projected.some((node) => node.playable)
-    };
-  });
+  const projected = nodes.map(project);
 
   return {
     stars: progress.stars,
-    regions,
-    nodes: regions.flatMap((region) => region.nodes),
+    games: projected.filter((node) => node.surface === "juegos"),
+    resources: projected.filter((node) => node.surface === "recursos"),
+    nodes: projected,
     collection: nodes.map((node) => ({
       nodeId: node.id,
       title: node.title,

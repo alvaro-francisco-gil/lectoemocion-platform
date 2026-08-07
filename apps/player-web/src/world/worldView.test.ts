@@ -6,11 +6,11 @@ import {
 } from "@lectoemocion/resource-schema";
 import { world } from "@lectoemocion/template-catalog";
 import {
-  deriveMapView,
+  deriveWorldView,
   EMPTY_PROGRESS,
   STARS_PER_COMPLETION,
   type Progress
-} from "./mapView";
+} from "./worldView";
 
 /** Three animals for a node's chests, named after the node so they are traceable. */
 const chestsFor = (node: string) => ({
@@ -22,59 +22,49 @@ const chestsFor = (node: string) => ({
 });
 
 /**
- * A four-chapter world in two places.
+ * A four-chapter world with one thing on the shelf.
  *
- * Two regions rather than one, because the region is now part of what
- * `deriveMapView` projects: a fixture with a single place could not tell a
- * door that opens from a door that does not.
+ * `three` stands under Recursos and is open from the start, which is what the
+ * real world's story does: a fixture where every node was a game could not tell
+ * the two lists apart.
  */
 const chain: World = parseWorld({
-  regions: [
+  nodes: [
     {
-      id: "casa",
-      title: "La casa",
-      background: "/world/granero.webp",
-      nodes: [
-        {
-          id: "one",
-          title: "Uno",
-          icon: "/vocabulary/gato.webp",
-          unlockedBy: [],
-          resource: { template: "name-story", seed: "one" },
-          reward: chestsFor("one")
-        },
-        {
-          id: "two",
-          title: "Dos",
-          icon: "/vocabulary/luna.webp",
-          unlockedBy: ["one"],
-          resource: { template: "pairs-game", seed: "two", pairCount: 3 },
-          reward: chestsFor("two")
-        }
-      ]
+      id: "one",
+      title: "Uno",
+      icon: "/vocabulary/gato.webp",
+      surface: "juegos",
+      unlockedBy: [],
+      resource: { template: "name-story", seed: "one" },
+      reward: chestsFor("one")
     },
     {
-      id: "fuera",
-      title: "Fuera",
-      background: "/world/bosque.webp",
-      nodes: [
-        {
-          id: "three",
-          title: "Tres",
-          icon: "/vocabulary/sol.webp",
-          unlockedBy: ["one"],
-          resource: { template: "pairs-game", seed: "three", pairCount: 3 },
-          reward: chestsFor("three")
-        },
-        {
-          id: "four",
-          title: "Cuatro",
-          icon: "/vocabulary/pato.webp",
-          unlockedBy: ["two", "three"],
-          resource: { template: "memory-album", seed: "four" },
-          reward: chestsFor("four")
-        }
-      ]
+      id: "two",
+      title: "Dos",
+      icon: "/vocabulary/luna.webp",
+      surface: "juegos",
+      unlockedBy: ["one"],
+      resource: { template: "pairs-game", seed: "two", pairCount: 3 },
+      reward: chestsFor("two")
+    },
+    {
+      id: "three",
+      title: "Tres",
+      icon: "/vocabulary/sol.webp",
+      surface: "recursos",
+      unlockedBy: [],
+      resource: { template: "pairs-game", seed: "three", pairCount: 3 },
+      reward: chestsFor("three")
+    },
+    {
+      id: "four",
+      title: "Cuatro",
+      icon: "/vocabulary/pato.webp",
+      surface: "juegos",
+      unlockedBy: ["two", "three"],
+      resource: { template: "memory-album", seed: "four" },
+      reward: chestsFor("four")
     }
   ]
 });
@@ -95,34 +85,34 @@ const progressAfter = (...completedNodes: string[]): Progress => ({
   stars: completedNodes.length * STARS_PER_COMPLETION
 });
 
-const stateOf = (view: ReturnType<typeof deriveMapView>, id: string) =>
+const stateOf = (view: ReturnType<typeof deriveWorldView>, id: string) =>
   view.nodes.find((node) => node.id === id)?.state;
 
-describe("deriving the map from progress", () => {
-  it("opens the entry node and nothing else to a new player", () => {
-    const view = deriveMapView(chain, EMPTY_PROGRESS);
+describe("deriving the world from progress", () => {
+  it("opens the entry node and the shelf, and nothing else, to a new player", () => {
+    const view = deriveWorldView(chain, EMPTY_PROGRESS);
     expect(stateOf(view, "one")).toBe("unlocked");
+    expect(stateOf(view, "three")).toBe("unlocked");
     expect(stateOf(view, "two")).toBe("locked");
     expect(stateOf(view, "four")).toBe("locked");
   });
 
   it("unlocks successors when their prerequisite is completed", () => {
-    const view = deriveMapView(chain, progressAfter("one"));
+    const view = deriveWorldView(chain, progressAfter("one"));
     expect(stateOf(view, "one")).toBe("completed");
     expect(stateOf(view, "two")).toBe("unlocked");
-    expect(stateOf(view, "three")).toBe("unlocked");
   });
 
   it("keeps a node locked until every prerequisite is done", () => {
-    const partial = deriveMapView(chain, progressAfter("one", "two"));
+    const partial = deriveWorldView(chain, progressAfter("one", "two"));
     expect(stateOf(partial, "four")).toBe("locked");
 
-    const complete = deriveMapView(chain, progressAfter("one", "two", "three"));
+    const complete = deriveWorldView(chain, progressAfter("one", "two", "three"));
     expect(stateOf(complete, "four")).toBe("unlocked");
   });
 
   it("keeps a completed node replayable rather than closing it", () => {
-    const view = deriveMapView(chain, progressAfter("one"));
+    const view = deriveWorldView(chain, progressAfter("one"));
     const one = view.nodes.find((node) => node.id === "one");
     expect(one?.state).toBe("completed");
     expect(one?.playable).toBe(true);
@@ -130,13 +120,13 @@ describe("deriving the map from progress", () => {
 
   it("is pure: the same inputs always give the same view", () => {
     const progress = progressAfter("one");
-    expect(deriveMapView(chain, progress)).toEqual(
-      deriveMapView(chain, progress)
+    expect(deriveWorldView(chain, progress)).toEqual(
+      deriveWorldView(chain, progress)
     );
   });
 
   it("ignores stored ids the world no longer contains", () => {
-    const view = deriveMapView(chain, {
+    const view = deriveWorldView(chain, {
       ...progressAfter("one"),
       completedNodes: ["one", "a-node-from-an-older-content-release"],
       lastPlayedNode: "a-node-from-an-older-content-release"
@@ -145,8 +135,8 @@ describe("deriving the map from progress", () => {
     expect(stateOf(view, "two")).toBe("unlocked");
   });
 
-  it("carries each node's kind so the map can draw it", () => {
-    const view = deriveMapView(chain, EMPTY_PROGRESS);
+  it("carries each node's kind so the shell can draw it", () => {
+    const view = deriveWorldView(chain, EMPTY_PROGRESS);
     expect(stateOf(view, "one")).toBe("unlocked");
     expect(view.nodes.find((node) => node.id === "one")?.kind).toBe("cinematic");
     expect(view.nodes.find((node) => node.id === "four")?.kind).toBe(
@@ -158,62 +148,30 @@ describe("deriving the map from progress", () => {
    * The total is not derived from the node list on purpose: replays are paid
    * too, and `completedNodes` is a set that has forgotten them.
    */
-  it("carries the star total so the map can show it", () => {
-    expect(deriveMapView(chain, EMPTY_PROGRESS).stars).toBe(0);
+  it("carries the star total so the shell can show it", () => {
+    expect(deriveWorldView(chain, EMPTY_PROGRESS).stars).toBe(0);
     expect(
-      deriveMapView(chain, { ...progressAfter("one"), stars: 42 }).stars
+      deriveWorldView(chain, { ...progressAfter("one"), stars: 42 }).stars
     ).toBe(42);
   });
 
   it("opens everything when the development bypass is on", () => {
-    const view = deriveMapView(chain, EMPTY_PROGRESS, { unlockAll: true });
+    const view = deriveWorldView(chain, EMPTY_PROGRESS, { unlockAll: true });
     expect(view.nodes.every((node) => node.playable)).toBe(true);
   });
 });
 
-describe("the world's places", () => {
-  const regionOf = (view: ReturnType<typeof deriveMapView>, id: string) =>
-    view.regions.find((region) => region.id === id);
-
-  it("keeps each region's chapters in it, in order", () => {
-    const view = deriveMapView(chain, EMPTY_PROGRESS);
-    expect(view.regions.map((region) => region.id)).toEqual(["casa", "fuera"]);
-    expect(regionOf(view, "fuera")?.nodes.map((node) => node.id)).toEqual([
-      "three",
-      "four"
-    ]);
-  });
-
-  it("carries each region's backdrop, so the map does not name files", () => {
-    const view = deriveMapView(chain, EMPTY_PROGRESS);
-    expect(regionOf(view, "fuera")?.background).toBe("/world/bosque.webp");
-  });
-
-  /*
-   * The door into a place is the place having something open in it. This is the
-   * whole rule — there is no second progression counting chapters — so a child
-   * cannot walk into a region and find every chapter in it locked.
-   */
-  it("shuts a region whose chapters are all still locked", () => {
-    const view = deriveMapView(chain, EMPTY_PROGRESS);
-    expect(regionOf(view, "casa")?.reachable).toBe(true);
-    expect(regionOf(view, "fuera")?.reachable).toBe(false);
-  });
-
-  it("opens a region as soon as one chapter inside it opens", () => {
-    const view = deriveMapView(chain, progressAfter("one"));
-    expect(regionOf(view, "fuera")?.reachable).toBe(true);
-  });
-
-  it("opens every region when the development bypass is on", () => {
-    const view = deriveMapView(chain, EMPTY_PROGRESS, { unlockAll: true });
-    expect(view.regions.every((region) => region.reachable)).toBe(true);
+describe("the world's two surfaces", () => {
+  it("splits the chapters into the section each one stands in", () => {
+    const view = deriveWorldView(chain, EMPTY_PROGRESS);
+    expect(view.games.map((node) => node.id)).toEqual(["one", "two", "four"]);
+    expect(view.resources.map((node) => node.id)).toEqual(["three"]);
   });
 
   /* The flat list is the same chapters, so nothing that reads it — the
-     collection, the ceremony — has to learn about regions. */
-  it("flattens to every chapter in the world, in walking order", () => {
-    const view = deriveMapView(chain, EMPTY_PROGRESS);
+     collection, the ceremony — has to learn about sections. */
+  it("keeps every chapter in one list, in authored order", () => {
+    const view = deriveWorldView(chain, EMPTY_PROGRESS);
     expect(view.nodes.map((node) => node.id)).toEqual([
       "one",
       "two",
@@ -221,14 +179,21 @@ describe("the world's places", () => {
       "four"
     ]);
   });
+
+  it("carries each node's surface, so the shell does not re-derive it", () => {
+    const view = deriveWorldView(chain, EMPTY_PROGRESS);
+    expect(view.nodes.find((node) => node.id === "three")?.surface).toBe(
+      "recursos"
+    );
+  });
 });
 
 describe("the collection and the chests owed for it", () => {
-  const collectionOf = (view: ReturnType<typeof deriveMapView>) =>
+  const collectionOf = (view: ReturnType<typeof deriveWorldView>) =>
     view.collection.map((slot) => [slot.nodeId, slot.animal?.animalId ?? null]);
 
   it("gives a new player an empty slot for every chapter", () => {
-    const view = deriveMapView(chain, EMPTY_PROGRESS);
+    const view = deriveWorldView(chain, EMPTY_PROGRESS);
     expect(collectionOf(view)).toEqual([
       ["one", null],
       ["two", null],
@@ -246,13 +211,13 @@ describe("the collection and the chests owed for it", () => {
       stars: STARS_PER_COMPLETION
     };
 
-    const owed = deriveMapView(chain, finished);
+    const owed = deriveWorldView(chain, finished);
     expect(owed.pendingReward?.nodeId).toBe("one");
     expect(
       owed.pendingReward?.choices.map((choice) => choice.animalId)
     ).toEqual(["one-a", "one-b", "one-c"]);
 
-    const claimed = deriveMapView(chain, {
+    const claimed = deriveWorldView(chain, {
       ...finished,
       rewards: [{ nodeId: "one", animalId: "one-b" }]
     });
@@ -260,7 +225,7 @@ describe("the collection and the chests owed for it", () => {
   });
 
   it("fills the chapter's own slot with the animal the child chose", () => {
-    const view = deriveMapView(chain, {
+    const view = deriveWorldView(chain, {
       completedNodes: ["one"],
       lastPlayedNode: "one",
       rewards: [{ nodeId: "one", animalId: "one-c" }],
@@ -276,7 +241,7 @@ describe("the collection and the chests owed for it", () => {
 
   /* Finishing several nodes before opening a chest owes them in world order. */
   it("owes one ceremony at a time, oldest first", () => {
-    const view = deriveMapView(chain, {
+    const view = deriveWorldView(chain, {
       completedNodes: ["two", "one"],
       lastPlayedNode: "two",
       rewards: [],
@@ -286,7 +251,7 @@ describe("the collection and the chests owed for it", () => {
   });
 
   it("never owes a chest for a node that was never finished", () => {
-    expect(deriveMapView(chain, EMPTY_PROGRESS).pendingReward).toBeNull();
+    expect(deriveWorldView(chain, EMPTY_PROGRESS).pendingReward).toBeNull();
   });
 
   /*
@@ -295,7 +260,7 @@ describe("the collection and the chests owed for it", () => {
    * with no way for a child to fill it.
    */
   it("offers the chests again when the stored animal no longer exists", () => {
-    const view = deriveMapView(chain, {
+    const view = deriveWorldView(chain, {
       completedNodes: ["one"],
       lastPlayedNode: "one",
       rewards: [{ nodeId: "one", animalId: "an-animal-from-an-older-release" }],
@@ -306,9 +271,10 @@ describe("the collection and the chests owed for it", () => {
   });
 });
 
-describe("the authored world through the map", () => {
-  it("starts a real player on exactly one playable node", () => {
-    const view = deriveMapView(world, EMPTY_PROGRESS);
-    expect(view.nodes.filter((node) => node.playable)).toHaveLength(1);
+describe("the authored world through the shell", () => {
+  it("starts a real player on one game and the whole shelf", () => {
+    const view = deriveWorldView(world, EMPTY_PROGRESS);
+    expect(view.games.filter((node) => node.playable)).toHaveLength(1);
+    expect(view.resources.every((node) => node.playable)).toBe(true);
   });
 });
