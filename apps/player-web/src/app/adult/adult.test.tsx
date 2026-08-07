@@ -223,6 +223,62 @@ describe("configuring a waiting gift", () => {
       "Elige qué hay dentro del regalo"
     );
   });
+
+  /*
+   * A one-shot confirmation only ever announces the first save of the panel
+   * session. Editing an already-prepared gift keeps it in the same list with
+   * no remount, which is exactly how the original "no feedback at all" defect
+   * survived a second save.
+   */
+  it("announces a second save of an already prepared gift, not just the first", () => {
+    const prepared = configurePrize(
+      awardDue(EMPTY_PRIZES, 30, [
+        { id: prizeId("p-1"), at: "2026-08-01T10:00:00.000Z" }
+      ]),
+      prizeId("p-1"),
+      { kind: "custom", text: "un helado", imageId: null }
+    );
+    open({ view: derivePrizeView(prepared, 30) });
+    passGate();
+    fireEvent.click(screen.getByRole("button", { name: "Guardar el regalo" }));
+    const firstAlert = screen.getByRole("alert");
+    expect(firstAlert).toHaveTextContent("Regalo guardado");
+
+    fireEvent.change(screen.getByLabelText("¿Qué hay dentro?"), {
+      target: { value: "un caramelo" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar el regalo" }));
+    const secondAlert = screen.getByRole("alert");
+    expect(secondAlert).toHaveTextContent("Regalo guardado");
+    /* A different node, not the same one left with unchanged text: aria-live
+       only announces text a screen reader has not already read. */
+    expect(secondAlert).not.toBe(firstAlert);
+  });
+
+  /*
+   * The confirmation must not outlive its moment. Left mounted forever, an
+   * unrelated validation error later in the panel — here, an out-of-range
+   * goal — puts two `role="alert"` nodes on screen at once, which is
+   * ambiguous for anything that queries by that role.
+   */
+  it("clears the saved confirmation once the adult acts again", () => {
+    open({ view: derivePrizeView(waiting, 30) });
+    passGate();
+    fireEvent.click(
+      screen.getByRole("radio", { name: "Encuentra tu regalo en el patio" })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Guardar el regalo" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Regalo guardado");
+
+    fireEvent.change(
+      screen.getByLabelText("Letriestrellas para el próximo regalo"),
+      { target: { value: "0" } }
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(screen.getByRole("alert")).toHaveTextContent("entre 5 y 200");
+  });
 });
 
 /*

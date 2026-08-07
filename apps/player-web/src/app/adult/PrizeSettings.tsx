@@ -40,12 +40,32 @@ export function PrizeSettings({
    * Saving moves a gift from one list to the next, which unmounts the form
    * that saved it — so the confirmation belongs here, above both lists, or it
    * would be announced and removed in the same render.
+   *
+   * `savedCount` is a counter, not a flag: it never goes back to zero, so
+   * every save gets a number no earlier save has used. That number is the
+   * confirmation's `key`, which forces React to mount a fresh node each time
+   * — resaving a gift that stays in the same list (a prepared one, edited
+   * again) does not remount its form, so without a fresh key the second
+   * confirmation would have unchanged text in an unchanged node, and
+   * aria-live announces nothing for that.
+   *
+   * `dismissed` is the second half: a confirmation that stays mounted for the
+   * rest of the panel session can end up on screen next to a later
+   * validation error, which makes `role="alert"` ambiguous. Any interaction
+   * with the panel — captured once, on the wrapping element, so no form has
+   * to know the confirmation exists — dismisses a stale confirmation before
+   * that interaction's own handler runs. A save that follows still shows: its
+   * `configure` call sets `dismissed` back to `false` after the capture
+   * handler has already set it, in the same event.
    */
-  const [saved, setSaved] = useState(false);
+  const [savedCount, setSavedCount] = useState(0);
+  const [dismissed, setDismissed] = useState(false);
   const configure = (id: PrizeId, content: PrizeContent) => {
-    setSaved(true);
+    setSavedCount((count) => count + 1);
+    setDismissed(false);
     onConfigure(id, content);
   };
+  const dismissStaleConfirmation = () => setDismissed(true);
 
   const form = (prize: Prize) => (
     <PrizeForm
@@ -57,10 +77,15 @@ export function PrizeSettings({
   );
 
   return (
-    <div className="prize-settings">
+    <div
+      className="prize-settings"
+      onClickCapture={dismissStaleConfirmation}
+      onChangeCapture={dismissStaleConfirmation}
+      onSubmitCapture={dismissStaleConfirmation}
+    >
       <GoalForm goal={view.goal} onSetGoal={onSetGoal} />
-      {saved ? (
-        <p className="prize-settings__saved" role="alert">
+      {savedCount > 0 && !dismissed ? (
+        <p key={savedCount} className="prize-settings__saved" role="alert">
           Regalo guardado
         </p>
       ) : null}
