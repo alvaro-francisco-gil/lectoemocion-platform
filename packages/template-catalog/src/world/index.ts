@@ -108,11 +108,7 @@ export const world: World = parseWorld({
       unlockedBy: [],
       resource: { template: "name-book", seed: "libro-nombres" },
       reward: {
-        choices: [
-          animal("llama", "Llama"),
-          animal("burro", "Burro"),
-          animal("pajaro", "Pájaro")
-        ]
+        animal: animal("llama", "Llama")
       }
     },
     {
