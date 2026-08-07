@@ -9,9 +9,10 @@ Status: Approved product design. Runtime and distribution are decided in
 LectoEmoción is a personalised early-literacy world for Spanish children aged
 3–5.
 
-Children travel through a framing story told in animated chapters. A map is the
-hub of that world. Minigames unlock as the story advances and remain replayable
-afterwards. The games teach names, initial letters, and sounds.
+Children travel through a framing story told in animated chapters. A hub of
+picture cards, split into sections, is the way into that world. Minigames unlock
+as the story advances and remain replayable afterwards. The games teach names,
+initial letters, and sounds.
 
 The world is fully playable with no setup. Every game ships with
 product-authored default content. An adult may then upload a child's first
@@ -139,7 +140,7 @@ first.
 ### 5.1 Play without setup
 
 1. An adult creates an account and signs in.
-2. The world opens on the map.
+2. The world opens on the hub, in its Juegos section.
 3. The first story chapter plays.
 4. Unlocked minigames are playable immediately using default content.
 
@@ -162,12 +163,12 @@ display.
 1. The adult opens LectoEmoción on the classroom display or tablet.
 2. The adult authenticates, or pairs the device using a short-lived code shown
    as a QR from the phone.
-3. The map appears, showing progress for that account.
+3. The hub appears, showing progress for that account.
 4. Children play story chapters, minigames, and non-interactive resources.
 5. The classroom display needs no library browser, no creation flow, and no
-   group management. The map is its navigation.
+   group management. The hub is its navigation.
 
-**The display is self-sufficient.** The adult moves between the map and a game
+**The display is self-sufficient.** The adult moves between the hub and a game
 by tapping the board. Playback must never require an active connection to the
 phone.
 
@@ -183,7 +184,8 @@ must not be placed where a child will hit them by accident during play.
 
 ### 6.1 The world
 
-- The map is a fixed, product-authored world, extended by product updates.
+- The world is fixed and product-authored, extended by product updates. Which
+  section a chapter stands in — Juegos or Recursos — is authored with it.
 - It is not user-composed, collaborative, or editable.
 - Progression is intended to be easy. Unlocking paces discovery; it is not a
   difficulty gate.
@@ -226,9 +228,9 @@ Resources reference media; they never duplicate it.
   the account's uploaded pictures placed into it. It is rendered by the player
   at playback time, not encoded as a video file. It is **not exportable,
   downloadable, or shareable**; it plays inside the application only.
-- **map / hub** — reads progress and routes into the other kinds.
+- **hub** — reads progress and routes into the other kinds.
 
-The map belongs to the player shell, not the template catalogue, because it
+The hub belongs to the player shell, not the template catalogue, because it
 depends on progress state that templates must not access.
 
 ### 6.4 Template contract
