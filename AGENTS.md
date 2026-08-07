@@ -38,7 +38,8 @@ children. With no roster its chapter is shown locked with an adult-facing
 reason rather than opened onto nothing. Do not read this as licence for a
 second such template: `TEMPLATES_NEEDING_ROSTER` in
 `packages/template-sdk/src/templateDefinition.ts` is total over every template
-and is where that decision is made, once, in the open.
+and is where that decision is made, once, in the open. See
+[ADR 0010](docs/decisions/0010-one-template-may-require-a-roster.md).
 
 Tenancy is Account → Group → child records, where a group is a class or a
 family. No layer may assume a group is a school class.

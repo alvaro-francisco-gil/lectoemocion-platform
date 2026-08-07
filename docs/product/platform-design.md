@@ -32,7 +32,9 @@ uploads at all.
 
 The exception is declared in code rather than described here:
 `TEMPLATES_NEEDING_ROSTER` in `@lectoemocion/template-sdk` is total over every
-template, so a new one cannot silently inherit either answer.
+template, so a new one cannot silently inherit either answer. The reasoning,
+including what was rejected, is
+[ADR 0010](../decisions/0010-one-template-may-require-a-roster.md).
 
 The platform does not use AI to generate stories, animations, game mechanics,
 images, voices, or text. "Personalisation" means deterministic placement of
@@ -265,6 +267,8 @@ Each template declares:
 
 - stable identifier and immutable version;
 - resource kind;
+- whether it can play without a roster — see
+  [ADR 0010](../decisions/0010-one-template-may-require-a-roster.md);
 - learning objective and target age;
 - product-authored default content for every personalisable slot;
 - personalisation slots, their media and text roles, and their selection
@@ -282,6 +286,11 @@ but cannot modify mechanics, timelines, or executable behaviour.
 Because default content is mandatory, every personalisable slot carries
 product-authored art, text, or audio. This is a standing content-production
 cost and must be budgeted per template.
+
+The one template that requires a roster has no personalisable slots at all: its
+content is the roster, so there is nothing for a default to stand in for. It
+carries no default-content cost and, in exchange, cannot be opened until an
+adult has recorded somebody.
 
 ### 6.5 Validation
 
