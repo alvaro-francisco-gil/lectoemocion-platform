@@ -5,7 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties
+  type ReactNode
 } from "react";
 import {
   worldNodes,
@@ -14,15 +14,14 @@ import {
 import { createResourceForNode, world } from "@lectoemocion/template-catalog";
 import { createGame } from "../game/createGame";
 import {
-  deriveMapView,
+  deriveWorldView,
   EMPTY_PROGRESS,
   STARS_PER_COMPLETION,
   type CollectionSlotView,
-  type MapNodeView,
-  type MapRegionView,
   type PendingRewardView,
-  type Progress
-} from "../world/mapView";
+  type Progress,
+  type WorldNodeView
+} from "../world/worldView";
 import { LOCAL_OWNER, LocalProgressStore } from "../world/progressStore";
 import { unlockAllEnabled } from "../world/unlockAll";
 import { useDragScroll } from "./useDragScroll";
@@ -35,21 +34,31 @@ const store = new LocalProgressStore(
 );
 
 /**
+ * Which section a child is standing in.
+ *
+ * Multijugador is absent on purpose. A section with nothing behind it is a
+ * button, not a place, so it cannot be a value here: a screen that cannot be
+ * built is a state that cannot be represented, rather than one rejected at
+ * runtime.
+ */
+type TabId = "juegos" | "recursos";
+
+/**
  * The world shell.
  *
- * It owns progression: it reads progress, derives the map, routes into a
+ * It owns progression: it reads progress, derives the world, routes into a
  * resource, and records completion. No template sees `Progress` — each receives
  * a manifest and a completion callback, and reports back.
  *
- * There is no page header. The world path is the whole map screen, and a
+ * There is no page header. The row of cards is the whole world screen, and a
  * playing resource shows only the way back: chrome above a game competes with
  * it at a child's eye level, and a permanent list of destinations is a way
  * around the progression.
  *
  * Exactly one screen is on at a time: a playing resource, the letriestrellas
  * just won, the animal just revealed, the chests owed for a first finish, the
- * menu, or the map. They are exclusive rather than layered so that nothing a
- * child can touch is ever hidden behind something else.
+ * menu, the collection, or a section. They are exclusive rather than layered so
+ * that nothing a child can touch is ever hidden behind something else.
  */
 export function App() {
   const [progress, setProgress] = useState<Progress>(EMPTY_PROGRESS);
@@ -68,13 +77,14 @@ export function App() {
   const [revealed, setRevealed] = useState<CollectibleAnimal | null>(null);
   /* The menu is a screen of its own, so whether it is on is part of which one. */
   const [menuOpen, setMenuOpen] = useState(false);
+  /* The collection is a screen too, for the same reason and in the same shape. */
+  const [collectionOpen, setCollectionOpen] = useState(false);
   /*
-   * Where the child is standing. Session state, deliberately not stored: the
-   * farm holds the entry chapter and everything the forest leads back to, so
-   * opening the app in the room a child happened to wander into last week is a
-   * worse start than opening it where the world begins.
+   * Which section the child is standing in. Session state, deliberately not
+   * stored: the app is for playing, so it opens on the games rather than on
+   * whichever tab a child happened to leave open last week.
    */
-  const [regionIndex, setRegionIndex] = useState(0);
+  const [tab, setTab] = useState<TabId>("juegos");
   const host = useRef<HTMLDivElement>(null);
   const panWorld = useDragScroll();
 
@@ -89,7 +99,7 @@ export function App() {
   }, []);
 
   const view = useMemo(
-    () => deriveMapView(world, progress, { unlockAll: unlockAllEnabled() }),
+    () => deriveWorldView(world, progress, { unlockAll: unlockAllEnabled() }),
     [progress]
   );
 
@@ -97,13 +107,6 @@ export function App() {
     () => worldNodes(world).find((node) => node.id === activeNodeId) ?? null,
     [activeNodeId]
   );
-
-  /*
-   * The world always has a first region, so a stored or stale index that no
-   * longer exists lands the child at the beginning rather than on a blank
-   * screen. Fails to the entry, not to nothing.
-   */
-  const region = view.regions[regionIndex] ?? view.regions[0]!;
 
   const select = useCallback(
     (nodeId: string) => {
@@ -182,19 +185,19 @@ export function App() {
     return <Menu onClose={() => setMenuOpen(false)} />;
   }
 
-  const before = view.regions[regionIndex - 1];
-  const after = view.regions[regionIndex + 1];
+  if (collectionOpen) {
+    return (
+      <CollectionScreen
+        slots={view.collection}
+        onClose={() => setCollectionOpen(false)}
+      />
+    );
+  }
+
+  const standing = tab === "juegos" ? view.games : view.resources;
 
   return (
-    /*
-     * The scene is the region's, passed as a custom property rather than set
-     * in the stylesheet: which place a child is standing in is content, and the
-     * stylesheet is not where the world's geography should be written down.
-     */
-    <main
-      className="map"
-      style={{ "--map-scene": `url("${region.background}")` } as CSSProperties}
-    >
+    <main className="world">
       <StarCounter stars={view.stars} />
       <button
         type="button"
@@ -205,42 +208,114 @@ export function App() {
         <MenuIcon />
       </button>
       {/*
-        An ordered list because the world is a sequence: that is what a screen
+        An ordered list because a section is a sequence: that is what a screen
         reader should hear, and it is what the connecting line draws.
 
-        Named "Mundo" whichever region is on screen: it is one map showing one
-        place at a time, not two navigations. Which place that is comes from the
-        doors at its ends, which say where they lead.
+        Named "Mundo" whichever section is on screen: it is one row of places to
+        go, not two navigations. Which section it is showing is said by the bar
+        below it, which is where that question belongs.
       */}
-      <nav aria-label="Mundo" className="map__world" ref={panWorld}>
+      <nav aria-label="Mundo" className="world__row" ref={panWorld}>
         <ol className="world-path">
-          {before ? (
-            <li>
-              <RegionDoor
-                region={before}
-                direction="back"
-                onEnter={() => setRegionIndex(regionIndex - 1)}
-              />
-            </li>
-          ) : null}
-          {region.nodes.map((node) => (
+          {standing.map((node) => (
             <li key={node.id}>
               <WorldNode node={node} onSelect={select} />
             </li>
           ))}
-          {after ? (
-            <li>
-              <RegionDoor
-                region={after}
-                direction="on"
-                onEnter={() => setRegionIndex(regionIndex + 1)}
-              />
-            </li>
-          ) : null}
         </ol>
       </nav>
-      <Collection slots={view.collection} />
+      <TabBar tab={tab} onChange={setTab} />
+      <button
+        type="button"
+        className="collection-button"
+        aria-label="Mis animales"
+        onClick={() => setCollectionOpen(true)}
+      >
+        <PawIcon />
+      </button>
     </main>
+  );
+}
+
+/**
+ * The three sections, as a bar along the bottom.
+ *
+ * Low and central, because unlike the star counter and the menu this is
+ * something a child uses: the corners are for the app talking, the bottom band
+ * is where hands land.
+ *
+ * Multijugador is a button that refuses rather than a section that is missing.
+ * A child shown three doors who finds one shut has learned the shape of the
+ * app; one shown two learns it again the day the third appears.
+ */
+function TabBar({
+  tab,
+  onChange
+}: {
+  tab: TabId;
+  onChange: (tab: TabId) => void;
+}) {
+  return (
+    <nav className="tab-bar" aria-label="Secciones">
+      <ul className="tab-bar__tabs">
+        <li>
+          <Tab id="juegos" label="Juegos" tab={tab} onChange={onChange}>
+            <GamesIcon />
+          </Tab>
+        </li>
+        <li>
+          <Tab id="recursos" label="Recursos" tab={tab} onChange={onChange}>
+            <ShelfIcon />
+          </Tab>
+        </li>
+        <li>
+          <button type="button" className="tab" disabled data-state="locked">
+            <span className="tab__icon" aria-hidden="true">
+              <LockIcon />
+            </span>
+            <span className="tab__label">Multijugador</span>
+            {/*
+              Spoken but not drawn. The dimming says "shut" to someone looking
+              at it; this is the same sentence for someone who is not.
+            */}
+            <span className="visually-hidden">Bloqueado</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+  );
+}
+
+function Tab({
+  id,
+  label,
+  tab,
+  onChange,
+  children
+}: {
+  id: TabId;
+  label: string;
+  tab: TabId;
+  onChange: (tab: TabId) => void;
+  children: ReactNode;
+}) {
+  const current = tab === id;
+  return (
+    <button
+      type="button"
+      className="tab"
+      /*
+       * `aria-current`, not `aria-pressed`: these are destinations, and where
+       * you are standing is not a switch you have turned on.
+       */
+      {...(current ? { "aria-current": "page" as const } : {})}
+      onClick={() => onChange(id)}
+    >
+      <span className="tab__icon" aria-hidden="true">
+        {children}
+      </span>
+      <span className="tab__label">{label}</span>
+    </button>
   );
 }
 
@@ -332,59 +407,88 @@ function StarAward({
 /**
  * The animals won so far, one slot per chapter, in world order.
  *
- * Display only: it is the record of what a child has done, not another way to
- * navigate. Its slots exist from the first screen so the row reads as a thing
- * to fill rather than a thing that grows.
+ * A screen rather than a row along the bottom edge: that band belongs to the
+ * sections now, and a record a child looks at has no business competing with
+ * the app's own navigation for the place their hands land.
+ *
+ * Display only: it is what a child has done, not another way to navigate. Its
+ * slots exist from the first screen, so the row reads as a thing to fill rather
+ * than a thing that grows.
  */
-function Collection({ slots }: { slots: readonly CollectionSlotView[] }) {
-  return (
-    <section
-      className="collection"
-      aria-label="Mis animales"
-      ref={useDragScroll()}
-    >
-      <ul className="collection__slots">
-        {slots.map((slot) => (
-          <li
-            key={slot.nodeId}
-            className="collection__slot"
-            data-filled={slot.animal !== null}
-          >
-            {slot.animal ? (
-              <>
-                {/*
-                  Empty `alt`: the name is the accessible text, and a screen
-                  reader announcing the picture as well would say it twice.
+function CollectionScreen({
+  slots,
+  onClose
+}: {
+  slots: readonly CollectionSlotView[];
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
 
-                  Spoken but not drawn, like the empty slot below it. A child of
-                  three does not read the label, the picture is the animal they
-                  remember winning, and a word under every square turns a row of
-                  animals into a row of text.
-                */}
-                <img src={slot.animal.imageUrl} alt="" />
-                <span className="collection__name visually-hidden">
-                  {slot.animal.label}
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="collection__empty" aria-hidden="true">
-                  ?
-                </span>
-                {/*
-                  Spoken but not drawn. An empty slot must say what it is to a
-                  screen reader without putting "todavía no" six times across a
-                  screen a child is looking at.
-                */}
-                <span className="visually-hidden">
-                  {slot.title}: todavía no
-                </span>
-              </>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
+  return (
+    <main
+      className="collection-screen"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Mis animales"
+    >
+      <button
+        type="button"
+        className="menu__close"
+        aria-label="Cerrar"
+        onClick={onClose}
+      >
+        <CloseIcon />
+      </button>
+      <section className="collection" ref={useDragScroll()}>
+        <ul className="collection__slots">
+          {slots.map((slot) => (
+            <li
+              key={slot.nodeId}
+              className="collection__slot"
+              data-filled={slot.animal !== null}
+            >
+              {slot.animal ? (
+                <>
+                  {/*
+                    Empty `alt`: the name is the accessible text, and a screen
+                    reader announcing the picture as well would say it twice.
+
+                    Spoken but not drawn, like the empty slot below it. A child of
+                    three does not read the label, the picture is the animal they
+                    remember winning, and a word under every square turns a row of
+                    animals into a row of text.
+                  */}
+                  <img src={slot.animal.imageUrl} alt="" />
+                  <span className="collection__name visually-hidden">
+                    {slot.animal.label}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="collection__empty" aria-hidden="true">
+                    ?
+                  </span>
+                  {/*
+                    Spoken but not drawn. An empty slot must say what it is to a
+                    screen reader without putting "todavía no" six times across a
+                    screen a child is looking at.
+                  */}
+                  <span className="visually-hidden">
+                    {slot.title}: todavía no
+                  </span>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+    </main>
   );
 }
 
@@ -461,78 +565,23 @@ function Reveal({
 }
 
 /**
- * The way out of a region and into the one beside it.
+ * One chapter, as a card.
  *
- * It stands at the end of the path like a chapter and is built like one — same
- * disc, same size, same picture-first rule — because to a child it is the same
- * gesture: the next thing along the road. What it shows is the place it leads
- * to, so the door out of the farm is a window onto the forest.
+ * The card is the chapter's own picture, filling a rectangle edge to edge. A
+ * child of three does not read the title and cannot count, so a numbered disc
+ * named nothing: the picture is what they remember a chapter by and what they
+ * aim a finger at, and a rectangle is the shape that gives an illustration the
+ * most of itself. The title rides on a chip over the picture, for the adult and
+ * the screen reader.
  *
- * A door with nothing open behind it is locked and says so, exactly as a
- * chapter does. The way back is never locked: a child who walked here has to
- * be able to walk home, and the chapters that wait on this region are there.
- */
-function RegionDoor({
-  region,
-  direction,
-  onEnter
-}: {
-  region: MapRegionView;
-  direction: "back" | "on";
-  onEnter: () => void;
-}) {
-  const titleId = useId();
-  const stateId = useId();
-  const open = direction === "back" || region.reachable;
-
-  return (
-    <button
-      type="button"
-      className="world-node region-door"
-      data-direction={direction}
-      data-state={open ? "unlocked" : "locked"}
-      disabled={!open}
-      aria-labelledby={titleId}
-      aria-describedby={stateId}
-      onClick={onEnter}
-    >
-      <span className="world-node__marker" aria-hidden="true">
-        <img className="world-node__icon" src={region.background} alt="" />
-        {open ? (
-          /* Which way the road goes, for a child who reads neither the title
-             nor the position of the door on a path they have to scroll. */
-          <span className="region-door__way">
-            <BackArrow />
-          </span>
-        ) : (
-          <LockIcon />
-        )}
-      </span>
-      <span className="world-node__title" id={titleId}>
-        {region.title}
-      </span>
-      <span className="world-node__state" id={stateId}>
-        {open ? "Ir" : "Bloqueado"}
-      </span>
-    </button>
-  );
-}
-
-/**
- * One chapter on the path.
- *
- * The marker is the chapter's own picture, as large as the row allows. A child
- * of three does not read the title and cannot count, so a numbered disc named
- * nothing: the picture is what they remember a chapter by and what they aim a
- * finger at. Nothing on the marker is a glyph — the number is gone, and a
- * locked chapter says so with a padlock over its picture rather than by hiding
- * it, because what is behind the lock is the reason to come back.
+ * A locked chapter says so with a padlock over its picture rather than by
+ * hiding it, because what is behind the lock is the reason to come back.
  */
 function WorldNode({
   node,
   onSelect
 }: {
-  node: MapNodeView;
+  node: WorldNodeView;
   onSelect: (nodeId: string) => void;
 }) {
   const titleId = useId();
@@ -571,7 +620,7 @@ function WorldNode({
 }
 
 /** Spoken by a screen reader and read by an adult; never carried by colour alone. */
-function stateLabel(node: MapNodeView): string {
+function stateLabel(node: WorldNodeView): string {
   if (node.state === "locked") return "Bloqueado";
   if (node.state === "completed") return "Completado";
   return node.kind === "cinematic" ? "Historia" : "Jugar";
@@ -641,6 +690,54 @@ function LockIcon() {
       <rect x="22" y="44" width="56" height="44" rx="9" fill="#4a3a63" />
       <circle cx="50" cy="63" r="7" fill="#e7e1ef" />
       <rect x="46" y="63" width="8" height="15" rx="4" fill="#e7e1ef" />
+    </svg>
+  );
+}
+
+/**
+ * A die: the one shape that reads as "things to play" without a word.
+ *
+ * Drawn rather than loaded, like every other icon here. The bar is on screen
+ * before anything else is, and on a classroom panel's cold cache a picture that
+ * arrives a beat late would leave a child with three unlabelled buttons.
+ */
+function GamesIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+      <rect x="3" y="3" width="18" height="18" rx="5" fill="currentColor" />
+      <circle cx="8.5" cy="8.5" r="1.8" fill="#2c1250" />
+      <circle cx="15.5" cy="15.5" r="1.8" fill="#2c1250" />
+      <circle cx="15.5" cy="8.5" r="1.8" fill="#2c1250" />
+      <circle cx="8.5" cy="15.5" r="1.8" fill="#2c1250" />
+    </svg>
+  );
+}
+
+/** An open book: the shelf holds one, and will hold more of the same kind. */
+function ShelfIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+      <path
+        d="M12 6.5C10.2 5.2 7.8 4.8 4 5.2v13c3.8-.4 6.2 0 8 1.3 1.8-1.3 4.2-1.7 8-1.3v-13c-3.8-.4-6.2 0-8 1.3Z"
+        fill="currentColor"
+      />
+      <path d="M12 6.5v13" fill="none" stroke="#2c1250" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+/** A paw: what the collection is full of, at a size where a word would not fit. */
+function PawIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+      <circle cx="7" cy="8" r="2.4" fill="currentColor" />
+      <circle cx="12" cy="6" r="2.4" fill="currentColor" />
+      <circle cx="17" cy="8" r="2.4" fill="currentColor" />
+      <circle cx="19.4" cy="13" r="2.1" fill="currentColor" />
+      <path
+        d="M12 11c3.2 0 5.6 2.4 5.6 4.9 0 2-1.6 3.1-3.4 3.1-1 0-1.6-.4-2.2-.4s-1.2.4-2.2.4c-1.8 0-3.4-1.1-3.4-3.1C6.4 13.4 8.8 11 12 11Z"
+        fill="currentColor"
+      />
     </svg>
   );
 }

@@ -3,7 +3,7 @@ import {
   STARS_PER_COMPLETION,
   type ClaimedReward,
   type Progress
-} from "./mapView";
+} from "./worldView";
 
 /**
  * Where progress lives.

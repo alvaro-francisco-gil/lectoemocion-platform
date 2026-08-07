@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { EMPTY_PROGRESS, STARS_PER_COMPLETION } from "./mapView";
+import { EMPTY_PROGRESS, STARS_PER_COMPLETION } from "./worldView";
 import { LOCAL_OWNER, LocalProgressStore, storageKey } from "./progressStore";
 
 const store = () => new LocalProgressStore(localStorage, LOCAL_OWNER);

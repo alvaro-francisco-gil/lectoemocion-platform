@@ -34,6 +34,16 @@ function returnToMap(): void {
   fireEvent.click(screen.getByRole("button", { name: "Volver al mapa" }));
 }
 
+/** Moves to a section by its label in the bottom bar. */
+function openTab(name: string): void {
+  fireEvent.click(
+    within(screen.getByRole("navigation", { name: "Secciones" })).getByRole(
+      "button",
+      { name }
+    )
+  );
+}
+
 /**
  * Acknowledges the letriestrellas every finish pays, and reports how many.
  *
@@ -66,7 +76,7 @@ function worldButtons(): HTMLElement[] {
   );
 }
 
-/** What the current region's path reads as, doors included, left to right. */
+/** What the section on screen reads as, left to right. */
 function pathTitles(): (string | null | undefined)[] {
   return worldButtons().map(
     (button) => button.querySelector(".world-node__title")?.textContent
@@ -85,13 +95,22 @@ async function openChest(which = 1): Promise<string> {
   return won.replace(/[¡!]/g, "");
 }
 
-/** The animals on the map, in world order — `null` for a slot still to fill. */
+/**
+ * The animals, in world order — `null` for a slot still to fill.
+ *
+ * The collection is a screen now, so reading it means opening it: this goes in,
+ * reads the row, and closes it again, leaving the caller where it found them.
+ */
 function collection(container: HTMLElement): (string | null)[] {
-  return [...container.querySelectorAll(".collection__slot")].map((slot) =>
-    slot.getAttribute("data-filled") === "true"
-      ? (slot.querySelector(".collection__name")?.textContent ?? "")
-      : null
+  fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+  const slots = [...container.querySelectorAll(".collection__slot")].map(
+    (slot) =>
+      slot.getAttribute("data-filled") === "true"
+        ? (slot.querySelector(".collection__name")?.textContent ?? "")
+        : null
   );
+  fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
+  return slots;
 }
 
 describe("the world shell", () => {
@@ -182,26 +201,6 @@ describe("the world shell", () => {
     );
   });
 
-  /*
-   * One region at a time, and the door to the next at the end of it. The
-   * chapters that stand in the forest are not on this path — that is what
-   * makes the forest somewhere to go rather than a change of wallpaper.
-   */
-  it("shows one region as an ordered path, with the way on at its end", () => {
-    render(<App />);
-    expect(pathTitles()).toEqual([
-      "El encuentro",
-      "El gallo Rayo",
-      "Las iniciales",
-      "Las primeras letras",
-      "El puente de sílabas",
-      "El taller de letras",
-      "Empieza igual",
-      "Nuestro álbum",
-      "El bosque"
-    ]);
-  });
-
   it("opens and closes the menu from the map", () => {
     render(<App />);
     expect(screen.queryByRole("dialog", { name: "Menú" })).toBeNull();
@@ -264,8 +263,6 @@ describe("the world shell", () => {
   it("keeps the collection out of the world's list of destinations", () => {
     const { container } = render(<App />);
 
-    /* Slots are a record, not a route: nothing in the row is pressable. */
-    expect(container.querySelectorAll(".collection button")).toHaveLength(0);
     /* One slot per chapter, counted from the world rather than listed here. */
     expect(collection(container)).toEqual(worldNodes(world).map(() => null));
   });
@@ -275,82 +272,184 @@ describe("the world shell", () => {
     const states = worldButtons().map(
       (button) => button.querySelector(".world-node__state")?.textContent
     );
-    /* The farm's chapters, then the door out of it — shut, because nothing in
-       the forest has opened yet. */
-    const farm = world.regions[0]!.nodes;
+    /* The entry chapter, then every game waiting behind it. */
     expect(states).toEqual([
       "Historia",
-      ...farm.slice(1).map(() => "Bloqueado"),
-      "Bloqueado"
+      ...worldNodes(world)
+        .filter((node) => node.surface === "juegos")
+        .slice(1)
+        .map(() => "Bloqueado")
     ]);
   });
 });
 
 /**
- * Walking between the world's places.
+ * The three sections along the bottom.
  *
- * The map shows one region at a time and the doors at its ends are how a child
- * moves between them. A door with nothing open behind it is shut, for the same
- * reason a locked chapter is: it would be a way to end up somewhere with
- * nothing to do.
+ * Juegos is the progression and Recursos is the shelf; Multijugador is a door
+ * with nothing behind it yet, shown shut rather than left out, so the shape of
+ * the app does not change the day it opens.
  */
-describe("the doors between regions", () => {
+describe("the three sections", () => {
   beforeEach(() => {
     localStorage.clear();
     createGame.mockClear();
   });
 
-  it("keeps the way on shut while every chapter behind it is locked", () => {
+  it("opens on Juegos, with every game and nothing from the shelf", () => {
     render(<App />);
-
-    const door = screen.getByRole("button", { name: "El bosque" });
-    expect(door).toBeDisabled();
-
-    fireEvent.click(door);
-    /* Still on the farm: a shut door is refused, not merely dimmed. */
-    expect(pathTitles()).toContain("El encuentro");
-  });
-
-  it("opens the way on once a chapter in the forest opens", async () => {
-    render(<App />);
-    await finishTheFarmUpToTheForest();
-
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "El bosque" })).toBeEnabled()
-    );
-  });
-
-  it("walks into the forest and back to the farm", async () => {
-    render(<App />);
-    await finishTheFarmUpToTheForest();
-
-    fireEvent.click(await screen.findByRole("button", { name: "El bosque" }));
-
-    /* The forest: its two chapters, and the way home in front of them. */
     expect(pathTitles()).toEqual([
-      "La granja",
+      "El encuentro",
+      "Las iniciales",
       "El bosque de parejas",
-      "¿Cuál es?"
+      "¿Cuál es?",
+      "Las primeras letras",
+      "El puente de sílabas",
+      "El taller de letras",
+      "Empieza igual",
+      "Nuestro álbum"
     ]);
+  });
 
-    /* The way back is never shut — the chapters that wait on the forest are
-       on the farm, and a child who could not walk home would be stuck. */
-    const back = screen.getByRole("button", { name: "La granja" });
-    expect(back).toBeEnabled();
+  it("shows the shelf under Recursos, and only the shelf", () => {
+    render(<App />);
+    openTab("Recursos");
+    expect(pathTitles()).toEqual(["El gallo Rayo"]);
+  });
 
-    fireEvent.click(back);
+  /* A book a child has to unlock is a book most of them never open. */
+  it("opens the story from the shelf on a brand new profile", () => {
+    render(<App />);
+    openTab("Recursos");
+
+    fireEvent.click(screen.getByRole("button", { name: "El gallo Rayo" }));
+
+    expect(createGame).toHaveBeenCalledTimes(1);
+  });
+
+  /* Stars for reading it, and a chest the first time: what a chapter is worth
+     does not depend on which section it was reached from. */
+  it("pays the story its stars and its chest", async () => {
+    render(<App />);
+    openTab("Recursos");
+    fireEvent.click(screen.getByRole("button", { name: "El gallo Rayo" }));
+    completeActiveResource();
+
+    expect(await collectStars()).toContain("+3");
+    expect(
+      await screen.findByRole("button", { name: "Abrir el cofre 1" })
+    ).toBeInTheDocument();
+  });
+
+  /* Leaving lands back on the shelf: a child is put back where they were, not
+     where the app opens. */
+  it("returns to the section the resource was opened from", async () => {
+    render(<App />);
+    openTab("Recursos");
+    fireEvent.click(screen.getByRole("button", { name: "El gallo Rayo" }));
+    returnToMap();
+
+    await waitFor(() => expect(pathTitles()).toEqual(["El gallo Rayo"]));
+  });
+
+  it("marks the section a child is standing in", () => {
+    render(<App />);
+    const bar = () => screen.getByRole("navigation", { name: "Secciones" });
+    expect(within(bar()).getByRole("button", { name: "Juegos" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+
+    openTab("Recursos");
+    expect(
+      within(bar()).getByRole("button", { name: "Recursos" })
+    ).toHaveAttribute("aria-current", "page");
+    expect(
+      within(bar()).getByRole("button", { name: "Juegos" })
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  /* Shut, and said to be shut: dimming alone tells a screen reader nothing. */
+  it("keeps Multijugador shut and inert", () => {
+    render(<App />);
+    const bar = screen.getByRole("navigation", { name: "Secciones" });
+    const blocked = within(bar).getByRole("button", { name: /Multijugador/ });
+
+    expect(blocked).toBeDisabled();
+    expect(blocked.textContent).toContain("Bloqueado");
+
+    fireEvent.click(blocked);
+    /* Still on the games: a shut section is refused, not merely dimmed. */
     expect(pathTitles()).toContain("El encuentro");
   });
 
-  /** Plays the farm as far as the forest: the entry, then the initials game. */
-  async function finishTheFarmUpToTheForest(): Promise<void> {
-    for (const title of ["El encuentro", "Las iniciales"]) {
-      fireEvent.click(await screen.findByRole("button", { name: title }));
-      completeActiveResource();
-      await collectStars();
-      await openChest();
-    }
-  }
+  /* Chrome belongs to the world screens. A game gets the screen to itself. */
+  it("takes the bar and the collection away while a resource plays", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
+
+    expect(screen.queryByRole("navigation", { name: "Secciones" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Mis animales" })).toBeNull();
+  });
+});
+
+describe("the collection screen", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    createGame.mockClear();
+  });
+
+  it("opens from the corner and closes again", () => {
+    render(<App />);
+    expect(screen.queryByRole("dialog", { name: "Mis animales" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+    expect(
+      screen.getByRole("dialog", { name: "Mis animales" })
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
+    expect(screen.queryByRole("dialog", { name: "Mis animales" })).toBeNull();
+  });
+
+  /* A screen with no way out is a trap on a device with no back button. */
+  it("closes on Escape", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: "Mis animales" })).toBeNull();
+  });
+
+  /* One screen at a time: the world is not left underneath to be tapped
+     through. */
+  it("puts the world away while it is open", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+
+    expect(screen.queryByRole("navigation", { name: "Mundo" })).toBeNull();
+  });
+
+  /* Slots are a record, not a route. */
+  it("keeps every slot unpressable", () => {
+    const { container } = render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+
+    expect(
+      container.querySelectorAll(".collection__slots button")
+    ).toHaveLength(0);
+  });
+
+  it("reaches the collection from the shelf as well as the games", () => {
+    render(<App />);
+    openTab("Recursos");
+
+    fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+    expect(
+      screen.getByRole("dialog", { name: "Mis animales" })
+    ).toBeInTheDocument();
+  });
 });
 
 describe("the chest a chapter is worth", () => {
