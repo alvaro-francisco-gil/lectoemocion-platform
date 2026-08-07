@@ -12,7 +12,11 @@ import {
   type CollectibleAnimal
 } from "@lectoemocion/resource-schema";
 import { createResourceForNode, world } from "@lectoemocion/template-catalog";
-import type { PrizeContent, PrizeId } from "@lectoemocion/domain";
+import type {
+  PrizeContent,
+  PrizeId,
+  PrizeImageId
+} from "@lectoemocion/domain";
 import { createGame } from "../game/createGame";
 import {
   deriveMapView,
@@ -27,7 +31,11 @@ import {
 import { LOCAL_OWNER, LocalProgressStore } from "../world/progressStore";
 import { derivePrizeView, EMPTY_PRIZES, type Prizes } from "../world/prizes";
 import { LocalPrizeStore, systemMinter, systemImageId } from "../world/prizeStore";
-import { LocalPrizeImageStore, downscaleToDataUrl } from "../world/prizeImageStore";
+import {
+  LocalPrizeImageStore,
+  downscaleToDataUrl,
+  type PrizePick
+} from "../world/prizeImageStore";
 import { unlockAllEnabled } from "../world/unlockAll";
 import { useDragScroll } from "./useDragScroll";
 import { AdultArea } from "./adult";
@@ -249,18 +257,34 @@ export function App() {
   /**
    * Takes what an adult picked, shrinks it, and keeps it under its own key.
    *
-   * Returns `null` when the picture could not be decoded or storage refused it,
-   * and the form then saves the prize with its words alone — the half an adult
-   * actually reads to the child.
+   * Says which way it failed rather than returning nothing: a picture the
+   * browser could not read and a store with no room are different things to
+   * tell an adult, and either one silently answering "no picture" is how a
+   * prize gets saved by someone who believes a photo is attached. The form
+   * saves the words regardless — the half an adult actually reads aloud.
    */
-  const pickImage = useCallback(async (file: File) => {
+  const pickImage = useCallback(async (file: File): Promise<PrizePick> => {
     const id = systemImageId();
+    let dataUrl: string;
     try {
-      const dataUrl = await downscaleToDataUrl(file);
-      return (await imageStore.save(id, dataUrl)) ? id : null;
+      dataUrl = await downscaleToDataUrl(file);
     } catch {
-      return null;
+      return { ok: false, problem: "unreadable-picture" };
     }
+    return (await imageStore.save(id, dataUrl))
+      ? { ok: true, id }
+      : { ok: false, problem: "no-room" };
+  }, []);
+
+  /**
+   * Drops a picture no prize points at any more.
+   *
+   * Every kept picture is a key of its own, so one the adult replaced or moved
+   * away from would sit in storage for ever — deletion is a capability, not an
+   * afterthought, and this is the smallest place it belongs.
+   */
+  const discardImage = useCallback((id: PrizeImageId) => {
+    void imageStore.remove(id);
   }, []);
 
   /*
@@ -347,6 +371,7 @@ export function App() {
         onSetGoal={setPrizeGoal}
         onConfigure={configure}
         onPickImage={pickImage}
+        onDiscardImage={discardImage}
         onClose={() => setDetour("none")}
       />
     );

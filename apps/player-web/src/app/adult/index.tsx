@@ -1,5 +1,6 @@
 import type { PrizeContent, PrizeId, PrizeImageId } from "@lectoemocion/domain";
 import { useEffect, type ReactElement } from "react";
+import type { PrizePick } from "../../world/prizeImageStore";
 import type { PrizeView } from "../../world/prizes";
 import { CloseIcon } from "../icons";
 import { AdultGate } from "./AdultGate";
@@ -23,13 +24,15 @@ export function AdultArea({
   onSetGoal,
   onConfigure,
   onPickImage,
+  onDiscardImage,
   onClose
 }: {
   view: PrizeView;
   currentYear: number;
   onSetGoal: (goal: number) => void;
   onConfigure: (id: PrizeId, content: PrizeContent) => void;
-  onPickImage: (file: File) => Promise<PrizeImageId | null>;
+  onPickImage: (file: File) => Promise<PrizePick>;
+  onDiscardImage: (id: PrizeImageId) => void;
   onClose: () => void;
 }): ReactElement {
   useEffect(() => {
@@ -56,6 +59,7 @@ export function AdultArea({
           onSetGoal={onSetGoal}
           onConfigure={onConfigure}
           onPickImage={onPickImage}
+          onDiscardImage={onDiscardImage}
         />
       </AdultGate>
     </main>

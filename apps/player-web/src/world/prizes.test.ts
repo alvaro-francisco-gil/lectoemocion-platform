@@ -140,4 +140,36 @@ describe("derivePrizeView", () => {
     expect(view.pending.map((prize) => prize.id)).toEqual([prizeId("p-2")]);
     expect(view.history.map((prize) => prize.id)).toEqual([prizeId("p-1")]);
   });
+
+  /*
+   * The map asks "is a gift waiting?" and an adult asks "which of these have I
+   * still to fill in?". Those are different questions about the same prize, so
+   * the view answers both rather than letting a screen re-derive one from the
+   * other.
+   */
+  it("tells a gift still to prepare apart from one already prepared", () => {
+    const two = awardDue(EMPTY_PRIZES, 60, mints(2));
+    const ready = configurePrize(two, prizeId("p-1"), PATIO);
+    const view = derivePrizeView(ready, 60);
+
+    expect(view.unprepared.map((prize) => prize.id)).toEqual([prizeId("p-2")]);
+    expect(view.prepared.map((prize) => prize.id)).toEqual([prizeId("p-1")]);
+    expect(view.pending.map((prize) => prize.id)).toEqual([
+      prizeId("p-1"),
+      prizeId("p-2")
+    ]);
+  });
+
+  it("counts an opened gift in none of the three waiting lists", () => {
+    const one = awardDue(EMPTY_PRIZES, 30, mints(1));
+    const ready = configurePrize(one, prizeId("p-1"), PATIO);
+    const view = derivePrizeView(
+      openPrize(ready, prizeId("p-1"), "2026-08-03T10:00:00.000Z"),
+      30
+    );
+
+    expect(view.unprepared).toEqual([]);
+    expect(view.prepared).toEqual([]);
+    expect(view.pending).toEqual([]);
+  });
 });

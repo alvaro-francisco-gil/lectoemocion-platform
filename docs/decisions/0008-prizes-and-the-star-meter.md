@@ -95,6 +95,15 @@ reading, and every unit test still passed because each one asserted the pure
 derivation in isolation, not the wiring. Any screen whose subject must survive
 a state change triggered by that screen's own action follows this rule.
 
+**A derived view names every question a screen asks of it, rather than letting
+two screens read one list differently.** `pending` answered "is a gift waiting
+for the child?", and the adult area read the same list as "which gifts have I
+still to fill in?" — so a gift already prepared was offered again under a blank
+form, and an adult with two queued could not tell them apart. `PrizeView` now
+carries `unprepared` and `prepared` beside it. The rule is that
+`derivePrizeView` stays the one place a prize's state is given a meaning; a
+screen that needs a different meaning asks for it there.
+
 **A touch target is proven reachable in the real layout it ships in, not only
 in a component test's DOM.** The map's waiting gift rendered correctly and
 passed every component test while sharing a hit region with the collection

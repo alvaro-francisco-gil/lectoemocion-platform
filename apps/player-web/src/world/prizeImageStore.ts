@@ -20,6 +20,22 @@ export function prizeImageKey(owner: string, id: PrizeImageId): string {
   return `lectoemocion.prizeImage.${owner}.${id}`;
 }
 
+export type PrizePickProblem = "unreadable-picture" | "no-room";
+
+/**
+ * What came of an adult picking a photo.
+ *
+ * A result rather than `PrizeImageId | null`, on the same terms as
+ * `checkPrizeGoal`: `null` collapses "the browser could not read that file"
+ * and "there was no room to keep it" into silence, and the adult saves the
+ * prize believing a picture is attached. Naming the problem is what lets the
+ * form say which one happened — and still save the words, which are the half
+ * an adult reads aloud.
+ */
+export type PrizePick =
+  | { readonly ok: true; readonly id: PrizeImageId }
+  | { readonly ok: false; readonly problem: PrizePickProblem };
+
 export interface FittedSize {
   readonly width: number;
   readonly height: number;
@@ -89,9 +105,10 @@ export class LocalPrizeImageStore implements PrizeImageStore {
  * Turns what an adult picked into a small JPEG, in the browser.
  *
  * The bytes never leave the device. `createImageBitmap` and a canvas are the
- * only path available in an aged WebView; a failure to decode is surfaced to
- * the caller, which shows the adult that the picture did not work rather than
- * storing something a child would see as a broken card.
+ * only path available in an aged WebView; a failure to decode throws, and the
+ * caller turns it into a `PrizePick` of `"unreadable-picture"` so the adult is
+ * shown that the picture did not work rather than storing something a child
+ * would see as a broken card.
  */
 export async function downscaleToDataUrl(
   file: Blob,

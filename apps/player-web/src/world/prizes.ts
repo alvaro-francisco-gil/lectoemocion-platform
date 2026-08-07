@@ -157,8 +157,21 @@ export interface PrizeView {
   /** Never more than the goal: a meter fuller than full says nothing. */
   readonly filled: number;
   readonly due: number;
-  /** Awarded and not yet opened, oldest first — the longest wait is owed first. */
+  /**
+   * Awarded and not yet opened, oldest first — the longest wait is owed first.
+   *
+   * What the *child* is owed: a wrapped box on the map is a box either way,
+   * whether or not an adult has said yet what is inside it.
+   */
   readonly pending: readonly Prize[];
+  /**
+   * The subset of `pending` no adult has filled in yet — what the adult area
+   * offers a blank form for. Split out here rather than filtered by that
+   * screen, so this stays the one place a prize's state is given a meaning.
+   */
+  readonly unprepared: readonly Prize[];
+  /** The subset of `pending` already filled in, waiting on the child to open it. */
+  readonly prepared: readonly Prize[];
   /** Opened, newest first: what a child asks about is what they just opened. */
   readonly history: readonly Prize[];
 }
@@ -182,6 +195,8 @@ export function derivePrizeView(
     filled,
     due: prizesDue(prizes, starsEarned),
     pending: prizes.prizes.filter((prize) => prize.state !== "opened"),
+    unprepared: prizes.prizes.filter((prize) => prize.state === "unconfigured"),
+    prepared: prizes.prizes.filter((prize) => prize.state === "ready"),
     history: prizes.prizes.filter((prize) => prize.state === "opened").reverse()
   };
 }
