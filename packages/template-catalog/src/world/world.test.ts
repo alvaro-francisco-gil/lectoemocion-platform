@@ -41,51 +41,6 @@ describe("the authored world", () => {
     expect(reachable.size).toBe(worldNodes(world).length);
   });
 
-  /*
-   * The world is meant to be two places a child walks between, and the entry
-   * chapter has to be in the first one — a child who opens the app somewhere
-   * they cannot start is a child who cannot start.
-   */
-  it("puts the entry chapter in the first region", () => {
-    const [first] = world.regions;
-    expect(first?.id).toBe("granja");
-    expect(first?.nodes.map((node) => node.id)).toContain("encuentro");
-  });
-
-  it("stands the forest chapters in the forest", () => {
-    const bosque = world.regions.find((region) => region.id === "bosque");
-    expect(bosque?.nodes.map((node) => node.id)).toEqual([
-      "parejas",
-      "cual-es"
-    ]);
-  });
-
-  /*
-   * The forest is not a dead end. Chapters on the farm wait on both of its
-   * chapters, so the door back is on the way through the world rather than a
-   * courtesy — if this ever stopped holding, the forest would become a room a
-   * child had no reason to leave.
-   */
-  it("makes the farm wait on the forest, so the walk goes both ways", () => {
-    const forest = new Set(
-      world.regions
-        .find((region) => region.id === "bosque")
-        ?.nodes.map((node) => node.id)
-    );
-    const waiting = world.regions
-      .find((region) => region.id === "granja")
-      ?.nodes.filter((node) =>
-        node.unlockedBy.some((required) => forest.has(required))
-      );
-
-    expect(waiting?.length).toBeGreaterThan(0);
-  });
-
-  it("gives every region a backdrop of its own", () => {
-    const scenes = world.regions.map((region) => region.background);
-    expect(new Set(scenes).size).toBe(scenes.length);
-  });
-
   it("offers all three resource kinds, so the world is not only minigames", () => {
     const kinds = new Set(
       worldNodes(world).map((node) => templateKind(node.resource.template))
@@ -159,22 +114,8 @@ describe("world validation", () => {
     ]
   };
 
-  /**
-   * One region holding the nodes under test.
-   *
-   * These cases are about the graph rather than the geography, and every one of
-   * them would otherwise repeat the same backdrop and title.
-   */
-  const worldOf = (...nodes: unknown[]) => ({
-    regions: [
-      {
-        id: "region",
-        title: "Región",
-        background: "/world/granero.webp",
-        nodes
-      }
-    ]
-  });
+  /** A world holding the nodes under test. */
+  const worldOf = (...nodes: unknown[]) => ({ nodes });
 
   const entry = {
     id: "start",
@@ -204,23 +145,8 @@ describe("world validation", () => {
     expect(() => parseWorld(worldOf(entry, entry))).toThrow("start");
   });
 
-  /* Two regions with one id is the same defect as two nodes with one: it makes
-     "which place is this" a question the world cannot answer. */
-  it("rejects a duplicate region id", () => {
-    const [region] = worldOf(entry).regions;
-    expect(() => parseWorld({ regions: [region, region] })).toThrow(
-      "Duplicate world region id"
-    );
-  });
-
-  /* A region is a place a child can walk into. An empty one is a room with
-     nothing in it, reachable and pointless. */
-  it("rejects a region with no chapters in it", () => {
-    expect(() => parseWorld(worldOf())).toThrow("Invalid world");
-  });
-
-  it("rejects a world with no regions at all", () => {
-    expect(() => parseWorld({ regions: [] })).toThrow("Invalid world");
+  it("rejects a world with no nodes at all", () => {
+    expect(() => parseWorld({ nodes: [] })).toThrow("Invalid world");
   });
 
   it("rejects a world with no entry node", () => {
@@ -255,61 +181,11 @@ describe("world validation", () => {
     ).toThrow("Unreachable world nodes: a, b");
   });
 
-  /* A cycle across regions is still a cycle: the graph is the world's, not the
-     region's, and a prerequisite that crosses a door must be checked the same. */
-  it("rejects a cycle that spans two regions", () => {
-    expect(() =>
-      parseWorld({
-        regions: [
-          {
-            id: "granja",
-            title: "La granja",
-            background: "/world/granero.webp",
-            nodes: [
-              entry,
-              {
-                id: "a",
-                title: "A",
-                icon: "/vocabulary/luna.webp",
-                unlockedBy: ["b"],
-                resource: { template: "pairs-game", seed: "a", pairCount: 3 },
-                reward
-              }
-            ]
-          },
-          {
-            id: "bosque",
-            title: "El bosque",
-            background: "/world/bosque.webp",
-            nodes: [
-              {
-                id: "b",
-                title: "B",
-                icon: "/vocabulary/sol.webp",
-                unlockedBy: ["a"],
-                resource: { template: "pairs-game", seed: "b", pairCount: 3 },
-                reward
-              }
-            ]
-          }
-        ]
-      })
-    ).toThrow("Unreachable world nodes: a, b");
-  });
-
-  /* The map is a row of pictures: a chapter without one cannot be found by a
+  /* The world is a row of pictures: a chapter without one cannot be found by a
      child who does not read, so it is a content defect, not a missing nicety. */
   it("rejects a node with no map icon", () => {
     const { icon: _dropped, ...iconless } = entry;
     expect(() => parseWorld(worldOf(iconless))).toThrow("Invalid world");
-  });
-
-  /* Same reasoning one level up: a region with no backdrop is a place with
-     nowhere to stand. */
-  it("rejects a region with no backdrop", () => {
-    const [region] = worldOf(entry).regions;
-    const { background: _dropped, ...sceneless } = region!;
-    expect(() => parseWorld({ regions: [sceneless] })).toThrow("Invalid world");
   });
 
   it("rejects a node with no reward to give", () => {

@@ -48,6 +48,5 @@ export type {
   NodeResource,
   NodeReward,
   World,
-  WorldNode,
-  WorldRegion
+  WorldNode
 } from "./worldSchema";
