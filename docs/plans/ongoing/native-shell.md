@@ -2,23 +2,23 @@
 
 ## Status
 
-- **Updated:** 2026-08-06
+- **Updated:** 2026-08-07
 - **Stage:** Step 1 — Expo app hosting the player in a WebView
-- **Branch:** `main`, uncommitted (additive scaffold; the root working tree
-  carries substantial unrelated in-flight work that must survive)
+- **Branch:** `main`
 - **Done:** `apps/mobile` scaffolded and rendering the player in a WebView;
-  `playerUrl` resolver with 11 tests; `PLAYER_HOST` on the player's dev server;
-  guardrails and typecheck green
-- **Next:** verify on a physical phone — blocked below
-- **Blockers:** **WSL2 NAT networking.** The dev host is WSL2 without mirrored
-  networking (`hostname -I` gives `172.26.86.22`, a NAT address, and
-  `.wslconfig` has no `networkingMode`). A phone on the LAN can reach neither
-  the Vite dev server nor Metro. Fix by adding `networkingMode=mirrored` to
-  `.wslconfig` and restarting WSL, or by port-proxying 4173 and 8081 from
-  Windows. This is host configuration, not repository work.
+  `playerUrl` resolver with 11 tests; scripted Android emulator workflow
+  (`scripts/mobile-emulator.mjs`, 30 tests) that creates the AVD, tunnels the
+  ports, and reports what is up; `LectoEmocion_Tablet` AVD created and booting
+- **Next:** load the player in the emulator and confirm a minigame is playable
+- **Blockers:** none.
 - **Handoff:** the hosted-versus-bundled player decision is deliberately
-  deferred — see "Open questions". Step 1 loads the dev server over the LAN,
-  which is a development affordance and not the shipping answer.
+  deferred — see "Open questions". Step 1 points at a dev server, which is a
+  development affordance and not the shipping answer.
+
+The earlier WSL2 NAT blocker recorded here is resolved: `.wslconfig` now sets
+`networkingMode=mirrored`. It stopped mattering anyway — `adb reverse` tunnels
+the ports from the device, so nothing has to traverse the LAN and the player's
+dev server stays on loopback.
 
 ## Goal
 
@@ -56,18 +56,36 @@ apps/mobile/
   playerUrl.ts        resolves and validates the player URL
   playerUrl.test.ts
   vitest.config.ts
+
+scripts/
+  mobile-emulator.mjs     the CLI: doctor, boot, wire, open, up, shot, logs
+  lib/emulator.mjs        pure logic — no spawning, no filesystem
+  lib/emulator.test.ts
 ```
+
+The emulator work splits that way for the same reason `rules.mjs` and
+`rules.test.ts` do: the decisions worth protecting are string-shaped — which SDK
+qualifies, which device states are usable, what a fresh AVD's `config.ini` says
+— and each is testable without a device attached.
 
 `playerUrl.ts` is the only logic in step 1, and it exists because of invariant
 6: a missing or malformed player URL must fail closed with an adult-facing
 error rather than render a blank white screen a parent cannot diagnose.
 
-The player URL comes from `EXPO_PUBLIC_PLAYER_URL`. In development that is the
-Vite dev server on the LAN, which requires the dev server to bind beyond
-loopback — hence the `PLAYER_HOST` addition to
-[`apps/player-web/vite.config.ts`](../../../apps/player-web/vite.config.ts),
-which keeps `127.0.0.1` as the default so existing e2e and worktree isolation
-are unchanged.
+The player URL comes from `EXPO_PUBLIC_PLAYER_URL`, which `pnpm mobile:start`
+derives from the checkout rather than reading from a file. The player's port is
+already derived per checkout so a worktree never tests against the primary
+checkout's code; a `.env` holding a fixed port would reintroduce that, and a
+WebView showing another checkout's player looks exactly like a working app.
+
+The device reaches it through `adb reverse`, not over the LAN. Expo's bundle
+loader rejects a cross-network bundle URL, so the emulator's `10.0.2.2` alias
+cannot serve Metro at all — and that alias does not exist on real hardware, so
+anything written that way breaks the first time a tablet is plugged in.
+Tunnelling makes `localhost` correct on both, and keeps the dev server on
+loopback instead of exposing it to the network. `PLAYER_HOST` on
+[`apps/player-web/vite.config.ts`](../../../apps/player-web/vite.config.ts)
+remains for the LAN case, unused by this workflow.
 
 Expo Go runs this without a native build: `react-native-webview` is one of the
 libraries it bundles. No EAS account, no store credentials, no Xcode.
@@ -81,8 +99,11 @@ libraries it bundles. No EAS account, no store credentials, no Xcode.
 - [x] `apps/mobile` Expo app rendering the player full-screen, with an
       adult-facing error state when the URL is unusable or the WebView fails
       to load.
-- [ ] Verified on a physical phone via Expo Go. **Blocked on WSL2 networking —
-      see Status.**
+- [x] Scripted emulator workflow: `scripts/mobile-emulator.mjs` plus the pure
+      logic and tests in `scripts/lib/emulator.mjs`.
+- [ ] Verified in the Android emulator via Expo Go: map and one minigame.
+- [ ] Verified on physical hardware. Same commands — `adb reverse` makes
+      `localhost` mean the dev machine over USB too.
 
 ## Verification
 
@@ -93,6 +114,31 @@ libraries it bundles. No EAS account, no store credentials, no Xcode.
 
 Deliberately no Playwright coverage: the shell is a WebView around an already
 end-to-end-tested player, and Playwright cannot drive Expo Go.
+
+## Native feel
+
+The embedded player is close to indistinguishable from native, but only at four
+seams, and only if each is worked on deliberately. Recorded here so they are
+scheduled rather than rediscovered late. None is in scope for step 1.
+
+1. **Cold start into the player.** Native screen → WebView boot → Phaser init →
+   assets. The most "this is a website" moment in the product. Bundling the
+   player removes the network from it; keeping the WebView warm rather than
+   mounting per navigation removes the rest; a native transition covers what is
+   left.
+2. **Backgrounding on cheap hardware.** Under about 2 GB the OS evicts the
+   WebView, and the child returns to a reload. Progress must persist
+   continuously and resume must be a tested path, not a discovery.
+3. **Gesture collisions.** Scroll, zoom, and bounce are already off in
+   `App.tsx`. The hardware back button and iOS edge-swipe are not, and either
+   yanking a child out mid-game is exactly the tell.
+4. **Audio.** Unlock rules, ducking, the iOS silent switch, Android latency.
+   Narration is not optional content, and this is fiddlier in a WebView than
+   natively.
+
+The standing risk is that "it needs to feel more native" becomes an argument for
+reimplementing minigames natively. That trades a solvable polish problem for an
+unbounded content-duplication one, and the whole architecture exists to avoid it.
 
 ## Open questions
 
