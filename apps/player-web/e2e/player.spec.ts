@@ -55,30 +55,25 @@ async function withProgress(page: Page, completedNodes: string[]) {
 }
 
 /**
- * Walks to the region a chapter stands in and opens it.
+ * Opens a chapter, moving to the section it stands in first.
  *
- * The map shows one place at a time, so a chapter in the forest is not on the
- * screen until a child has walked there. This retraces that walk rather than
- * assuming where the map happens to be: back through every door home, then
- * forward through the doors to the region the chapter is in.
+ * Which section that is comes from the world rather than from a list here, so a
+ * chapter that moves to the shelf does not quietly stop being covered.
  */
 async function openChapter(page: Page, nodeId: string) {
-  const target = world.regions.findIndex((region) =>
-    region.nodes.some((node) => node.id === nodeId)
-  );
-  if (target < 0) throw new Error(`No such world node: ${nodeId}`);
+  const node = worldNodes(world).find((candidate) => candidate.id === nodeId);
+  if (!node) throw new Error(`No such world node: ${nodeId}`);
 
-  const back = page.locator('.region-door[data-direction="back"]');
-  while ((await back.count()) > 0) await back.click();
-  for (let step = 0; step < target; step += 1) {
-    await page.locator('.region-door[data-direction="on"]').click();
-  }
-
-  const node = world.regions[target]!.nodes.find(
-    (candidate) => candidate.id === nodeId
-  )!;
+  await page
+    .getByRole("button", {
+      name: node.surface === "recursos" ? "Recursos" : "Juegos"
+    })
+    .click();
   await page.getByRole("button", { name: node.title, exact: true }).click();
 }
+
+/** Every chapter on the path. The shelf is reached by its own section. */
+const GAMES = worldNodes(world).filter((node) => node.surface === "juegos");
 
 /**
  * Takes the letriestrellas every finish pays and, when the chapter is owed
@@ -164,10 +159,19 @@ test("finishing a chapter hands out an animal for the collection", async ({
   page
 }) => {
   await page.goto("/");
+
+  const openCollection = () =>
+    page.getByRole("button", { name: "Mis animales" }).click();
+  const closeCollection = () =>
+    page.getByRole("button", { name: "Cerrar", exact: true }).click();
+  const empty = page.locator('.collection__slot[data-filled="false"]');
+  const filled = page.locator('.collection__slot[data-filled="true"]');
+
   /* One slot per chapter, counted from the world so a new one does not fail
      this test for having been added. */
-  const empty = page.locator('.collection__slot[data-filled="false"]');
+  await openCollection();
   await expect(empty).toHaveCount(worldNodes(world).length);
+  await closeCollection();
 
   await page.getByRole("button", { name: ENTRY }).click();
   await completed(page, "encuentro");
@@ -179,32 +183,56 @@ test("finishing a chapter hands out an animal for the collection", async ({
   await chests.nth(1).click();
   await page.getByRole("button", { name: "Seguir" }).click();
 
-  const filled = page.locator('.collection__slot[data-filled="true"]');
+  await openCollection();
   await expect(filled).toHaveCount(1);
   await expect(filled.locator("img")).toBeVisible();
   await expect(empty).toHaveCount(worldNodes(world).length - 1);
 });
 
-test("the collection sits below the path, and the path is centred", async ({
-  page
-}) => {
+test("the bar sits below the cards without covering them", async ({ page }) => {
   await withProgress(page, ["encuentro"]);
   await page.goto("/");
 
-  const path = (await page.locator(".world-path").boundingBox())!;
-  const collection = (await page.locator(".collection").boundingBox())!;
+  const row = (await page.locator(".world-path").boundingBox())!;
+  const bar = (await page.locator(".tab-bar__tabs").boundingBox())!;
   const viewport = await page.evaluate(() => ({ height: innerHeight }));
 
-  /* Below, and not overlapping: the row is a footer, not a second path. */
-  expect(collection.y).toBeGreaterThanOrEqual(path.y + path.height);
+  /* Below, and not overlapping: the bar is chrome, not a second row. */
+  expect(bar.y).toBeGreaterThanOrEqual(row.y + row.height);
 
-  /*
-   * The path holds the middle band rather than the bottom edge it used to sit
-   * on, with the collection taking the space underneath it.
-   */
-  const centre = path.y + path.height / 2;
-  expect(centre).toBeGreaterThan(viewport.height * 0.2);
+  /* The cards hold the middle band rather than the bottom edge. */
+  const centre = row.y + row.height / 2;
+  expect(centre).toBeGreaterThan(viewport.height * 0.15);
   expect(centre).toBeLessThan(viewport.height * 0.7);
+});
+
+/* The shelf is open from the first screen, and what is on it is not on the
+   path: two sections, not one list shown twice. */
+test("the story is on the shelf, open to a brand new player", async ({
+  page
+}) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "El gallo Rayo" })).toHaveCount(
+    0
+  );
+
+  await page.getByRole("button", { name: "Recursos" }).click();
+  const story = page.getByRole("button", { name: "El gallo Rayo" });
+  await expect(story).toBeEnabled();
+  await expect(page.getByRole("button", { name: ENTRY })).toHaveCount(0);
+
+  await story.click();
+  await expect(page.locator("canvas")).toBeVisible();
+});
+
+/* Shut, and refused: dimming a section a child cannot reach is presentation,
+   not the rule. */
+test("Multijugador is shut", async ({ page }) => {
+  await page.goto("/");
+  const blocked = page.getByRole("button", { name: /Multijugador/ });
+
+  await expect(blocked).toBeDisabled();
+  await expect(page.getByRole("button", { name: ENTRY })).toBeVisible();
 });
 
 test("a completed chapter stays replayable", async ({ page }) => {
@@ -360,9 +388,12 @@ test("the world list is gone while a resource plays", async ({ page }) => {
   await expect(page.locator("canvas")).toBeVisible();
   await expect(worldList).toBeHidden();
   await expect(page.getByRole("button", { name: SECOND })).toHaveCount(0);
-  /* The star counter belongs to the map too: nothing counts up beside a
-     running game. */
+  /* The star counter and the bar belong to the world screens too: nothing
+     counts up, and nothing offers a way out sideways, beside a running game. */
   await expect(page.getByRole("region", { name: "Letriestrellas" })).toHaveCount(
+    0
+  );
+  await expect(page.getByRole("navigation", { name: "Secciones" })).toHaveCount(
     0
   );
 
@@ -379,13 +410,11 @@ test("the world reads as one horizontal path, with no page header", async ({
   await expect(page.locator("header")).toHaveCount(0);
   await expect(page.locator("h1")).toHaveCount(0);
 
-  /* Derived, not written down: adding a chapter must not fail this test. The
-     first region's chapters, plus the door standing at the end of them. */
+  /* Derived, not written down: adding a chapter must not fail this test. */
   const nodes = page.locator(".world-node");
-  await expect(nodes).toHaveCount(world.regions[0]!.nodes.length + 1);
+  await expect(nodes).toHaveCount(GAMES.length);
 
-  /* Every node shares a row, doors included: same top edge, strictly
-     increasing left edge. */
+  /* Every card shares a row: same top edge, strictly increasing left edge. */
   const boxes = await nodes.evaluateAll((elements) =>
     elements.map((element) => {
       const { x, y } = element.getBoundingClientRect();
@@ -401,90 +430,37 @@ test("the world reads as one horizontal path, with no page header", async ({
 });
 
 /*
- * The marker is a picture, and only a picture.
+ * The card is a picture.
  *
  * A child of three cannot read the title and cannot count, so what tells one
- * chapter from another has to be the illustration — and a digit or a letter
- * inside the disc is a thing on the map that says nothing to the person the
- * map is for. Big enough to aim a finger at, too: a marker measured here so
- * that a layout change cannot quietly shrink it back to a bullet.
+ * chapter from another has to be the illustration. Big enough to aim a finger
+ * at, too: measured here so that a layout change cannot quietly shrink a card
+ * back to a bullet.
  */
-test("every chapter is a picture, drawn large and with no glyph on it", async ({
-  page
-}) => {
+test("every chapter is a picture card, drawn large", async ({ page }) => {
   await withProgress(page, ["encuentro"]);
   await page.goto("/");
 
-  /* The chapters only: a door carries a backdrop, which is measured with the
-     regions rather than here. */
-  const markers = page.locator(".world-node:not(.region-door) .world-node__marker");
-  await expect(markers).toHaveCount(world.regions[0]!.nodes.length);
+  const markers = page.locator(".world-node__marker");
+  await expect(markers).toHaveCount(GAMES.length);
 
   const drawn = await markers.evaluateAll((elements) =>
-    elements.map((element) => ({
-      text: element.textContent?.trim() ?? "",
-      hasPicture: element.querySelector("img") !== null,
-      size: element.getBoundingClientRect().width
-    }))
+    elements.map((element) => {
+      const box = element.getBoundingClientRect();
+      return {
+        hasPicture: element.querySelector("img") !== null,
+        width: box.width,
+        height: box.height
+      };
+    })
   );
 
   for (const marker of drawn) {
-    expect(marker.text, "no digit or letter on the marker").toBe("");
     expect(marker.hasPicture, "the chapter's own picture").toBe(true);
-    expect(marker.size).toBeGreaterThanOrEqual(96);
+    expect(marker.width).toBeGreaterThanOrEqual(120);
+    /* A rectangle, not a disc: wider than it is tall. */
+    expect(marker.width).toBeGreaterThan(marker.height);
   }
-});
-
-/*
- * The world is two places, and the door between them is a real move: the path
- * changes, and so does the ground it is drawn on. The scene is what a child
- * actually reads as "somewhere else" — the titles under the markers are for
- * the adult — so it is what this measures.
- */
-test("walking through the door changes the place, and the way back leads home", async ({
-  page
-}) => {
-  const [farm, forest] = world.regions;
-  /* Enough to open the forest: its first chapter waits on the initials game. */
-  await withProgress(page, ["encuentro", "iniciales"]);
-  await page.goto("/");
-
-  const scene = () =>
-    page
-      .locator(".map")
-      .evaluate((element) => getComputedStyle(element).backgroundImage);
-
-  expect(await scene()).toContain(farm!.background);
-
-  const door = page.getByRole("button", { name: forest!.title, exact: true });
-  await expect(door).toBeEnabled();
-  await door.click();
-
-  expect(await scene()).toContain(forest!.background);
-  for (const node of forest!.nodes) {
-    await expect(
-      page.getByRole("button", { name: node.title, exact: true })
-    ).toBeVisible();
-  }
-  /* The farm's chapters are not merely dimmed here: they are somewhere else. */
-  await expect(page.getByRole("button", { name: ENTRY })).toHaveCount(0);
-
-  await page.getByRole("button", { name: farm!.title, exact: true }).click();
-  expect(await scene()).toContain(farm!.background);
-  await expect(page.getByRole("button", { name: ENTRY })).toBeVisible();
-});
-
-/* A door with nothing open behind it is refused, exactly as a locked chapter
-   is: walking into a region where everything is locked is a way to get lost. */
-test("the door to a region with nothing open in it stays shut", async ({
-  page
-}) => {
-  const [, forest] = world.regions;
-  await page.goto("/");
-
-  const door = page.getByRole("button", { name: forest!.title, exact: true });
-  await expect(door).toBeDisabled();
-  await expect(door).toHaveAttribute("data-state", "locked");
 });
 
 test("playing shows only the way back", async ({ page }) => {

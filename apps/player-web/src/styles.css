@@ -170,9 +170,14 @@ main { height: 100dvh; }
   background: #f4c95d;
 }
 
+/*
+ * One definite cell, so the title chip rides *on* the card rather than sitting
+ * in a row beneath it. Everything a card is made of stacks in this one cell.
+ */
 .world-node {
   width: var(--card-width);
   display: grid;
+  grid-template: 1fr / 1fr;
   padding: 0;
   border: 0;
   background: none;
@@ -180,6 +185,7 @@ main { height: 100dvh; }
   color: inherit;
   cursor: pointer;
 }
+.world-node > * { grid-area: 1 / 1; }
 .world-node[disabled] { cursor: not-allowed; }
 
 /*
@@ -205,17 +211,33 @@ main { height: 100dvh; }
   background: #4a2a75;
   box-shadow: 0 8px 0 rgb(0 0 0 / 0.22);
 }
-.world-node__marker > * {
+/* `*` and `::after` both: the completed star is a pseudo-element, which `> *`
+   does not match, and without this it lands in a row of its own. */
+.world-node__marker > *,
+.world-node__marker::after {
   grid-area: 1 / 1;
   place-self: center;
   min-width: 0;
   min-height: 0;
 }
 
+/*
+ * `contain`, not `cover`.
+ *
+ * These are cut-out illustrations, not photographs of a scene: most are taller
+ * than they are wide, and covering a 4:3 rectangle crops the rooster down to a
+ * patch of yellow. The whole subject has to survive, because the subject is the
+ * only thing a child who cannot read navigates by. The card's own colour is
+ * what fills the rest.
+ *
+ * The bottom inset is the chip's: the title rides over the picture, and a
+ * silhouette running under it would be cut in half by a word.
+ */
 .world-node__icon {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  padding: 5% 5% 16%;
+  object-fit: contain;
 }
 
 /*

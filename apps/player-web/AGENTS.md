@@ -9,15 +9,15 @@ inside the mobile shell. See
 
 ```text
 src/app/      React shell — routing, adult-facing UI
-src/world/    progression — progress storage and the map view derived from it
+src/world/    progression — progress storage and the world view derived from it
 src/game/     the rendering adapter — the only place Phaser may appear
 ```
 
 Progression lives in `src/world/` and nowhere else.
 `scripts/check-progress-boundary.mjs` stops a template or a shared package
-importing it. The shell reads progress, derives a `MapView`, and hands the map
-scene that view plus a callback; it hands a template a manifest plus a
-completion callback. Neither ever sees `Progress`.
+importing it. The shell reads progress, derives a `WorldView`, and draws the
+sections from it; it hands a template a manifest plus a completion callback.
+No template ever sees `Progress`.
 
 `scripts/check-engine-neutral.mjs` enforces that boundary. Phaser types must not
 escape `src/game/` into the shell, shared packages, or manifests: the renderer
@@ -28,23 +28,29 @@ The shell never reaches into a scene, and a scene never reads application
 state. They communicate through the manifest going in and completion events
 coming out.
 
-## The map
+## The world
 
-The map is what a child who cannot read navigates, so it is pictures first.
+The world is what a child who cannot read navigates, so it is pictures first.
 
-- **A chapter is its own illustration, never a glyph.** No numbers, no letters,
-  no ordinal on the marker. The picture is authored per node as `icon` in the
-  world schema; the title under it is for the adult and the screen reader.
-- **One region is on screen at a time**, with its backdrop behind it and a door
-  at each end leading to the region beside it. `--map-scene` carries the
-  backdrop from the shell into the stylesheet — which place a child is standing
-  in is content, not CSS.
-- **A door is open when something inside the region it leads to is open.**
-  Derived by `deriveMapView` from the same `unlockedBy` rule as the nodes;
-  there is no second progression counting chapters. The way back is always
-  open.
-- **Which region a child is in is session state, not stored progress.** The app
-  opens where the world begins.
+- **A chapter is its own illustration on a card, never a glyph.** No numbers,
+  no letters, no ordinal. The picture is authored per node as `icon` in the
+  world schema and fills the card; the title on the chip over it is for the
+  adult and the screen reader.
+- **There are three sections and one of them is shut.** Juegos and Recursos come
+  from `WorldNode.surface`, authored per node and never derived from the
+  template — "a book belongs on the shelf" is a rule that breaks silently the
+  first time it is wrong. Multijugador is a disabled button, not a member of the
+  shell's `TabId` union: a screen that cannot be built is a state that cannot be
+  represented.
+- **What a chapter is worth does not depend on the section it is in.** The story
+  on the shelf pays letriestrellas and a chest exactly as a game does, and keeps
+  its slot in the collection. Rewards belong to the world, not to a tab.
+- **Which section a child is in is session state, not stored progress.** The app
+  opens on Juegos.
+- **Exactly one screen is on at a time**: a playing resource, the stars, the
+  reveal, the chests, the menu, the collection, or a section. Exclusive rather
+  than layered, so nothing a child can touch is ever hidden behind something
+  else.
 
 ## Rendering rules
 
