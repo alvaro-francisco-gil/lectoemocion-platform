@@ -96,14 +96,12 @@ const CARD_TINTS = 6;
  * there while an adult changes who is playing; what the exclusivity rule was
  * protecting — a tap landing on something hidden — is handled instead by the
  * scrim and by `select` refusing while the drawer is up.
- */
-/**
- * The roster is a prop with a build-derived default, not a value read inside.
  *
- * `App` is the composition root, so where the children come from is decided
- * here and nowhere below. It also means a test can render the shell with no
+ * The roster is a prop with a build-derived default rather than a value read
+ * inside. This is the composition root, so where the children come from is
+ * decided here and nowhere below — and a test can then render the shell with no
  * roster and see what a school sees, which is the state that actually ships
- * until capture lands.
+ * until photo and recording capture lands.
  */
 export function App({
   roster = rosterForBuild(import.meta.env.DEV)

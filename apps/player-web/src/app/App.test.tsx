@@ -8,6 +8,7 @@ import {
   type RenderResult
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ChildRecord } from "@lectoemocion/domain";
 import { worldNodes } from "@lectoemocion/resource-schema";
 import { syntheticClass, world } from "@lectoemocion/template-catalog";
 import { App } from "./App";
@@ -103,8 +104,10 @@ async function openChest(which = 1): Promise<string> {
  * finished before then would have no profile to pay — so every test has to
  * wait for the same thing a child waits for.
  */
-async function renderApp(): Promise<RenderResult> {
-  const result = render(<App />);
+async function renderApp(
+  props: { readonly roster?: readonly ChildRecord[] } = {}
+): Promise<RenderResult> {
+  const result = render(<App {...props} />);
   await screen.findAllByRole("button", { name: /^Quién juega/ });
   return result;
 }
@@ -398,8 +401,8 @@ describe("the book of names before there are any names", () => {
 
   const book = () => screen.getByRole("button", { name: "El libro de los nombres" });
 
-  it("says what it needs instead of saying it is blocked", () => {
-    render(<App roster={[]} />);
+  it("says what it needs instead of saying it is blocked", async () => {
+    await renderApp({ roster: [] });
     openTab("Recursos");
 
     expect(book().querySelector(".world-node__state")?.textContent).toBe(
@@ -410,24 +413,24 @@ describe("the book of names before there are any names", () => {
     );
   });
 
-  it("cannot be opened", () => {
-    render(<App roster={[]} />);
+  it("cannot be opened", async () => {
+    await renderApp({ roster: [] });
     openTab("Recursos");
 
     fireEvent.click(book());
     expect(createGame).not.toHaveBeenCalled();
   });
 
-  it("leaves the story beside it open", () => {
-    render(<App roster={[]} />);
+  it("leaves the story beside it open", async () => {
+    await renderApp({ roster: [] });
     openTab("Recursos");
 
     fireEvent.click(screen.getByRole("button", { name: "El gallo Rayo" }));
     expect(createGame).toHaveBeenCalledTimes(1);
   });
 
-  it("opens once there are names, and builds a book of them", () => {
-    render(<App roster={syntheticClass} />);
+  it("opens once there are names, and builds a book of them", async () => {
+    await renderApp({ roster: syntheticClass });
     openTab("Recursos");
 
     expect(book().querySelector(".world-node__note")).toBeNull();
