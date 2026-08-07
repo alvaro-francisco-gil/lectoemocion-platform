@@ -79,6 +79,24 @@ describe("setGoal", () => {
     expect(cheaper.prizes[0]?.costStars).toBe(30);
     expect(starsClaimed(cheaper)).toBe(30);
   });
+
+  it("owes nothing against a goal of zero rather than dividing by it", () => {
+    const zeroed = setGoal(EMPTY_PRIZES, 0);
+    expect(prizesDue(zeroed, 100)).toBe(0);
+    expect(derivePrizeView(zeroed, 100)).toMatchObject({ filled: 0, due: 0 });
+  });
+
+  it("owes nothing against a negative goal and never shows a negative fill", () => {
+    const negative = setGoal(EMPTY_PRIZES, -10);
+    expect(prizesDue(negative, 100)).toBe(0);
+    expect(derivePrizeView(negative, 100)).toMatchObject({ filled: 0, due: 0 });
+  });
+
+  it("owes nothing against a fractional goal", () => {
+    const fractional = setGoal(EMPTY_PRIZES, 2.5);
+    expect(prizesDue(fractional, 100)).toBe(0);
+    expect(derivePrizeView(fractional, 100)).toMatchObject({ filled: 0, due: 0 });
+  });
 });
 
 describe("configurePrize and openPrize", () => {

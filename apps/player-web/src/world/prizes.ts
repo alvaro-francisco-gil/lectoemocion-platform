@@ -35,6 +35,18 @@ export function starsClaimed(prizes: Prizes): number {
 }
 
 /**
+ * Whether a goal can be divided into. `checkPrizeGoal` is what stops a bad
+ * goal being saved, but this module must not trust that it was called: a
+ * goal of zero or less would divide by nothing or below it, and a fractional
+ * one has no honest "one prize's worth" to count in whole numbers. Failing
+ * closed here means a goal that slips past the boundary above owes nothing
+ * rather than inventing prizes out of `Infinity` or `NaN`.
+ */
+function isDivisible(goal: number): boolean {
+  return Number.isInteger(goal) && goal > 0;
+}
+
+/**
  * How many prizes the child has earned and not yet been given.
  *
  * Derived rather than remembered, the same way `pendingReward` is: closing the
@@ -44,6 +56,7 @@ export function starsClaimed(prizes: Prizes): number {
  * against.
  */
 export function prizesDue(prizes: Prizes, starsEarned: number): number {
+  if (!isDivisible(prizes.goal)) return 0;
   const unclaimed = starsEarned - starsClaimed(prizes);
   if (unclaimed < prizes.goal) return 0;
   return Math.floor(unclaimed / prizes.goal);
@@ -161,9 +174,12 @@ export function derivePrizeView(
   starsEarned: number
 ): PrizeView {
   const unclaimed = Math.max(0, starsEarned - starsClaimed(prizes));
+  const filled = isDivisible(prizes.goal)
+    ? Math.min(unclaimed, prizes.goal)
+    : 0;
   return {
     goal: prizes.goal,
-    filled: Math.min(unclaimed, prizes.goal),
+    filled,
     due: prizesDue(prizes, starsEarned),
     pending: prizes.prizes.filter((prize) => prize.state !== "opened"),
     history: prizes.prizes.filter((prize) => prize.state === "opened").reverse()
