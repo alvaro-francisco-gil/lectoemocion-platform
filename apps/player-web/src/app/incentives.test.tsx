@@ -54,15 +54,20 @@ async function createCoupon(label: string, cost: number): Promise<void> {
   await screen.findByRole("navigation", { name: "Mundo" });
 }
 
+/** The stars themselves are the way in, once there is anything to spend them on. */
 function openShop(): void {
-  fireEvent.click(screen.getByRole("button", { name: "Premios" }));
+  fireEvent.click(screen.getByRole("button", { name: /Ver los premios/ }));
 }
 
-/** The balance the map shows in its corner. */
+/**
+ * The balance the map shows in its corner, whether or not it is pressable.
+ *
+ * The counter is a readout with no coupons and a control with them, so the
+ * number is read through the label both states share rather than through a role
+ * that changes underneath the test.
+ */
 function mapBalance(): string {
-  return (
-    screen.getByRole("region", { name: "Letriestrellas" }).textContent ?? ""
-  );
+  return screen.getByLabelText(/letriestrellas/i).textContent ?? "";
 }
 
 function historyLabels(): string[] {
@@ -81,7 +86,25 @@ describe("premios bought with letriestrellas", () => {
     render(<App />);
     await screen.findByRole("navigation", { name: "Mundo" });
 
-    expect(screen.queryByRole("button", { name: "Premios" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Ver los premios/ })).toBeNull();
+    /* A readout, not a disabled target: pressing must never do nothing. */
+    expect(
+      screen.getByRole("region", { name: "Letriestrellas" })
+    ).toBeInTheDocument();
+  });
+
+  it("turns the stars themselves into the way in", async () => {
+    render(<App />);
+    await createCoupon("Fútbol", 3);
+
+    expect(screen.queryByRole("region", { name: "Letriestrellas" })).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "0 letriestrellas. Ver los premios" })
+    );
+
+    expect(
+      await screen.findByRole("main", { name: "Premios" })
+    ).toBeInTheDocument();
   });
 
   it("opens the shop once a coupon exists", async () => {
@@ -186,7 +209,9 @@ describe("premios bought with letriestrellas", () => {
 
     const reopened = render(<App />);
     fireEvent.click(
-      (await reopened.findAllByRole("button", { name: "Premios" })).at(-1) ??
+      (await reopened.findAllByRole("button", { name: /Ver los premios/ })).at(
+        -1
+      ) ??
         document.body
     );
 
@@ -284,7 +309,7 @@ describe("the adult's coupon list", () => {
     closeMenu();
 
     await screen.findByRole("navigation", { name: "Mundo" });
-    expect(screen.queryByRole("button", { name: "Premios" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Ver los premios/ })).toBeNull();
   });
 
   it("keeps a purchase readable after its coupon is deleted", async () => {

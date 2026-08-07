@@ -80,13 +80,31 @@ The menu is open. Everything reachable from it is recoverable by the adult who
 wrote it, and deleting asks a second, differently-worded time. A PIN belongs
 with real accounts, not with a coupon list on one device.
 
-### The shop's entrance is in the child's reach band
+### The stars are the shop's entrance, and that breaks the reach-band rule
 
-The map's other two corners are a readout and adult chrome, high on the screen.
-The way into the shop is the one control on that screen a child is meant to
-press, so it is low and on the left — a child of three cannot touch the top of
-an 86-inch panel. An end-to-end test asserts it, in all three viewport
-projects.
+Pressing the stars is the whole affordance. A child who wants to know what their
+stars are for touches the stars; a separate button elsewhere on the map is a
+thing to learn rather than a thing to try, and two controls for one idea is
+worse than one in the wrong place.
+
+The counter therefore stays in the map's top-left corner and becomes pressable
+there. That is the player's reach-band rule — child-facing controls sit low,
+because a three-year-old cannot touch the top of an 86-inch panel — knowingly
+not applied, and it is the only place it is not.
+
+The cost is specific and accepted: on a classroom panel a small child cannot
+open the shop themselves, and an adult does it for them. On the surfaces where a
+child holds the device, which is where a family-bought coupon is actually spent,
+the affordance is exactly where they will look. An earlier revision put a second
+"Premios" button in the reachable band; it was removed because two entrances to
+one screen is the worse failure.
+
+With no coupons the counter is a readout again, not a disabled control. A target
+that does nothing teaches a child that pressing does nothing.
+
+Its position does not change when the first coupon appears — an end-to-end test
+pins that, in all three viewport projects — because a child looking for their
+stars must find them where they were.
 
 ## Rejected alternatives
 
@@ -104,6 +122,11 @@ a reward whose whole point is that it happens away from the app.
 
 **Removing a coupon once bought.** Treats a promise as stock. It also makes the
 shelf empty itself, which is the state the shop deliberately hides.
+
+**A separate shop button in the child's reach band.** Obeys the reach-band rule,
+and puts two controls on the map for one idea — the stars, which say what you
+have, and a button, which says what it buys. A child has to be taught that the
+second one exists. Pressing the thing you are counting needs no teaching.
 
 ## Consequences
 

@@ -266,7 +266,18 @@ export function App() {
 
   return (
     <main className="map">
-      <StarCounter stars={shop.balance} />
+      {/*
+        The stars are the way into the shop — but only once an adult has
+        promised something. With an empty shelf they stay the readout they were:
+        a door a child opens onto nothing is worse than no door, and coupons are
+        opt-in per family or class, so most deployments will never have one.
+      */}
+      <StarCounter
+        stars={shop.balance}
+        onOpenShop={
+          shop.items.length === 0 ? null : () => setDetour("shop")
+        }
+      />
       <button
         type="button"
         className="menu-button"
@@ -275,25 +286,6 @@ export function App() {
       >
         <MenuIcon />
       </button>
-      {/*
-        Offered only once an adult has promised something. A shop with an empty
-        shelf is a door a child opens and finds nothing behind, and the coupons
-        are opt-in per family or class — most deployments will never have one.
-
-        Low and on the left, unlike the map's other two corners: those are adult
-        chrome and a readout, and this is the one control on this screen a child
-        is meant to press. The reachable band is the bottom of an 86-inch panel.
-      */}
-      {shop.items.length === 0 ? null : (
-        <button
-          type="button"
-          className="shop-button"
-          onClick={() => setDetour("shop")}
-        >
-          <GiftIcon />
-          <span className="shop-button__label">Premios</span>
-        </button>
-      )}
       {/*
         An ordered list because the world is a sequence: that is what a screen
         reader should hear, and it is what the connecting line draws.
@@ -313,23 +305,61 @@ export function App() {
 }
 
 /**
- * The letriestrellas there are to spend, in the map's top-left corner.
+ * The letriestrellas there are to spend, in the map's top-left corner — and,
+ * once there is anything to spend them on, the way to spend them.
  *
- * A balance rather than a lifetime total, now that there is something to spend
- * them on: the number in the corner has to be the number a child compares
- * against a price, or the shop refuses a coupon the map said they could afford.
- * Earned and spent are still kept apart in storage — see `starBalance` — so
- * nothing is ever unpaid, only used.
+ * A balance rather than a lifetime total: the number in the corner has to be
+ * the number a child compares against a price, or the shop refuses a coupon the
+ * map said they could afford. Earned and spent are still kept apart in storage
+ * — see `starBalance` — so nothing is ever unpaid, only used.
  *
- * It is display only, nothing here is pressable, and it lives on the map alone:
- * a total counting up beside a running game is a second thing to watch.
+ * Pressing the stars is the whole affordance. A child who wants to know what
+ * their stars are for touches the stars; a second button elsewhere on the map
+ * would be a thing to learn, and this is a thing to try. The present beside the
+ * number is what says it is pressable to someone who cannot read the label.
+ *
+ * With no coupons it is a readout again, not a disabled control: a target that
+ * does nothing teaches a child that pressing does nothing.
+ *
+ * This is the one place the player's reach-band rule is knowingly not applied —
+ * see `AGENTS.md`. On a classroom panel a small child cannot touch this corner,
+ * and an adult opens the shop for them. It is a deliberate trade for a single
+ * obvious affordance on the surfaces where a child holds the device.
  */
-function StarCounter({ stars }: { stars: number }) {
+function StarCounter({
+  stars,
+  onOpenShop
+}: {
+  stars: number;
+  onOpenShop: (() => void) | null;
+}) {
+  if (onOpenShop === null) {
+    return (
+      <section className="star-counter" aria-label="Letriestrellas">
+        <StarIcon />
+        <span className="star-counter__count">{stars}</span>
+      </section>
+    );
+  }
+
   return (
-    <section className="star-counter" aria-label="Letriestrellas">
+    <button
+      type="button"
+      className="star-counter star-counter--shop"
+      /*
+       * Named by the count *and* by what pressing does. The number alone would
+       * announce a total and hide that it opens anything; "ver los premios"
+       * alone would drop the one fact the child is here to check.
+       */
+      aria-label={`${stars} letriestrellas. Ver los premios`}
+      onClick={onOpenShop}
+    >
       <StarIcon />
       <span className="star-counter__count">{stars}</span>
-    </section>
+      <span className="star-counter__gift" aria-hidden="true">
+        <GiftIcon />
+      </span>
+    </button>
   );
 }
 

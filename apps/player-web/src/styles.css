@@ -208,7 +208,7 @@ main { height: 100dvh; }
 /* ---------------------------------------------------------------- stars */
 
 /*
- * The running total, over the map's top-left corner.
+ * The balance, over the map's top-left corner — and the way into the shop.
  *
  * On the left because it is the child's number, and the corner opposite is
  * where the app's own controls live: what was won and what an adult can change
@@ -216,8 +216,12 @@ main { height: 100dvh; }
  *
  * Out of the flow on purpose: the map is a two-band layout and the path owns
  * the middle of the screen, so a third band for one number would push the path
- * off centre. `pointer-events: none` because it is a readout, not a control —
- * it must never eat a tap aimed at the first node of the path.
+ * off centre.
+ *
+ * One shape for both states, so the number never moves when the first coupon
+ * appears. The readout keeps `pointer-events: none` — it must not eat a tap
+ * aimed at the first node of the path — and the shop variant below turns that
+ * back on, which is the only difference that matters.
  */
 .star-counter {
   position: absolute;
@@ -227,9 +231,12 @@ main { height: 100dvh; }
   display: flex;
   align-items: center;
   gap: 0.4em;
+  margin: 0;
   padding: 0.3em 0.9em 0.3em 0.5em;
+  border: 0;
   border-radius: 999px;
   background: rgb(255 255 255 / 0.9);
+  font: inherit;
   font-size: clamp(1.1rem, 3vw, 2rem);
   font-weight: 800;
   color: #402060;
@@ -237,6 +244,32 @@ main { height: 100dvh; }
 }
 
 .star-counter > svg {
+  width: 1.3em;
+  height: 1.3em;
+}
+
+/*
+ * Pressable, and it has to look it: a ring and a present, so a child who cannot
+ * read the label still sees that these stars are for something. The present
+ * sits after the number rather than before it, because the number is what the
+ * child came to read and the offer is what follows from it.
+ */
+.star-counter--shop {
+  pointer-events: auto;
+  border: 3px solid #7b2cbf;
+  padding-right: 0.5em;
+  background: rgb(255 255 255 / 0.95);
+  cursor: pointer;
+}
+.star-counter--shop:hover { background: #fff; }
+.star-counter--shop:focus-visible {
+  outline: 4px solid #402060;
+  outline-offset: 3px;
+}
+
+.star-counter__gift {
+  display: grid;
+  place-items: center;
   width: 1.3em;
   height: 1.3em;
 }
@@ -615,44 +648,6 @@ main { height: 100dvh; }
 }
 
 /* ------------------------------------------------------------- incentives */
-
-/*
- * The way into the shop, low on the left of the map.
- *
- * The map's other two corners are adult chrome and a readout; this is the one
- * control on that screen a child is meant to press, so it sits in the reachable
- * band at the bottom of an 86-inch panel rather than beside them. It is a disc
- * with a word under it: the present is what a child recognises across a room,
- * and the word is what an adult reads.
- */
-.shop-button {
-  position: absolute;
-  left: clamp(0.5rem, 2vw, 1.5rem);
-  bottom: clamp(0.75rem, 3vh, 2rem);
-  z-index: 2;
-  display: grid;
-  justify-items: center;
-  gap: 0.2rem;
-  padding: 0.5rem;
-  border: 3px solid #7b2cbf;
-  border-radius: 1.25rem;
-  background: rgb(255 255 255 / 0.92);
-  color: #402060;
-  font: inherit;
-  font-weight: 800;
-  cursor: pointer;
-}
-.shop-button > svg { width: clamp(40px, 6vw, 72px); height: auto; }
-.shop-button__label { font-size: clamp(0.8rem, 1.4vw, 1.1rem); }
-.shop-button:hover { background: #fff; }
-.shop-button:focus-visible { outline: 4px solid #402060; outline-offset: 3px; }
-
-/*
- * The shop sits clear of the button that opens it: the collection is centred in
- * a full-width band, so without this the animals would run under the disc on a
- * wide panel. Reserved on both sides so the row stays centred.
- */
-.map .collection { padding-inline: max(clamp(0.5rem, 3vw, 2rem), 110px); }
 
 /*
  * Three bands: what you have, what it buys, and the way out. The way out is at

@@ -649,28 +649,52 @@ test("the map offers no shop until an adult has promised something", async ({
   await page.goto("/");
   await expect(page.getByRole("navigation", { name: "Mundo" })).toBeVisible();
 
-  await expect(page.getByRole("button", { name: "Premios" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /Ver los premios/ })
+  ).toHaveCount(0);
+  /* Still the readout it always was, in the same corner, showing the same number. */
+  await expect(
+    page.getByRole("region", { name: "Letriestrellas" })
+  ).toBeVisible();
 });
 
-test("the way into the shop sits in the child's reach band", async ({
-  page
-}) => {
+test("the stars themselves are the way into the shop", async ({ page }) => {
   await withCoupons(page, [{ id: "futbol", label: "Fútbol", cost: 3 }]);
   await page.goto("/");
 
-  const height = await page.evaluate(() => innerHeight);
-  const button = await page
-    .getByRole("button", { name: "Premios" })
+  /* The readout is gone: the same corner is now the control, not a twin of it. */
+  await expect(
+    page.getByRole("region", { name: "Letriestrellas" })
+  ).toHaveCount(0);
+
+  await page.getByRole("button", { name: /Ver los premios/ }).click();
+
+  await expect(page.getByRole("main", { name: "Premios" })).toBeVisible();
+});
+
+test("the shop's entrance does not move when the first coupon appears", async ({
+  page
+}) => {
+  await page.goto("/");
+  const readout = await page
+    .getByRole("region", { name: "Letriestrellas" })
+    .boundingBox();
+
+  await withCoupons(page, [{ id: "futbol", label: "Fútbol", cost: 3 }]);
+  await page.goto("/");
+  const control = await page
+    .getByRole("button", { name: /Ver los premios/ })
     .boundingBox();
 
   /*
-   * The lower half of the screen. A child of three cannot touch the top of an
-   * 86-inch panel, and this is the one control on the map they are meant to
-   * press — the star counter and the menu, which sit high, are a readout and
-   * adult chrome.
+   * A child looking for their stars must find them where they were. The border
+   * the control gains is a pixel wider on each side, so this checks that the
+   * corner did not move rather than that the box is identical.
    */
-  expect(button).not.toBeNull();
-  expect(button!.y).toBeGreaterThan(height / 2);
+  expect(readout).not.toBeNull();
+  expect(control).not.toBeNull();
+  expect(Math.abs(control!.x - readout!.x)).toBeLessThanOrEqual(4);
+  expect(Math.abs(control!.y - readout!.y)).toBeLessThanOrEqual(4);
 });
 
 test("the shop fits the viewport and never scrolls the page", async ({
@@ -685,7 +709,7 @@ test("the shop fits the viewport and never scrolls the page", async ({
     }))
   );
   await page.goto("/");
-  await page.getByRole("button", { name: "Premios" }).click();
+  await page.getByRole("button", { name: /Ver los premios/ }).click();
   await expect(page.getByRole("main", { name: "Premios" })).toBeVisible();
 
   /*
@@ -712,7 +736,7 @@ test("a coupon is bought with letriestrellas and lands in the history", async ({
   ]);
   await page.goto("/");
 
-  await page.getByRole("button", { name: "Premios" }).click();
+  await page.getByRole("button", { name: /Ver los premios/ }).click();
   /* Out of reach stays on the shelf, visible and refused. */
   await expect(
     page.getByRole("button", { name: "Elegir la peli, 99 letriestrellas" })
@@ -730,9 +754,10 @@ test("a coupon is bought with letriestrellas and lands in the history", async ({
   ).toContainText("0");
 
   await page.getByRole("button", { name: "Volver al mapa" }).click();
-  await expect(page.getByRole("region", { name: "Letriestrellas" })).toContainText(
-    "0"
-  );
+  /* The counter is a control here, not the readout it is with an empty shelf. */
+  await expect(
+    page.getByRole("button", { name: /Ver los premios/ })
+  ).toContainText("0");
 });
 
 test("an adult writes a coupon from the menu", async ({ page }) => {
@@ -751,5 +776,7 @@ test("an adult writes a coupon from the menu", async ({ page }) => {
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Cerrar el menú" }).click();
-  await expect(page.getByRole("button", { name: "Premios" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Ver los premios/ })
+  ).toBeVisible();
 });

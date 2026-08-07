@@ -42,6 +42,15 @@ screen grows its own opinion about what a child can afford. Rationale is in
   touch the top of an 86-inch display. The upper area is for display only.
   Adult navigation may sit higher, but never where a child will hit it during
   play.
+
+  There is exactly one declared exception: the map's star counter, which opens
+  the shop once coupons exist. It stays in its corner because a child looking
+  for what their stars buy touches the stars, and a second control elsewhere is
+  a thing to learn rather than a thing to try. The cost is real — on a panel an
+  adult opens the shop for them — and it was taken deliberately. See
+  [ADR 0008](../../docs/decisions/0008-incentives-and-the-star-economy.md).
+  Do not read this as licence for a second exception; it is the reason the rule
+  is written as a rule.
 - **Audio unlocks on first gesture.** Every browser blocks autoplay; the unlock
   must be explicit and must survive an aged WebView.
 - **Touch, stylus, and mouse map to the same semantic actions.** Never depend on
