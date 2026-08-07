@@ -1,4 +1,5 @@
 export { assertNever } from "./assertNever";
+export { isPlausibleBirthYear, MIN_ADULT_AGE, MAX_ADULT_AGE } from "./adultGate";
 export type { ChildRecord } from "./childRecord";
 export {
   checkCustomPrize,
