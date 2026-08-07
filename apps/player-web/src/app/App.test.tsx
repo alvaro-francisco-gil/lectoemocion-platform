@@ -4,11 +4,15 @@ import {
   render,
   screen,
   waitFor,
-  within
+  within,
+  type RenderResult
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ChildRecord } from "@lectoemocion/domain";
 import { worldNodes } from "@lectoemocion/resource-schema";
-import { world } from "@lectoemocion/template-catalog";
+import { syntheticClass, world } from "@lectoemocion/template-catalog";
+import { LOCAL_OWNER, storageKey } from "../world/progressStore";
+import { prizeStorageKey } from "../world/prizeStore";
 import { App } from "./App";
 
 type Destroyable = { destroy: () => void };
@@ -34,6 +38,16 @@ function returnToMap(): void {
   fireEvent.click(screen.getByRole("button", { name: "Volver al mapa" }));
 }
 
+/** Moves to a section by its label in the bottom bar. */
+function openTab(name: string): void {
+  fireEvent.click(
+    within(screen.getByRole("navigation", { name: "Secciones" })).getByRole(
+      "button",
+      { name }
+    )
+  );
+}
+
 /**
  * Acknowledges the letriestrellas every finish pays, and reports how many.
  *
@@ -47,7 +61,7 @@ async function collectStars(): Promise<string> {
   return won;
 }
 
-/** The fill meter in the map's corner. */
+/** The fill meter in the world's corner. */
 function prizeMeter(): HTMLElement {
   return screen.getByRole("meter", {
     name: "Letriestrellas hacia el próximo regalo"
@@ -55,8 +69,22 @@ function prizeMeter(): HTMLElement {
 }
 
 /** What the meter reads, as "filled / goal". */
-function starTotal(): string {
+function meterTotal(): string {
   return prizeMeter().textContent ?? "";
+}
+
+/**
+ * The running total in the world's corner.
+ *
+ * Not the same number as the meter beside it: this one only climbs, and the
+ * meter empties every time a regalo is paid for. Both are asserted wherever the
+ * total moves, because a change that quietly conflated them would otherwise
+ * pass.
+ */
+function starTotal(): string {
+  return (
+    screen.getByRole("region", { name: "Letriestrellas" }).textContent ?? ""
+  );
 }
 
 /**
@@ -71,14 +99,21 @@ function worldButtons(): HTMLElement[] {
   );
 }
 
-/** What the current region's path reads as, doors included, left to right. */
+/** What the section on screen reads as, left to right. */
 function pathTitles(): (string | null | undefined)[] {
   return worldButtons().map(
     (button) => button.querySelector(".world-node__title")?.textContent
   );
 }
 
-/** Opens a chest and acknowledges the animal inside, landing back on the map. */
+/**
+ * Opens a chest and acknowledges the animal, landing back on the map.
+ *
+ * Acknowledging the reveal hands over to the book, which opens itself, stamps
+ * the animal in and closes itself again. Waiting that out is part of getting
+ * back to the world: a caller that carried on immediately would be tapping the
+ * map through an open modal.
+ */
 async function openChest(which = 1): Promise<string> {
   const chest = await screen.findByRole("button", {
     name: `Abrir el cofre ${which}`
@@ -87,6 +122,9 @@ async function openChest(which = 1): Promise<string> {
 
   const won = (await screen.findByRole("status")).textContent ?? "";
   fireEvent.click(screen.getByRole("button", { name: "Seguir" }));
+
+  await screen.findByRole("dialog", { name: "Mis animales" });
+  await closeTheBook();
   return won.replace(/[¡!]/g, "");
 }
 
@@ -101,21 +139,93 @@ async function openFirstChest(): Promise<string> {
   return openChest(1);
 }
 
-/** Answers the adult area's birth-year gate the way an adult does. */
-function passAdultGate(year = 1988): void {
+/**
+ * Answers the prize area's birth-year gate the way an adult does.
+ *
+ * Named apart from `passAdultGate` below, which is the profile drawer's keypad.
+ * There are two gates in this shell and they are answered differently; folding
+ * them into one is the adult-gate follow-up, and until then a single helper
+ * would have to guess which one is on screen.
+ */
+function passPrizeGate(year = 1988): void {
   fireEvent.change(screen.getByLabelText("¿En qué año naciste?"), {
     target: { value: String(year) }
   });
   fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
 }
 
-/** The animals on the map, in world order — `null` for a slot still to fill. */
+/**
+ * Renders the shell and waits for it to know who is playing.
+ *
+ * The world is not interactive until the profile read lands — a chapter
+ * finished before then would have no profile to pay — so every test has to
+ * wait for the same thing a child waits for.
+ */
+async function renderApp(
+  props: { readonly roster?: readonly ChildRecord[] } = {}
+): Promise<RenderResult> {
+  const result = render(<App {...props} />);
+  await screen.findAllByRole("button", { name: /^Quién juega/ });
+  return result;
+}
+
+/** Opens the drawer from the avatar in the world's top-left corner. */
+async function openProfiles(): Promise<void> {
+  fireEvent.click(await screen.findByRole("button", { name: /^Quién juega/ }));
+}
+
+/** Taps a year into the adult gate's pad, digit by digit. */
+function tapYear(year: string): void {
+  for (const digit of year) {
+    fireEvent.click(screen.getByRole("button", { name: digit }));
+  }
+}
+
+/**
+ * Gets past the adult gate.
+ *
+ * A year old enough to be an adult's, typed on the pad the way a parent would
+ * rather than written into state, so these tests fail if the pad stops working.
+ */
+function passAdultGate(): void {
+  expect(
+    screen.getByRole("dialog", { name: "Sólo para adultos" })
+  ).toBeInTheDocument();
+  tapYear("1988");
+}
+
+/**
+ * Waits out the beat the book stays up for after a stamp.
+ *
+ * It closes itself, so this is a wait rather than a click — and the timeout is
+ * generous because what it is waiting for is a real animation playing out.
+ */
+async function closeTheBook(): Promise<void> {
+  await waitFor(() => expect(bookDialog()).toBeNull(), { timeout: 4000 });
+}
+
+const bookDialog = () => screen.queryByRole("dialog", { name: "Mis animales" });
+
+/**
+ * The animals, in world order — `null` for a page still owed.
+ *
+ * The book is a modal, so reading it means opening it: this goes in, reads the
+ * page, and closes it again, leaving the caller where it found them.
+ */
 function collection(container: HTMLElement): (string | null)[] {
-  return [...container.querySelectorAll(".collection__slot")].map((slot) =>
-    slot.getAttribute("data-filled") === "true"
-      ? (slot.querySelector(".collection__name")?.textContent ?? "")
+  fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+  const pages = [...container.querySelectorAll(".animal-book__page")].map((page) =>
+    page.getAttribute("data-earned") === "true"
+      ? (page.querySelector(".animal-book__name")?.textContent ?? "")
       : null
   );
+  tapOutsideTheBook();
+  return pages;
+}
+
+/** Shuts the book the way a child does: a tap on the page around it. */
+function tapOutsideTheBook(): void {
+  fireEvent.click(screen.getByRole("dialog", { name: "Mis animales" }));
 }
 
 describe("the world shell", () => {
@@ -124,8 +234,8 @@ describe("the world shell", () => {
     createGame.mockClear();
   });
 
-  it("starts on the map with only the entry node open", () => {
-    render(<App />);
+  it("starts on the map with only the entry node open", async () => {
+    await renderApp();
     expect(createGame).not.toHaveBeenCalled();
 
     const open = worldButtons().filter(
@@ -136,8 +246,8 @@ describe("the world shell", () => {
     ).toEqual(["El encuentro"]);
   });
 
-  it("refuses to open a locked node", () => {
-    render(<App />);
+  it("refuses to open a locked node", async () => {
+    await renderApp();
 
     fireEvent.click(screen.getByRole("button", { name: "Las iniciales" }));
 
@@ -145,7 +255,7 @@ describe("the world shell", () => {
   });
 
   it("opens a resource and returns to the map", async () => {
-    render(<App />);
+    await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
     expect(createGame).toHaveBeenCalledTimes(1);
 
@@ -156,7 +266,7 @@ describe("the world shell", () => {
   });
 
   it("unlocks the next node once the first is completed", async () => {
-    render(<App />);
+    await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
     completeActiveResource();
     await collectStars();
@@ -170,7 +280,7 @@ describe("the world shell", () => {
   });
 
   it("keeps a completed node replayable", async () => {
-    render(<App />);
+    await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
     completeActiveResource();
     await collectStars();
@@ -187,7 +297,7 @@ describe("the world shell", () => {
   });
 
   it("restores progress from a previous session", async () => {
-    render(<App />);
+    await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
     completeActiveResource();
     await collectStars();
@@ -198,7 +308,7 @@ describe("the world shell", () => {
       ).not.toBeDisabled()
     );
 
-    const remounted = render(<App />);
+    const remounted = await renderApp();
     await waitFor(() =>
       expect(
         remounted.getAllByRole("button", { name: "Las iniciales" }).at(-1)
@@ -206,28 +316,45 @@ describe("the world shell", () => {
     );
   });
 
-  /*
-   * One region at a time, and the door to the next at the end of it. The
-   * chapters that stand in the forest are not on this path — that is what
-   * makes the forest somewhere to go rather than a change of wallpaper.
-   */
-  it("shows one region as an ordered path, with the way on at its end", () => {
-    render(<App />);
-    expect(pathTitles()).toEqual([
-      "El encuentro",
-      "El gallo Rayo",
-      "Las iniciales",
-      "Las primeras letras",
-      "El puente de sílabas",
-      "El taller de letras",
-      "Empieza igual",
-      "Nuestro álbum",
-      "El bosque"
-    ]);
+  it("opens and closes the menu from the child's own face", async () => {
+    await renderApp();
+    expect(screen.queryByRole("dialog", { name: "Quién juega" })).toBeNull();
+
+    await openProfiles();
+    expect(screen.getByRole("dialog", { name: "Quién juega" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar el menú" }));
+    expect(screen.queryByRole("dialog", { name: "Quién juega" })).toBeNull();
   });
 
-  it("opens and closes the adult area from the map", () => {
-    render(<App />);
+  /* A panel with no way out is a trap on a device with no back button. */
+  it("closes the menu on Escape", async () => {
+    await renderApp();
+    await openProfiles();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: "Quién juega" })).toBeNull();
+  });
+
+  /*
+   * The reverse of what this file asserted before profiles existed.
+   *
+   * The menu used to take the whole screen so there was nothing underneath to
+   * tap through. It is a drawer now, and the world stays visible on purpose —
+   * a child needs to see the game is still there and they are coming back. The
+   * mis-tap that justified the old behaviour is handled by the scrim instead,
+   * which is what the next test proves.
+   */
+  it("leaves the world visible behind the drawer", async () => {
+    await renderApp();
+    await openProfiles();
+
+    expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
+  });
+
+  it("opens and closes the adult area from the world", async () => {
+    await renderApp();
     expect(screen.queryByRole("dialog", { name: "Ajustes" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Menú" }));
@@ -238,8 +365,8 @@ describe("the world shell", () => {
   });
 
   /* A panel with no way out is a trap on a device with no back button. */
-  it("closes the adult area on Escape", () => {
-    render(<App />);
+  it("closes the adult area on Escape", async () => {
+    await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Menú" }));
 
     fireEvent.keyDown(document, { key: "Escape" });
@@ -248,9 +375,14 @@ describe("the world shell", () => {
     expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
   });
 
-  /* One screen at a time: the map is not left underneath to be tapped through. */
-  it("puts the world away while the adult area is open", () => {
-    render(<App />);
+  /*
+   * One screen at a time. The profile drawer is the declared exception — it is
+   * a layer and the world stays visible behind it — but the adult area is not:
+   * it replaces the world outright, so there is nothing underneath for a child
+   * to tap through while an adult is in it.
+   */
+  it("puts the world away while the adult area is open", async () => {
+    await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Menú" }));
 
     expect(screen.queryByRole("navigation", { name: "Mundo" })).toBeNull();
@@ -259,8 +391,33 @@ describe("the world shell", () => {
     expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
   });
 
-  it("hides the world list while a resource is playing", () => {
-    render(<App />);
+  /*
+   * The scrim is the visual half of this and a stylesheet cannot be trusted to
+   * be the whole of it: a missed `pointer-events` rule is a child dropped into
+   * a game they never chose. The shell refuses the tap as well, which is the
+   * half that can be proven here.
+   */
+  it("refuses to open a chapter while the drawer is up", async () => {
+    const { container } = await renderApp();
+    await openProfiles();
+
+    expect(container.querySelector(".profile-menu__scrim")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
+    expect(createGame).not.toHaveBeenCalled();
+  });
+
+  it("closes when the scrim is tapped", async () => {
+    const { container } = await renderApp();
+    await openProfiles();
+
+    fireEvent.click(container.querySelector(".profile-menu__scrim")!);
+
+    expect(screen.queryByRole("dialog", { name: "Quién juega" })).toBeNull();
+  });
+
+  it("hides the world list while a resource is playing", async () => {
+    await renderApp();
     expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
@@ -278,104 +435,347 @@ describe("the world shell", () => {
     expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
   });
 
-  it("keeps the duende off the map and off a running game", () => {
-    const { container } = render(<App />);
+  it("keeps the duende off the map and off a running game", async () => {
+    const { container } = await renderApp();
     expect(container.querySelector(".duende")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
     expect(container.querySelector(".duende")).toBeNull();
   });
 
-  it("keeps the collection out of the world's list of destinations", () => {
-    const { container } = render(<App />);
+  it("keeps the collection out of the world's list of destinations", async () => {
+    const { container } = await renderApp();
 
-    /* Slots are a record, not a route: nothing in the row is pressable. */
-    expect(container.querySelectorAll(".collection button")).toHaveLength(0);
     /* One slot per chapter, counted from the world rather than listed here. */
     expect(collection(container)).toEqual(worldNodes(world).map(() => null));
   });
 
-  it("marks each node's state without relying on colour", () => {
-    render(<App />);
+  /*
+   * Each card is its own colour, and no two beside each other share one. The
+   * picture is what a child navigates by and the colour is what makes it carry
+   * across a room, so two neighbours in the same tint would cost a landmark.
+   */
+  it("gives neighbouring cards different colours", async () => {
+    await renderApp();
+    const tints = worldButtons().map((button) =>
+      button.getAttribute("data-tint")
+    );
+
+    expect(tints.every((tint) => tint !== null)).toBe(true);
+    for (const [index, tint] of tints.entries()) {
+      if (index > 0) expect(tint).not.toBe(tints[index - 1]);
+    }
+  });
+
+  /* Colour is decoration over a card that already says what it is. */
+  it("never lets colour be the only thing that says a card is finished", async () => {
+    await renderApp();
+    const entry = screen.getByRole("button", { name: "El encuentro" });
+    expect(entry.querySelector(".world-node__state")?.textContent).toBe(
+      "Historia"
+    );
+  });
+
+  it("marks each node's state without relying on colour", async () => {
+    await renderApp();
     const states = worldButtons().map(
       (button) => button.querySelector(".world-node__state")?.textContent
     );
-    /* The farm's chapters, then the door out of it — shut, because nothing in
-       the forest has opened yet. */
-    const farm = world.regions[0]!.nodes;
+    /* The entry chapter, then every game waiting behind it. */
     expect(states).toEqual([
       "Historia",
-      ...farm.slice(1).map(() => "Bloqueado"),
-      "Bloqueado"
+      ...worldNodes(world)
+        .filter((node) => node.surface === "juegos")
+        .slice(1)
+        .map(() => "Bloqueado")
     ]);
   });
 });
 
 /**
- * Walking between the world's places.
+ * The one chapter an adult has to act on.
  *
- * The map shows one region at a time and the doors at its ends are how a child
- * moves between them. A door with nothing open behind it is shut, for the same
- * reason a locked chapter is: it would be a way to end up somewhere with
- * nothing to do.
+ * *El libro de los nombres* is the class's own names, so with nobody recorded
+ * there is nothing to open. It stands on the shelf saying what it needs rather
+ * than hiding, because an adult who cannot see the feature will never add the
+ * names it is asking for.
  */
-describe("the doors between regions", () => {
+describe("the book of names before there are any names", () => {
   beforeEach(() => {
     localStorage.clear();
     createGame.mockClear();
   });
 
-  it("keeps the way on shut while every chapter behind it is locked", () => {
-    render(<App />);
+  const book = () => screen.getByRole("button", { name: "El libro de los nombres" });
 
-    const door = screen.getByRole("button", { name: "El bosque" });
-    expect(door).toBeDisabled();
+  it("says what it needs instead of saying it is blocked", async () => {
+    await renderApp({ roster: [] });
+    openTab("Recursos");
 
-    fireEvent.click(door);
-    /* Still on the farm: a shut door is refused, not merely dimmed. */
-    expect(pathTitles()).toContain("El encuentro");
-  });
-
-  it("opens the way on once a chapter in the forest opens", async () => {
-    render(<App />);
-    await finishTheFarmUpToTheForest();
-
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "El bosque" })).toBeEnabled()
+    expect(book().querySelector(".world-node__state")?.textContent).toBe(
+      "Faltan los nombres"
+    );
+    expect(book().querySelector(".world-node__note")?.textContent).toBe(
+      "Añade los nombres y las fotos de los niños para abrir este libro"
     );
   });
 
-  it("walks into the forest and back to the farm", async () => {
-    render(<App />);
-    await finishTheFarmUpToTheForest();
+  it("cannot be opened", async () => {
+    await renderApp({ roster: [] });
+    openTab("Recursos");
 
-    fireEvent.click(await screen.findByRole("button", { name: "El bosque" }));
+    fireEvent.click(book());
+    expect(createGame).not.toHaveBeenCalled();
+  });
 
-    /* The forest: its two chapters, and the way home in front of them. */
+  it("leaves the story beside it open", async () => {
+    await renderApp({ roster: [] });
+    openTab("Recursos");
+
+    fireEvent.click(screen.getByRole("button", { name: "El gallo Rayo" }));
+    expect(createGame).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens once there are names, and builds a book of them", async () => {
+    await renderApp({ roster: syntheticClass });
+    openTab("Recursos");
+
+    expect(book().querySelector(".world-node__note")).toBeNull();
+    fireEvent.click(book());
+
+    const resource = createGame.mock.calls.at(-1)?.[1] as {
+      template: { id: string };
+      pages: readonly { grapheme: string }[];
+    };
+    expect(resource.template.id).toBe("name-book");
+    expect(resource.pages[0]?.grapheme).toBe("A");
+  });
+});
+
+/**
+ * The three sections along the bottom.
+ *
+ * Juegos is the progression and Recursos is the shelf; Multijugador is a door
+ * with nothing behind it yet, shown shut rather than left out, so the shape of
+ * the app does not change the day it opens.
+ */
+describe("the three sections", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    createGame.mockClear();
+  });
+
+  it("opens on Juegos, with every game and nothing from the shelf", async () => {
+    await renderApp();
     expect(pathTitles()).toEqual([
-      "La granja",
+      "El encuentro",
+      "Las iniciales",
       "El bosque de parejas",
-      "¿Cuál es?"
+      "¿Cuál es?",
+      "Las primeras letras",
+      "El puente de sílabas",
+      "El taller de letras",
+      "Empieza igual",
+      "Nuestro álbum"
     ]);
+  });
 
-    /* The way back is never shut — the chapters that wait on the forest are
-       on the farm, and a child who could not walk home would be stuck. */
-    const back = screen.getByRole("button", { name: "La granja" });
-    expect(back).toBeEnabled();
+  it("shows the shelf under Recursos, and only the shelf", async () => {
+    await renderApp();
+    openTab("Recursos");
+    expect(pathTitles()).toEqual(["El gallo Rayo", "El libro de los nombres"]);
+  });
 
-    fireEvent.click(back);
+  /* A book a child has to unlock is a book most of them never open. */
+  it("opens the story from the shelf on a brand new profile", async () => {
+    await renderApp();
+    openTab("Recursos");
+
+    fireEvent.click(screen.getByRole("button", { name: "El gallo Rayo" }));
+
+    expect(createGame).toHaveBeenCalledTimes(1);
+  });
+
+  /* Stars for reading it, and a chest the first time: what a chapter is worth
+     does not depend on which section it was reached from. */
+  it("pays the story its stars and its chest", async () => {
+    await renderApp();
+    openTab("Recursos");
+    fireEvent.click(screen.getByRole("button", { name: "El gallo Rayo" }));
+    completeActiveResource();
+
+    expect(await collectStars()).toContain("+3");
+    expect(
+      await screen.findByRole("button", { name: "Abrir el cofre 1" })
+    ).toBeInTheDocument();
+  });
+
+  /* Leaving lands back on the shelf: a child is put back where they were, not
+     where the app opens. */
+  it("returns to the section the resource was opened from", async () => {
+    await renderApp();
+    openTab("Recursos");
+    fireEvent.click(screen.getByRole("button", { name: "El gallo Rayo" }));
+    returnToMap();
+
+    await waitFor(() =>
+      expect(pathTitles()).toEqual(["El gallo Rayo", "El libro de los nombres"])
+    );
+  });
+
+  it("marks the section a child is standing in", async () => {
+    await renderApp();
+    const bar = () => screen.getByRole("navigation", { name: "Secciones" });
+    expect(within(bar()).getByRole("button", { name: "Juegos" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+
+    openTab("Recursos");
+    expect(
+      within(bar()).getByRole("button", { name: "Recursos" })
+    ).toHaveAttribute("aria-current", "page");
+    expect(
+      within(bar()).getByRole("button", { name: "Juegos" })
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  /* Shut, and said to be shut: dimming alone tells a screen reader nothing. */
+  it("keeps Multijugador shut and inert", async () => {
+    await renderApp();
+    const bar = screen.getByRole("navigation", { name: "Secciones" });
+    const blocked = within(bar).getByRole("button", { name: /Multijugador/ });
+
+    expect(blocked).toBeDisabled();
+    expect(blocked.textContent).toContain("Bloqueado");
+
+    fireEvent.click(blocked);
+    /* Still on the games: a shut section is refused, not merely dimmed. */
     expect(pathTitles()).toContain("El encuentro");
   });
 
-  /** Plays the farm as far as the forest: the entry, then the initials game. */
-  async function finishTheFarmUpToTheForest(): Promise<void> {
-    for (const title of ["El encuentro", "Las iniciales"]) {
-      fireEvent.click(await screen.findByRole("button", { name: title }));
-      completeActiveResource();
-      await collectStars();
-      await openChest();
-    }
-  }
+  /* Chrome belongs to the world screens. A game gets the screen to itself. */
+  it("takes the bar and the collection away while a resource plays", async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
+
+    expect(screen.queryByRole("navigation", { name: "Secciones" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Mis animales" })).toBeNull();
+  });
+});
+
+describe("the book of animals", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    createGame.mockClear();
+  });
+
+  it("opens from the corner and closes on a tap outside it", async () => {
+    await renderApp();
+    expect(screen.queryByRole("dialog", { name: "Mis animales" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+    expect(
+      screen.getByRole("dialog", { name: "Mis animales" })
+    ).toBeInTheDocument();
+
+    tapOutsideTheBook();
+    expect(screen.queryByRole("dialog", { name: "Mis animales" })).toBeNull();
+  });
+
+  /*
+   * Tapping the book itself must not shut it. A child looking at what they have
+   * collected will put a finger on the animals, and losing the book to that is
+   * losing it for no reason they can see.
+   */
+  it("stays open when the page itself is touched", async () => {
+    const { container } = await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+
+    fireEvent.click(container.querySelector(".animal-book__pages")!);
+    fireEvent.click(container.querySelector(".animal-book__page")!);
+
+    expect(
+      screen.getByRole("dialog", { name: "Mis animales" })
+    ).toBeInTheDocument();
+  });
+
+  /* A screen with no way out is a trap on a device with no back button. */
+  it("closes on Escape", async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: "Mis animales" })).toBeNull();
+  });
+
+  /*
+   * A record, not a place to go. The world stays where it was, so a child who
+   * looks at their animals has not lost the section or the scroll position they
+   * were standing in.
+   */
+  it("leaves the world where it was underneath", async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+
+    expect(
+      screen.getByRole("navigation", { name: "Mundo" })
+    ).toBeInTheDocument();
+  });
+
+  /* Focus goes in and comes back, because the world is still behind it. */
+  it("takes focus in and gives it back on close", async () => {
+    await renderApp();
+    const paw = screen.getByRole("button", { name: "Mis animales" });
+    paw.focus();
+    fireEvent.click(paw);
+
+    expect(screen.getByRole("dialog", { name: "Mis animales" })).toHaveFocus();
+
+    tapOutsideTheBook();
+    expect(paw).toHaveFocus();
+  });
+
+  /*
+   * Nothing in the book is a control at all — not a page, and no longer a way
+   * out. It is a record a child looks at, and the way out is the world they can
+   * already see around it.
+   */
+  it("holds no buttons at all", async () => {
+    const { container } = await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+
+    expect(container.querySelectorAll(".animal-book button")).toHaveLength(0);
+  });
+
+  /*
+   * The shadow is the promise. A page shows which animal is still owed, drawn
+   * from the same picture that will fill it, so the book is never a row of
+   * anonymous holes.
+   */
+  it("draws every animal from the first screen, none of them earned", async () => {
+    const { container } = await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+
+    const pages = [...container.querySelectorAll(".animal-book__page")];
+    expect(pages).toHaveLength(worldNodes(world).length);
+    expect(pages.every((page) => page.getAttribute("data-earned") === "false"))
+      .toBe(true);
+    expect(
+      pages.map((page) => page.querySelector("img")?.getAttribute("src"))
+    ).toEqual(worldNodes(world).map((node) => node.reward.animal.imageUrl));
+  });
+
+  it("reaches the collection from the shelf as well as the games", async () => {
+    await renderApp();
+    openTab("Recursos");
+
+    fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+    expect(
+      screen.getByRole("dialog", { name: "Mis animales" })
+    ).toBeInTheDocument();
+  });
 });
 
 describe("the chest a chapter is worth", () => {
@@ -397,7 +797,7 @@ describe("the chest a chapter is worth", () => {
   }
 
   it("offers three chests the first time a chapter is finished", async () => {
-    render(<App />);
+    await renderApp();
     await finishTheFirstChapter();
 
     expect(
@@ -413,7 +813,7 @@ describe("the chest a chapter is worth", () => {
    * open chest is what makes him worth looking at.
    */
   it("stands the duende with the chests and takes him away at the reveal", async () => {
-    const { container } = render(<App />);
+    const { container } = await renderApp();
     await finishTheFirstChapter();
 
     /* Present, but nameless: he is who the chests came from, not a fourth
@@ -432,7 +832,7 @@ describe("the chest a chapter is worth", () => {
   });
 
   it("puts the animal from the chest into that chapter's slot", async () => {
-    const { container } = render(<App />);
+    const { container } = await renderApp();
     await finishTheFirstChapter();
 
     const won = await openChest(2);
@@ -445,9 +845,13 @@ describe("the chest a chapter is worth", () => {
     );
   });
 
-  /* Three chests, three animals: which one the child gets is their choice. */
-  it("gives a different animal for a different chest", async () => {
-    render(<App />);
+  /*
+   * Three chests, one animal. The choosing is the ceremony; what a chapter
+   * grants is a fact about the chapter, which is what lets the book draw the
+   * shadow of what it still owes.
+   */
+  it("gives the chapter's animal whichever chest is opened", async () => {
+    await renderApp();
     await finishTheFirstChapter();
     const first = await openChest(1);
 
@@ -455,14 +859,39 @@ describe("the chest a chapter is worth", () => {
     cleanup();
     localStorage.clear();
     createGame.mockClear();
-    render(<App />);
+    await renderApp();
     await finishTheFirstChapter();
 
-    expect(await openChest(3)).not.toBe(first);
+    expect(await openChest(3)).toBe(first);
+  });
+
+  /*
+   * The reveal hands over to the book, which shows the animal arriving in its
+   * place and then takes itself away. Nothing is tapped: a child at the end of
+   * a chapter has already made every choice this ceremony asks for.
+   */
+  it("stamps the animal into the book and puts the book away again", async () => {
+    const { container } = await renderApp();
+    await finishTheFirstChapter();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Abrir el cofre 1" }));
+    await screen.findByRole("status");
+    fireEvent.click(screen.getByRole("button", { name: "Seguir" }));
+
+    const book = await screen.findByRole("dialog", { name: "Mis animales" });
+    const stamping = container.querySelectorAll('[data-stamping="true"]');
+    expect(stamping).toHaveLength(1);
+    expect(stamping[0]?.getAttribute("data-earned")).toBe("true");
+    expect(book).toBeInTheDocument();
+
+    await closeTheBook();
+    expect(
+      screen.getByRole("navigation", { name: "Mundo" })
+    ).toBeInTheDocument();
   });
 
   it("does not offer chests again for a chapter already rewarded", async () => {
-    render(<App />);
+    await renderApp();
     await finishTheFirstChapter();
     await openChest();
 
@@ -485,25 +914,57 @@ describe("the chest a chapter is worth", () => {
    * owes the child their animal.
    */
   it("still owes the chests after the page is reloaded", async () => {
-    render(<App />);
+    await renderApp();
     await finishTheFirstChapter();
     await screen.findByRole("button", { name: "Abrir el cofre 1" });
 
     cleanup();
-    render(<App />);
+    await renderApp();
 
     expect(
       await screen.findByRole("button", { name: "Abrir el cofre 1" })
     ).toBeInTheDocument();
   });
 
+  /*
+   * A content update can retire the animal a chapter granted. The chapter then
+   * honestly owes its chest again — and that offer has to be closable. A claim
+   * the store refused would leave the ceremony pending forever, and because it
+   * is derived from storage it would be the first thing on screen every single
+   * time the app was opened, with the world unreachable behind it.
+   */
+  it("lets a chapter whose animal was retired be paid again", async () => {
+    localStorage.setItem(
+      storageKey(LOCAL_OWNER),
+      JSON.stringify({
+        completedNodes: ["encuentro"],
+        lastPlayedNode: "encuentro",
+        rewards: [{ nodeId: "encuentro", animalId: "un-animal-retirado" }],
+        stars: 3
+      })
+    );
+    await renderApp();
+
+    await openChest();
+    expect(
+      await screen.findByRole("navigation", { name: "Mundo" })
+    ).toBeInTheDocument();
+
+    /* And it stays paid: the ceremony does not come back on the next visit. */
+    cleanup();
+    await renderApp();
+
+    await screen.findByRole("navigation", { name: "Mundo" });
+    expect(screen.queryByRole("button", { name: /Abrir el cofre/ })).toBeNull();
+  });
+
   it("keeps the collection after a reload", async () => {
-    render(<App />);
+    await renderApp();
     await finishTheFirstChapter();
     const won = await openChest();
 
     cleanup();
-    const remounted = render(<App />);
+    const remounted = await renderApp();
 
     await waitFor(() =>
       expect(collection(remounted.container)).toEqual([
@@ -525,13 +986,14 @@ describe("the letriestrellas every finish is worth", () => {
     completeActiveResource();
   }
 
-  it("starts a new player at zero", () => {
-    render(<App />);
-    expect(starTotal()).toBe("0 / 30");
+  it("starts a new player at zero", async () => {
+    await renderApp();
+    expect(starTotal()).toBe("0");
+    expect(meterTotal()).toBe("0 / 30");
   });
 
   it("pays three stars the moment a chapter is finished", async () => {
-    render(<App />);
+    await renderApp();
     finish("El encuentro");
 
     /* Before the chests: the stars are for playing, the animal is for
@@ -540,12 +1002,13 @@ describe("the letriestrellas every finish is worth", () => {
     expect(screen.getByRole("button", { name: "Abrir el cofre 1" })).toBeInTheDocument();
 
     await openChest();
-    await waitFor(() => expect(starTotal()).toBe("3 / 30"));
+    await waitFor(() => expect(starTotal()).toBe("3"));
+    expect(meterTotal()).toBe("3 / 30");
   });
 
   /* The animals are once each; the stars are every time. */
   it("pays again for a replay that owes no chest", async () => {
-    render(<App />);
+    await renderApp();
     finish("El encuentro");
     await collectStars();
     await openChest();
@@ -554,34 +1017,40 @@ describe("the letriestrellas every finish is worth", () => {
     expect(await collectStars()).toContain("+3");
 
     /* Straight back to the map: no second chest for the same chapter. */
-    await waitFor(() => expect(starTotal()).toBe("6 / 30"));
+    await waitFor(() => expect(starTotal()).toBe("6"));
+    expect(meterTotal()).toBe("6 / 30");
     expect(screen.queryByRole("button", { name: /Abrir el cofre/ })).toBeNull();
   });
 
   it("keeps the total after a reload", async () => {
-    render(<App />);
+    await renderApp();
     finish("El encuentro");
     await collectStars();
     await openChest();
-    await waitFor(() => expect(starTotal()).toBe("3 / 30"));
+    await waitFor(() => expect(starTotal()).toBe("3"));
+    expect(meterTotal()).toBe("3 / 30");
 
     cleanup();
-    render(<App />);
+    await renderApp();
 
-    await waitFor(() => expect(starTotal()).toBe("3 / 30"));
+    await waitFor(() => expect(starTotal()).toBe("3"));
+    expect(meterTotal()).toBe("3 / 30");
   });
 
   it("keeps the counter off a running game and out of the ceremonies", async () => {
-    render(<App />);
+    await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
+    expect(screen.queryByRole("region", { name: "Letriestrellas" })).toBeNull();
     expect(
       screen.queryByRole("meter", {
         name: "Letriestrellas hacia el próximo regalo"
       })
     ).toBeNull();
+    expect(screen.queryByRole("navigation", { name: "Secciones" })).toBeNull();
 
     completeActiveResource();
     await screen.findByRole("status");
+    expect(screen.queryByRole("region", { name: "Letriestrellas" })).toBeNull();
     expect(
       screen.queryByRole("meter", {
         name: "Letriestrellas hacia el próximo regalo"
@@ -590,15 +1059,20 @@ describe("the letriestrellas every finish is worth", () => {
   });
 
   /* A readout, not a route: nothing in the corner opens anything. */
-  it("keeps the counter unpressable", () => {
-    render(<App />);
+  it("keeps the counter unpressable", async () => {
+    await renderApp();
+    expect(
+      screen
+        .getByRole("region", { name: "Letriestrellas" })
+        .querySelectorAll("button")
+    ).toHaveLength(0);
     expect(prizeMeter().querySelectorAll("button")).toHaveLength(0);
   });
 });
 
 describe("the prize meter", () => {
   it("shows what is filled against the goal", async () => {
-    render(<App />);
+    await renderApp();
     const meter = await screen.findByRole("meter", {
       name: "Letriestrellas hacia el próximo regalo"
     });
@@ -608,7 +1082,7 @@ describe("the prize meter", () => {
   });
 
   it("is display only, so nothing a child touches sits out of reach", async () => {
-    render(<App />);
+    await renderApp();
     const meter = await screen.findByRole("meter", {
       name: "Letriestrellas hacia el próximo regalo"
     });
@@ -625,7 +1099,7 @@ describe("reaching the goal", () => {
    */
   function nearlyThere(): void {
     localStorage.setItem(
-      "lectoemocion.progress.local",
+      storageKey(LOCAL_OWNER),
       JSON.stringify({
         completedNodes: [],
         lastPlayedNode: null,
@@ -634,7 +1108,7 @@ describe("reaching the goal", () => {
       })
     );
     localStorage.setItem(
-      "lectoemocion.prizes.local",
+      prizeStorageKey(LOCAL_OWNER),
       JSON.stringify({ goal: 6, prizes: [] })
     );
   }
@@ -646,7 +1120,7 @@ describe("reaching the goal", () => {
 
   it("puts a gift on screen after the stars, not instead of them", async () => {
     nearlyThere();
-    render(<App />);
+    await renderApp();
     await playFirstChapter();
     await collectStars();
     await openFirstChest();
@@ -655,7 +1129,7 @@ describe("reaching the goal", () => {
 
   it("leaves the gift on the map when the child carries on", async () => {
     nearlyThere();
-    render(<App />);
+    await renderApp();
     await playFirstChapter();
     await collectStars();
     await openFirstChest();
@@ -667,7 +1141,7 @@ describe("reaching the goal", () => {
 
   it("starts the meter refilling the moment the gift is awarded", async () => {
     nearlyThere();
-    render(<App />);
+    await renderApp();
     await playFirstChapter();
     await collectStars();
     await openFirstChest();
@@ -689,7 +1163,7 @@ describe("reaching the goal", () => {
     fireEvent.click(
       screen.getAllByRole("button", { name: "Preparar el regalo" })[0]!
     );
-    passAdultGate();
+    passPrizeGate();
     fill();
     fireEvent.click(
       screen.getAllByRole("button", { name: "Guardar el regalo" })[formIndex]!
@@ -701,7 +1175,7 @@ describe("reaching the goal", () => {
 
   it("reveals what a preset gift holds, once opened", async () => {
     nearlyThere();
-    render(<App />);
+    await renderApp();
     await playFirstChapter();
     await collectStars();
     await openFirstChest();
@@ -722,7 +1196,7 @@ describe("reaching the goal", () => {
 
   it("reveals what a custom gift holds, once opened", async () => {
     nearlyThere();
-    render(<App />);
+    await renderApp();
     await playFirstChapter();
     await collectStars();
     await openFirstChest();
@@ -750,11 +1224,11 @@ describe("reaching the goal", () => {
    */
   it("keeps showing the gift just opened, not the next one waiting", async () => {
     localStorage.setItem(
-      "lectoemocion.prizes.local",
+      prizeStorageKey(LOCAL_OWNER),
       JSON.stringify({ goal: 5, prizes: [] })
     );
     localStorage.setItem(
-      "lectoemocion.progress.local",
+      storageKey(LOCAL_OWNER),
       JSON.stringify({
         completedNodes: [],
         lastPlayedNode: null,
@@ -762,6 +1236,12 @@ describe("reaching the goal", () => {
         stars: 10
       })
     );
+    /*
+     * Not `renderApp`, which waits for the world: two prizes are due the
+     * moment this mounts, so the ceremony takes the screen and the avatar in
+     * its corner is never drawn. The gift itself is what says the shell is
+     * ready here.
+     */
     render(<App />);
     await screen.findByText("Un regalo te está esperando");
 
@@ -777,5 +1257,248 @@ describe("reaching the goal", () => {
       await screen.findByText("Encuentra tu regalo en el patio")
     ).toBeVisible();
     expect(screen.queryByText("Un regalo te está esperando")).toBeNull();
+  });
+});
+
+/*
+ * Who is playing.
+ *
+ * The device has always had exactly one implicit player. These prove it can
+ * have several without any of them losing what they have already won, and that
+ * the machinery for changing them stays out of a child's reach.
+ */
+describe("profiles", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    createGame.mockClear();
+  });
+
+  it("names the child whose face is in the corner", async () => {
+    await renderApp();
+
+    expect(
+      await screen.findByRole("button", { name: "Quién juega: Peque" })
+    ).toBeInTheDocument();
+  });
+
+  /*
+   * The reason the starter profile is given the id the progress store has
+   * always used. A family that has played for a term must not open the app
+   * after this change and find an empty world.
+   */
+  it("hands the stars already on the device to the starter profile", async () => {
+    /* Stars only: a completed node would owe chests, and the ceremony for them
+       would be on screen instead of the map this asserts about. */
+    localStorage.setItem(
+      storageKey(LOCAL_OWNER),
+      JSON.stringify({
+        completedNodes: [],
+        lastPlayedNode: null,
+        rewards: [],
+        stars: 27
+      })
+    );
+
+    await renderApp();
+
+    await waitFor(() => expect(starTotal()).toBe("27"));
+  });
+
+  it("gives a new child a world of their own without touching the first one", async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
+    completeActiveResource();
+    await collectStars();
+    await openChest();
+    await waitFor(() => expect(starTotal()).toBe("3"));
+
+    await openProfiles();
+    fireEvent.click(screen.getByRole("button", { name: "Añadir niño" }));
+    passAdultGate();
+    fireEvent.change(screen.getByLabelText("Nombre"), {
+      target: { value: "Vera" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(starTotal()).toBe("0"));
+    expect(
+      screen.getByRole("button", { name: "Quién juega: Vera" })
+    ).toBeInTheDocument();
+  });
+
+  it("gives each child back their own stars when they are chosen again", async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
+    completeActiveResource();
+    await collectStars();
+    await openChest();
+    await waitFor(() => expect(starTotal()).toBe("3"));
+
+    await openProfiles();
+    fireEvent.click(screen.getByRole("button", { name: "Añadir niño" }));
+    passAdultGate();
+    fireEvent.change(screen.getByLabelText("Nombre"), {
+      target: { value: "Vera" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(starTotal()).toBe("0"));
+
+    await openProfiles();
+    fireEvent.click(screen.getByRole("button", { name: "Jugar como Peque" }));
+
+    await waitFor(() => expect(starTotal()).toBe("3"));
+  });
+
+  /* Switching is the one thing a child may do here unaided. */
+  it("lets a child change to another profile with no gate", async () => {
+    await renderApp();
+    await openProfiles();
+    fireEvent.click(screen.getByRole("button", { name: "Añadir niño" }));
+    passAdultGate();
+    fireEvent.change(screen.getByLabelText("Nombre"), {
+      target: { value: "Vera" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await openProfiles();
+    fireEvent.click(screen.getByRole("button", { name: "Jugar como Peque" }));
+
+    expect(
+      screen.queryByRole("dialog", { name: "Sólo para adultos" })
+    ).toBeNull();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Quién juega: Peque" })
+      ).toBeInTheDocument()
+    );
+  });
+
+  it("asks for an adult's year before it will add a child", async () => {
+    await renderApp();
+    await openProfiles();
+
+    fireEvent.click(screen.getByRole("button", { name: "Añadir niño" }));
+
+    expect(
+      screen.getByRole("dialog", { name: "Sólo para adultos" })
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Nombre")).toBeNull();
+  });
+
+  it("asks for an adult's year before it will edit a child", async () => {
+    await renderApp();
+    await openProfiles();
+
+    fireEvent.click(screen.getByRole("button", { name: "Editar a Peque" }));
+
+    expect(
+      screen.getByRole("dialog", { name: "Sólo para adultos" })
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Nombre")).toBeNull();
+  });
+
+  /* The one year a child might have heard said aloud is their own. */
+  it("refuses a year too recent to be an adult's", async () => {
+    await renderApp();
+    await openProfiles();
+    fireEvent.click(screen.getByRole("button", { name: "Añadir niño" }));
+
+    tapYear("2024");
+
+    expect(screen.queryByLabelText("Nombre")).toBeNull();
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+  });
+
+  it("records the name, the picture and the month an adult supplies", async () => {
+    await renderApp();
+    await openProfiles();
+    fireEvent.click(screen.getByRole("button", { name: "Editar a Peque" }));
+    passAdultGate();
+
+    fireEvent.change(screen.getByLabelText("Nombre"), {
+      target: { value: "Vera" }
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "Búho" }));
+    fireEvent.change(screen.getByLabelText("Mes"), { target: { value: "6" } });
+    fireEvent.change(screen.getByLabelText("Año"), { target: { value: "2021" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Quién juega: Vera" })
+      ).toBeInTheDocument()
+    );
+
+    await openProfiles();
+    const row = screen.getByRole("dialog", { name: "Quién juega" });
+    expect(row.textContent).toContain("Vera");
+    expect(row.textContent).toMatch(/años/);
+  });
+
+  /* Nobody has said when this child was born, and the app must not pretend. */
+  it("offers to fill in a birth date rather than inventing an age", async () => {
+    await renderApp();
+    await openProfiles();
+
+    const drawer = screen.getByRole("dialog", { name: "Quién juega" });
+    expect(drawer.textContent).toContain("Añadir fecha");
+    expect(drawer.textContent).not.toMatch(/años/);
+  });
+
+  it("will not delete the only child on the device", async () => {
+    await renderApp();
+    await openProfiles();
+    fireEvent.click(screen.getByRole("button", { name: "Editar a Peque" }));
+    passAdultGate();
+
+    expect(screen.queryByRole("button", { name: "Borrar" })).toBeNull();
+  });
+
+  it("deletes a child, and the stars that were theirs, once confirmed", async () => {
+    await renderApp();
+    await openProfiles();
+    fireEvent.click(screen.getByRole("button", { name: "Añadir niño" }));
+    passAdultGate();
+    fireEvent.change(screen.getByLabelText("Nombre"), {
+      target: { value: "Vera" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Quién juega: Vera" })
+      ).toBeInTheDocument()
+    );
+    fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
+    completeActiveResource();
+    await collectStars();
+    await openChest();
+    await waitFor(() => expect(starTotal()).toBe("3"));
+
+    await openProfiles();
+    fireEvent.click(screen.getByRole("button", { name: "Editar a Vera" }));
+    passAdultGate();
+    fireEvent.click(screen.getByRole("button", { name: "Borrar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sí, borrar a Vera" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Quién juega: Peque" })
+      ).toBeInTheDocument()
+    );
+    /* Vera was the only child who had played, so her namespace was the only
+       progress on the device — and deleting her must take it with her. */
+    const progressKeys = Object.keys(localStorage).filter((key) =>
+      key.startsWith(storageKey(""))
+    );
+    expect(progressKeys).toEqual([]);
+  });
+
+  /* Planned work, shown as planned. Neither pretends to be ready. */
+  it("shows the rows that are not built yet as unavailable", async () => {
+    await renderApp();
+    await openProfiles();
+
+    expect(screen.getByRole("button", { name: /Progreso/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Zona de adultos/ })).toBeDisabled();
   });
 });

@@ -12,11 +12,15 @@ export {
   isPrizePresetKey
 } from "./prize";
 export { deriveInitial } from "./initial";
+export { ageInYears } from "./playerProfile";
+export type { Birth, Month, PlayerProfile } from "./playerProfile";
 export {
   accountId,
+  avatarId,
   childRecordId,
   groupId,
   mediaAssetId,
+  playerProfileId,
   prizeId,
   prizeImageId,
   resourceId,
@@ -25,10 +29,12 @@ export {
 } from "./ids";
 export type {
   AccountId,
+  AvatarId,
   Branded,
   ChildRecordId,
   GroupId,
   MediaAssetId,
+  PlayerProfileId,
   PrizeId,
   PrizeImageId,
   ResourceId,

@@ -28,7 +28,7 @@ export function AdultGate({
 
   return (
     <form
-      className="adult-gate"
+      className="prize-gate"
       onSubmit={(event) => {
         event.preventDefault();
         if (isPlausibleBirthYear(Number.parseInt(year, 10), currentYear)) {
@@ -39,12 +39,12 @@ export function AdultGate({
         setYear("");
       }}
     >
-      <label className="adult-gate__label" htmlFor={fieldId}>
+      <label className="prize-gate__label" htmlFor={fieldId}>
         ¿En qué año naciste?
       </label>
       <input
         id={fieldId}
-        className="adult-gate__field"
+        className="prize-gate__field"
         type="number"
         inputMode="numeric"
         autoComplete="off"
@@ -52,11 +52,11 @@ export function AdultGate({
         onChange={(event) => setYear(event.target.value)}
       />
       {refused ? (
-        <p className="adult-gate__refusal" role="alert">
+        <p className="prize-gate__refusal" role="alert">
           Ese año no puede ser. Inténtalo otra vez.
         </p>
       ) : null}
-      <button type="submit" className="adult-gate__submit">
+      <button type="submit" className="prize-gate__submit">
         Entrar
       </button>
     </form>

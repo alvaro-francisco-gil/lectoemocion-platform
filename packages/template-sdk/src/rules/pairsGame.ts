@@ -1,6 +1,6 @@
 import type { ManifestFor } from "@lectoemocion/resource-schema";
 import { seededShuffle } from "../seededRandom";
-import { ROUND_LIVES, type RoundStatus } from "./lives";
+import { type RoundStatus } from "./roundStatus";
 
 export type PairsCardGroup = "picture" | "word";
 
@@ -16,7 +16,6 @@ export interface PairsRound {
   readonly cards: readonly PairsCard[];
   readonly matched: readonly string[];
   readonly selectedCardId: string | null;
-  readonly livesRemaining: number;
   readonly status: RoundStatus;
 }
 
@@ -56,7 +55,6 @@ export function createPairsRound(
     cards: [...pictures, ...words],
     matched: [],
     selectedCardId: null,
-    livesRemaining: ROUND_LIVES,
     status: "playing"
   };
 }
@@ -105,14 +103,9 @@ export function selectPairsCard(
     };
   }
 
-  const livesRemaining = round.livesRemaining - 1;
+  /* Two cards that do not pair cost the selection and nothing else. */
   return {
-    round: {
-      ...round,
-      selectedCardId: null,
-      livesRemaining,
-      status: livesRemaining === 0 ? "lost" : "playing"
-    },
+    round: { ...round, selectedCardId: null },
     attempt: { kind: "mismatched", cardIds: [selected.cardId, card.cardId] }
   };
 }

@@ -17,6 +17,19 @@ const NodeResourceSchema = Type.Union([
     { additionalProperties: false }
   ),
   /*
+   * The book of names carries a seed and nothing else. What is in it is the
+   * group's own roster, which the player supplies at play time — naming
+   * children here would put child data in authored content, where it must
+   * never live.
+   */
+  Type.Object(
+    {
+      template: Type.Literal("name-book"),
+      seed: Type.String({ minLength: 1 })
+    },
+    { additionalProperties: false }
+  ),
+  /*
    * A story is named, not inlined. Thirty-one pages written out here would
    * bury the shape of the world in content, and the catalogue is where
    * authored content lives.
@@ -152,28 +165,19 @@ export const CollectibleAnimalSchema = Type.Object(
 );
 
 /**
- * How many chests a node offers.
- *
- * Fixed rather than per-node: three is a choice a child aged 3–5 can hold in
- * mind at once, and a node that offered a different number would make the
- * ceremony a thing to learn again each time.
- */
-export const CHEST_COUNT = 3;
-
-/**
  * What a node gives the first time it is finished.
  *
- * The choices are authored, not derived, so a content review can see every
- * animal a child can be handed. Which of the three they get is decided by the
- * chest they open and by nothing else.
+ * One animal, authored rather than derived, so a content review can see every
+ * animal a child can be handed. The chests the ceremony offers are theatre:
+ * they are how the reward is handed over, not what it is, and how many of them
+ * there are is a question for the shell rather than for the world.
+ *
+ * One rather than a choice of three because the book shows a child the shadow
+ * of what each chapter still owes them. A shadow can only promise a specific
+ * animal if the chapter grants a specific animal.
  */
 const NodeRewardSchema = Type.Object(
-  {
-    choices: Type.Array(CollectibleAnimalSchema, {
-      minItems: CHEST_COUNT,
-      maxItems: CHEST_COUNT
-    })
-  },
+  { animal: CollectibleAnimalSchema },
   { additionalProperties: false }
 );
 
@@ -182,14 +186,24 @@ export const WorldNodeSchema = Type.Object(
     id: Type.String({ minLength: 1 }),
     title: Type.String({ minLength: 1, maxLength: 60 }),
     /**
-     * The picture that stands for this chapter on the map.
+     * The picture that stands for this chapter.
      *
      * Required, because it is how a child who cannot read finds a chapter
-     * again: the map is a row of pictures, not a row of numbered buttons, and a
-     * node without one would be a hole a three-year-old cannot navigate. The
+     * again: the world is a row of pictures, not a row of numbered buttons, and
+     * a node without one would be a hole a three-year-old cannot navigate. The
      * title stays for the adult and for the screen reader.
      */
     icon: Type.String({ minLength: 1 }),
+    /**
+     * Which of the shell's sections this chapter stands in.
+     *
+     * Authored, never derived from the template. "A book belongs on the shelf"
+     * is a rule that breaks the first time a game belongs there or a story
+     * belongs on the path — and it would break silently, by filing the node
+     * under the wrong section. Required with no default, so a node whose place
+     * nobody decided is a content error rather than a node missing from both.
+     */
+    surface: Type.Union([Type.Literal("juegos"), Type.Literal("recursos")]),
     /** Every listed node must be completed before this one opens. */
     unlockedBy: Type.Array(Type.String({ minLength: 1 })),
     resource: NodeResourceSchema,
@@ -198,36 +212,15 @@ export const WorldNodeSchema = Type.Object(
   { additionalProperties: false }
 );
 
-/**
- * One place the world is made of.
- *
- * A region is a backdrop and the chapters standing on it — the farm, the
- * forest. It exists so the map can be somewhere rather than one endless row: a
- * child walks off the end of the farm into the forest and back again, and the
- * scene behind them changes with them.
- *
- * A region is *not* a stage of difficulty and holds no unlock rule of its own.
- * What may be played is still `unlockedBy`, node by node, and prerequisites
- * cross regions freely — the walk between them is the point.
- */
-const WorldRegionSchema = Type.Object(
-  {
-    id: Type.String({ minLength: 1 }),
-    title: Type.String({ minLength: 1, maxLength: 60 }),
-    /** The scene behind the path. Also the picture on the door into here. */
-    background: Type.String({ minLength: 1 }),
-    nodes: Type.Array(WorldNodeSchema, { minItems: 1 })
-  },
-  { additionalProperties: false }
-);
-
 export const WorldSchema = Type.Object(
   {
     /**
-     * In walking order: the door at the end of one region opens on the next.
-     * The child starts in the first.
+     * Every chapter, in the order a child meets them.
+     *
+     * One flat list: the world is one scroll rather than a set of places to
+     * walk between, and what a child may reach is `unlockedBy` node by node.
      */
-    regions: Type.Array(WorldRegionSchema, { minItems: 1 })
+    nodes: Type.Array(WorldNodeSchema, { minItems: 1 })
   },
   { additionalProperties: false }
 );
@@ -236,19 +229,11 @@ export type CollectibleAnimal = Static<typeof CollectibleAnimalSchema>;
 export type NodeReward = Static<typeof NodeRewardSchema>;
 export type NodeResource = Static<typeof NodeResourceSchema>;
 export type WorldNode = Static<typeof WorldNodeSchema>;
-export type WorldRegion = Static<typeof WorldRegionSchema>;
 export type World = Static<typeof WorldSchema>;
 
-/**
- * Every chapter in the world, in walking order.
- *
- * Which region a chapter stands in is the map's business, and almost nothing
- * else's: progress, the collection and the reward ceremony are all about the
- * whole world. This is the one flattening, so those callers never learn the
- * shape of the regions.
- */
+/** Every chapter in the world, in authored order. */
 export function worldNodes(world: World): readonly WorldNode[] {
-  return world.regions.flatMap((region) => region.nodes);
+  return world.nodes;
 }
 
 const validate = new Ajv({ allErrors: true }).compile(WorldSchema);
@@ -267,14 +252,6 @@ export function parseWorld(value: unknown): World {
   const world = value as World;
   const nodes = worldNodes(world);
 
-  const regionIds = new Set<string>();
-  for (const region of world.regions) {
-    if (regionIds.has(region.id)) {
-      throw new Error(`Duplicate world region id: ${region.id}`);
-    }
-    regionIds.add(region.id);
-  }
-
   const ids = new Set<string>();
   for (const node of nodes) {
     if (ids.has(node.id)) {
@@ -284,15 +261,17 @@ export function parseWorld(value: unknown): World {
   }
 
   /*
-   * Three chests must hold three different animals. Two chests hiding the same
-   * one turns a choice into a trick: the child weighs three doors and two of
-   * them were never distinct.
+   * No two chapters may grant the same animal. The book draws one page per
+   * chapter and fills it with that chapter's animal, so a repeat would print
+   * the same shadow twice and leave a page that can never be filled.
    */
+  const animals = new Set<string>();
   for (const node of nodes) {
-    const animals = new Set(node.reward.choices.map((choice) => choice.animalId));
-    if (animals.size !== node.reward.choices.length) {
-      throw new Error(`Node ${node.id} offers the same animal in two chests`);
+    const { animalId } = node.reward.animal;
+    if (animals.has(animalId)) {
+      throw new Error(`Two chapters grant the same animal: ${animalId}`);
     }
+    animals.add(animalId);
   }
 
   for (const node of nodes) {

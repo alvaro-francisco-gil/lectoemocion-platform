@@ -1,14 +1,13 @@
 import { seededDerangement } from "../seededRandom";
-import { ROUND_LIVES, type RoundStatus } from "./lives";
+import { type RoundStatus } from "./roundStatus";
 
 /**
  * The rules shared by every "rebuild this in order" game.
  *
  * Syllables and letters differ only in what a card carries. The rules — deal a
- * derangement, charge a life for a wrong or occupied slot, win when the tray
- * empties — are one thing, so they are written once here and the games name
- * their own cards on top. A second copy would be a second place for the lives
- * budget to drift.
+ * derangement, refuse a wrong or occupied slot, win when the tray empties —
+ * are one thing, so they are written once here and the games name their own
+ * cards on top. A second copy would be a second place for the two to drift.
  *
  * Generic over the card so `SyllableCard.syllable` and `LetterCard.letter`
  * stay the words their readers expect; this layer only needs an identity and
@@ -22,14 +21,18 @@ export interface SequenceCard {
 export interface SequenceRound<Card extends SequenceCard> {
   readonly slots: readonly (Card | null)[];
   readonly tray: readonly Card[];
-  readonly livesRemaining: number;
   readonly status: RoundStatus;
 }
 
-export type SequenceAttempt =
-  | { kind: "placed" }
-  | { kind: "rejected" }
-  | { kind: "ignored" };
+/**
+ * There is no `ignored` here, unlike the matching games.
+ *
+ * A sequence round ends only by being won, and winning is exactly what empties
+ * the tray, so there is no card left to offer a finished round: the lookup
+ * below rejects the id before any status could be consulted. The kind existed
+ * to absorb taps on a round that had run out of lives, and went when they did.
+ */
+export type SequenceAttempt = { kind: "placed" } | { kind: "rejected" };
 
 export interface SequencePlacement<Card extends SequenceCard> {
   readonly round: SequenceRound<Card>;
@@ -50,7 +53,6 @@ export function dealSequence<Card extends SequenceCard>(
   return {
     slots: cards.map(() => null),
     tray: seededDerangement(cards, seed),
-    livesRemaining: ROUND_LIVES,
     status: "playing"
   };
 }
@@ -76,21 +78,14 @@ export function placeSequenceCard<Card extends SequenceCard>(
     throw new Error(`Unknown ${noun} slot: ${slotIndex}`);
   }
 
-  if (round.status !== "playing") {
-    return { round, attempt: { kind: "ignored" } };
-  }
-
+  /*
+   * The card does not stick, and that is the whole of the consequence: the
+   * round handed back is the one that came in, so a child who keeps missing
+   * loses nothing but the attempt.
+   */
   const occupied = round.slots[slotIndex] !== null;
   if (occupied || card.slotIndex !== slotIndex) {
-    const livesRemaining = round.livesRemaining - 1;
-    return {
-      round: {
-        ...round,
-        livesRemaining,
-        status: livesRemaining === 0 ? "lost" : "playing"
-      },
-      attempt: { kind: "rejected" }
-    };
+    return { round, attempt: { kind: "rejected" } };
   }
 
   const slots = round.slots.map((slot, index) =>

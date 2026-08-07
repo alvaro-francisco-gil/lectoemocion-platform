@@ -1,13 +1,12 @@
 import type { ManifestFor, VocabularyItem } from "@lectoemocion/resource-schema";
 import { vocabularyWord } from "@lectoemocion/resource-schema";
 import { seededShuffle } from "../seededRandom";
-import { ROUND_LIVES, type RoundStatus } from "./lives";
+import { type RoundStatus } from "./roundStatus";
 
 export interface WordPictureRound {
   readonly targetVocabularyItemId: string;
   readonly word: string;
   readonly choices: readonly VocabularyItem[];
-  readonly livesRemaining: number;
   readonly status: RoundStatus;
 }
 
@@ -38,7 +37,6 @@ export function createWordPictureRound(
     targetVocabularyItemId,
     word: vocabularyWord(target),
     choices: seededShuffle(manifest.vocabulary, manifest.seed),
-    livesRemaining: ROUND_LIVES,
     status: "playing"
   };
 }
@@ -62,13 +60,6 @@ export function chooseWordPicture(
     return { round: { ...round, status: "won" }, attempt: { kind: "correct" } };
   }
 
-  const livesRemaining = round.livesRemaining - 1;
-  return {
-    round: {
-      ...round,
-      livesRemaining,
-      status: livesRemaining === 0 ? "lost" : "playing"
-    },
-    attempt: { kind: "incorrect" }
-  };
+  /* The wrong picture leaves every picture, including the right one, offered. */
+  return { round, attempt: { kind: "incorrect" } };
 }

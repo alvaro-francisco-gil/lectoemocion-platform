@@ -1,7 +1,6 @@
 export { selectParticipants } from "./participantSelection";
 export { seededDerangement, seededShuffle } from "./seededRandom";
-export { ROUND_LIVES } from "./rules/lives";
-export type { RoundStatus } from "./rules/lives";
+export type { RoundStatus } from "./rules/roundStatus";
 export { createPairsRound, selectPairsCard } from "./rules/pairsGame";
 export type {
   PairsAttempt,
@@ -61,5 +60,10 @@ export type {
   WordPictureChoice,
   WordPictureRound
 } from "./rules/wordPictureGame";
-export { TEMPLATE_KINDS, templateKind } from "./templateDefinition";
+export {
+  TEMPLATES_NEEDING_ROSTER,
+  TEMPLATE_KINDS,
+  templateKind,
+  templateNeedsRoster
+} from "./templateDefinition";
 export type { ResourceKind, SelectionStrategy } from "./templateDefinition";

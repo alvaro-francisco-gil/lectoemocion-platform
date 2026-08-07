@@ -7,6 +7,11 @@ import { renderInitialSyllableGame } from "../templates/renderInitialSyllableGam
 import { renderInitialsGame } from "../templates/renderInitialsGame";
 import { renderLettersGame } from "../templates/renderLettersGame";
 import { renderMemoryAlbum } from "../templates/renderMemoryAlbum";
+import {
+  isNamePhotoKey,
+  queueNamePhotos,
+  renderNameBook
+} from "../templates/renderNameBook";
 import { renderNameStory } from "../templates/renderNameStory";
 import { renderPairsGame } from "../templates/renderPairsGame";
 import { renderSyllablesGame } from "../templates/renderSyllablesGame";
@@ -38,10 +43,28 @@ export class ResourceScene extends Phaser.Scene {
     if ("vocabulary" in resource) {
       queueVocabularyPictures(this, resource.vocabulary);
     }
-    if ("pages" in resource) {
+    /*
+     * Dispatched on the template, not on the presence of a field. Two templates
+     * carry `pages` now, and they are pages of entirely different things — a
+     * structural test would hand a book of names to the story loader.
+     */
+    if (isTemplate(resource, "illustrated-story")) {
       queueStoryPictures(this, resource.pages);
     }
-    this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, () => {
+    if (isTemplate(resource, "name-book")) {
+      queueNamePhotos(this, resource.pages);
+    }
+
+    this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, (file: Phaser.Loader.File) => {
+      /*
+       * A child's photo is *personalised* media, invariant 6's one declared
+       * exception, and it is the only asset in this scene that is. Everything
+       * else here is product-authored default content, whose absence fails
+       * closed. One 404 must not blank a book that is otherwise complete: the
+       * name still has a page, a card, and a voice, and `renderNameBook` draws
+       * the card without a picture.
+       */
+      if (isNamePhotoKey(file.key)) return;
       this.missingAssets += 1;
     });
   }
@@ -79,6 +102,10 @@ export class ResourceScene extends Phaser.Scene {
      */
     if (isTemplate(resource, "illustrated-story")) {
       renderIllustratedStory(this, resource, done);
+      return;
+    }
+    if (isTemplate(resource, "name-book")) {
+      renderNameBook(this, resource, done);
       return;
     }
     if (isTemplate(resource, "initials-game")) {

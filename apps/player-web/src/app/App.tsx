@@ -5,86 +5,154 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties
+  type CSSProperties,
+  type ReactNode
 } from "react";
+import {
+  assertNever,
+  type ChildRecord,
+  type PrizeContent,
+  type PrizeId,
+  type PrizeImageId
+} from "@lectoemocion/domain";
 import {
   worldNodes,
   type CollectibleAnimal
 } from "@lectoemocion/resource-schema";
 import { createResourceForNode, world } from "@lectoemocion/template-catalog";
-import type {
-  PrizeContent,
-  PrizeId,
-  PrizeImageId
-} from "@lectoemocion/domain";
 import { createGame } from "../game/createGame";
+import { rosterForBuild } from "../world/devRoster";
 import {
-  deriveMapView,
+  deriveWorldView,
   EMPTY_PROGRESS,
   STARS_PER_COMPLETION,
   type CollectionSlotView,
-  type MapNodeView,
-  type MapRegionView,
   type PendingRewardView,
-  type Progress
-} from "../world/mapView";
+  type Progress,
+  type WorldNodeView
+} from "../world/worldView";
 import { LOCAL_OWNER, LocalProgressStore } from "../world/progressStore";
 import { derivePrizeView, EMPTY_PRIZES, type Prizes } from "../world/prizes";
-import { LocalPrizeStore, systemMinter, systemImageId } from "../world/prizeStore";
+import {
+  LocalPrizeStore,
+  systemImageId,
+  systemMinter
+} from "../world/prizeStore";
 import {
   LocalPrizeImageStore,
   downscaleToDataUrl,
   type PrizePick
 } from "../world/prizeImageStore";
 import { unlockAllEnabled } from "../world/unlockAll";
+import { bookShape } from "./bookShape";
 import { useDragScroll } from "./useDragScroll";
+import { avatarImageUrl } from "../profiles/avatarCatalogue";
+import {
+  LocalProfileStore,
+  ProfileStoreError,
+  type ProfileBook,
+  type ProfileDraft
+} from "../profiles/profileStore";
+import { ProfileMenu } from "./ProfileMenu";
 import { AdultArea } from "./adult";
 import { Gift } from "./Gift";
-import {
-  BackArrow,
-  ChestIcon,
-  GiftIcon,
-  MenuIcon,
-  StarIcon
-} from "./icons";
+import { BackArrow, ChestIcon, GiftIcon, MenuIcon, StarIcon } from "./icons";
 
-const storage =
-  typeof localStorage === "undefined"
-    ? { getItem: () => null, setItem: () => undefined }
-    : localStorage;
+/*
+ * A store that answers nothing, for a browser that has no storage at all —
+ * private mode, or a locked-down panel. The session still plays; it just does
+ * not persist.
+ */
+const memoryStorage = {
+  getItem: () => null,
+  setItem: () => undefined,
+  removeItem: () => undefined
+};
 
-const store = new LocalProgressStore(storage, LOCAL_OWNER);
-const prizeStore = new LocalPrizeStore(storage, LOCAL_OWNER, systemMinter());
-const imageStore = new LocalPrizeImageStore(
-  typeof localStorage === "undefined"
-    ? {
-        getItem: () => null,
-        setItem: () => undefined,
-        removeItem: () => undefined
-      }
-    : localStorage,
-  LOCAL_OWNER
+const browserStorage =
+  typeof localStorage === "undefined" ? memoryStorage : localStorage;
+
+const profiles = new LocalProfileStore(browserStorage, () =>
+  crypto.randomUUID()
 );
+
+/**
+ * Which section a child is standing in.
+ *
+ * Multijugador is absent on purpose. A section with nothing behind it is a
+ * button, not a place, so it cannot be a value here: a screen that cannot be
+ * built is a state that cannot be represented, rather than one rejected at
+ * runtime.
+ */
+type TabId = "juegos" | "recursos";
+
+/**
+ * How many card colours the row cycles through.
+ *
+ * It agrees with `.world-node[data-tint="N"]` in `styles.css`, and this is the
+ * only number that has to: the palette itself is the stylesheet's business.
+ * Six, because a row long enough to repeat has put four cards between the
+ * repeats, which is further than a child compares.
+ */
+const CARD_TINTS = 6;
+
+/**
+ * How many chests the duende offers.
+ *
+ * A question about the ceremony rather than about the world, which is why it
+ * lives here and not in the schema: every chest holds the chapter's one animal,
+ * so this is how wide the choice looks, not how many outcomes there are. Three
+ * is what a child aged 3–5 can hold in mind at once.
+ */
+const CHEST_COUNT = 3;
+
+/**
+ * How long the book stays up while it stamps an animal in.
+ *
+ * The stamp itself runs for most of it; the rest is the beat afterwards where
+ * the animal is simply sitting in the page among the others, which is the part
+ * a child is actually being shown. It agrees with the `book-stamp` animation in
+ * `styles.css`, and this is the only number that has to.
+ */
+const STAMP_VISIBLE_MS = 1850;
 
 /**
  * The world shell.
  *
- * It owns progression: it reads progress, derives the map, routes into a
+ * It owns progression: it reads progress, derives the world, routes into a
  * resource, and records completion. No template sees `Progress` — each receives
  * a manifest and a completion callback, and reports back.
  *
- * There is no page header. The world path is the whole map screen, and a
+ * There is no page header. The row of cards is the whole world screen, and a
  * playing resource shows only the way back: chrome above a game competes with
  * it at a child's eye level, and a permanent list of destinations is a way
  * around the progression.
  *
  * Exactly one screen is on at a time: a playing resource, the letriestrellas
  * just won, the animal just revealed, the chests owed for a first finish, the
- * gift ceremony, the adult area, or the map. They are exclusive rather than
+ * gift ceremony, the adult area, or a section. They are exclusive rather than
  * layered so that nothing a child can touch is ever hidden behind something
  * else.
+ *
+ * Two things are layers over the world instead. The profile drawer is one: a
+ * child needs to see the world is still there while an adult changes who is
+ * playing, and what the exclusivity rule was protecting — a tap landing on
+ * something hidden — is handled by the scrim and by `select` refusing while the
+ * drawer is up. The animal book is the other: it is a record of what a child has
+ * done, not a place to go, so looking at it must not cost them their place in
+ * the world.
+ *
+ * The roster is a prop with a build-derived default rather than a value read
+ * inside. This is the composition root, so where the children come from is
+ * decided here and nowhere below — and a test can then render the shell with no
+ * roster and see what a school sees, which is the state that actually ships
+ * until photo and recording capture lands.
  */
-export function App() {
+export function App({
+  roster = rosterForBuild(import.meta.env.DEV)
+}: {
+  readonly roster?: readonly ChildRecord[];
+} = {}) {
   const [progress, setProgress] = useState<Progress>(EMPTY_PROGRESS);
   const [prizes, setPrizes] = useState<Prizes>(EMPTY_PRIZES);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
@@ -99,39 +167,130 @@ export function App() {
    * be derived: the moment it is claimed it stops being pending, and without
    * this the reveal would vanish in the same frame the chest opened.
    */
-  const [revealed, setRevealed] = useState<CollectibleAnimal | null>(null);
+  const [revealed, setRevealed] = useState<PendingRewardView | null>(null);
   /*
    * The adult area and the gift are screens of their own rather than layers, so
-   * which one is on is one fact. A pair of booleans could say "both", and both is
-   * not a state this shell has.
+   * which one is on is one fact. A pair of booleans could say "both", and both
+   * is not a state this shell has.
    */
   const [detour, setDetour] = useState<"none" | "adult" | "gift">("none");
   /*
-   * Where the child is standing. Session state, deliberately not stored: the
-   * farm holds the entry chapter and everything the forest leads back to, so
-   * opening the app in the room a child happened to wander into last week is a
-   * worse start than opening it where the world begins.
+   * The drawer is a layer rather than a screen, so it is not part of which
+   * screen is on: the world stays mounted underneath it.
    */
-  const [regionIndex, setRegionIndex] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  /* Whether the child asked to see the book. */
+  const [animalBookOpen, setAnimalBookOpen] = useState(false);
+  /*
+   * The chapter whose animal is being stamped into the book right now.
+   *
+   * It opens the book on its own and closes it again, so this is not the same
+   * question as `animalBookOpen`: one is the child asking to look, the other is the
+   * book showing them what just arrived.
+   */
+  const [stamping, setStamping] = useState<string | null>(null);
+  /*
+   * Everyone who plays on this device. `null` until the first read lands —
+   * which is a frame, and the corner simply has no face in it until then.
+   */
+  const [book, setBook] = useState<ProfileBook | null>(null);
+  /*
+   * A profile problem an adult has to see. Profiles cannot be re-derived from
+   * anything on the device, so this fails closed rather than resetting: the
+   * unreadable data is left exactly where it is, to be recovered.
+   */
+  const [profileError, setProfileError] = useState<string | null>(null);
+  /*
+   * Which section the child is standing in. Session state, deliberately not
+   * stored: the app is for playing, so it opens on the games rather than on
+   * whichever tab a child happened to leave open last week.
+   */
+  const [tab, setTab] = useState<TabId>("juegos");
   const host = useRef<HTMLDivElement>(null);
   const panWorld = useDragScroll();
 
+  /*
+   * The prizes are still the device's rather than a child's.
+   *
+   * Progress became per-profile when profiles arrived; the prize ledger and the
+   * pictures behind it have not moved yet, so both are still keyed by
+   * `LOCAL_OWNER`. That is a known gap, not a decision — on a shared family
+   * tablet one child's regalo is every child's — and closing it is its own
+   * change, tracked as the prize-ownership follow-up. This is where it closes:
+   * the owner becomes `selectedId`, exactly as `progressStore` below already
+   * does.
+   *
+   * Built here rather than beside `profiles` above for the same reason the
+   * progress store is: a store carries an in-memory fallback for a browser that
+   * denies storage, and one built at module scope carries that fallback across
+   * every mount the module ever sees.
+   */
+  const prizeStore = useMemo(
+    () => new LocalPrizeStore(browserStorage, LOCAL_OWNER, systemMinter()),
+    []
+  );
+  const imageStore = useMemo(
+    () => new LocalPrizeImageStore(browserStorage, LOCAL_OWNER),
+    []
+  );
+
   useEffect(() => {
     let cancelled = false;
-    void store.read().then((stored) => {
-      if (!cancelled) setProgress(stored);
-    });
+    void profiles.read().then(
+      (next) => {
+        if (!cancelled) setBook(next);
+      },
+      (error: unknown) => {
+        if (!cancelled) setProfileError(describeProfileFailure(error));
+      }
+    );
     void prizeStore.read().then((stored) => {
       if (!cancelled) setPrizes(stored);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [prizeStore]);
+
+  /*
+   * One progress store per child, namespaced by their profile id. This is the
+   * seam `progressStore.ts` was written with: what used to be the constant
+   * `LOCAL_OWNER` is now whoever is playing, and the starter profile carries
+   * that same string so nothing already on the device moves.
+   */
+  const selectedId = book?.selectedId ?? null;
+  const progressStore = useMemo(
+    () =>
+      selectedId === null
+        ? null
+        : new LocalProgressStore(browserStorage, selectedId),
+    [selectedId]
+  );
+
+  useEffect(() => {
+    if (progressStore === null) return;
+    let cancelled = false;
+    /*
+     * Cleared before the read, not after it. Holding the previous child's
+     * total on screen for the frame it takes to load the next one shows a
+     * child stars that are not theirs.
+     */
+    setProgress(EMPTY_PROGRESS);
+    void progressStore.read().then((stored) => {
+      if (!cancelled) setProgress(stored);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [progressStore]);
 
   const view = useMemo(
-    () => deriveMapView(world, progress, { unlockAll: unlockAllEnabled() }),
-    [progress]
+    () =>
+      deriveWorldView(world, progress, {
+        unlockAll: unlockAllEnabled(),
+        hasRoster: roster.length > 0
+      }),
+    [progress, roster]
   );
 
   const prizeView = useMemo(
@@ -144,47 +303,91 @@ export function App() {
     [activeNodeId]
   );
 
-  /*
-   * The world always has a first region, so a stored or stale index that no
-   * longer exists lands the child at the beginning rather than on a blank
-   * screen. Fails to the entry, not to nothing.
-   */
-  const region = view.regions[regionIndex] ?? view.regions[0]!;
-
   const select = useCallback(
     (nodeId: string) => {
+      /*
+       * Nothing in the world opens while the drawer is up. The scrim already
+       * covers it, but a stylesheet is not a guarantee — one missed
+       * `pointer-events` rule would drop a child into a game they never chose.
+       */
+      if (menuOpen) return;
       const target = view.nodes.find((node) => node.id === nodeId);
       /* Dimming a locked node is presentation; refusing to open it is the rule. */
       if (!target?.playable) return;
       setActiveNodeId(nodeId);
     },
-    [view]
+    [view, menuOpen]
   );
 
-  const complete = useCallback((nodeId: string) => {
-    void store.recordCompletion(nodeId).then((next) => {
-      setProgress(next);
+  const complete = useCallback(
+    (nodeId: string) => {
+      if (progressStore === null) return;
+      void progressStore.recordCompletion(nodeId).then((next) => {
+        setProgress(next);
+        /*
+         * Every finish leaves the game, because every finish is paid: the stars
+         * come first and the chests, when a chapter is owed them, come after.
+         * Banked before they are shown, for the same reason as the animal — a
+         * child who is told they won something and then loses it to a closing
+         * tab has been given nothing.
+         */
+        setActiveNodeId(null);
+        setAwarded(STARS_PER_COMPLETION);
+      });
+    },
+    [progressStore]
+  );
+
+  const openChest = useCallback(
+    (reward: PendingRewardView) => {
+      if (progressStore === null) return;
       /*
-       * Every finish leaves the game, because every finish is paid: the stars
-       * come first and the chests, when a chapter is owed them, come after.
-       * Banked before they are shown, for the same reason as the animal — a
-       * child who is told they won something and then loses it to a closing
-       * tab has been given nothing.
+       * Recorded before it is shown. A child who is handed an animal and then
+       * loses it to a closing tab has been given nothing, and the reveal is the
+       * one part of this that can safely be replayed.
        */
-      setActiveNodeId(null);
-      setAwarded(STARS_PER_COMPLETION);
-    });
+      setRevealed(reward);
+      void progressStore
+        .claimReward(reward.nodeId, reward.animal.animalId)
+        .then(setProgress);
+    },
+    [progressStore]
+  );
+
+  /*
+   * Every profile change lands here, so the drawer never holds a book of its
+   * own to drift from this one.
+   */
+  const applyProfileChange = useCallback(
+    (change: Promise<ProfileBook>) => {
+      void change.then(setBook, (error: unknown) => {
+        setProfileError(describeProfileFailure(error));
+      });
+    },
+    []
+  );
+
+  /*
+   * The reveal hands over to the book: the animal a child has just been shown
+   * travels into the page and is stamped where its shadow was.
+   */
+  const acknowledgeReveal = useCallback((nodeId: string) => {
+    setRevealed(null);
+    setStamping(nodeId);
   }, []);
 
-  const openChest = useCallback((nodeId: string, animal: CollectibleAnimal) => {
-    /*
-     * Recorded before it is shown. A child who is handed an animal and then
-     * loses it to a closing tab has been given nothing, and the reveal is the
-     * one part of this that can safely be replayed.
-     */
-    setRevealed(animal);
-    void store.claimReward(nodeId, animal.animalId).then(setProgress);
-  }, []);
+  /*
+   * The book closes itself once the stamp has landed and been looked at.
+   *
+   * Nothing is tapped in any of it. A child at the end of a chapter has already
+   * made every choice this ceremony asks for, and a modal they must dismiss to
+   * get back to the world is one more thing between them and playing again.
+   */
+  useEffect(() => {
+    if (stamping === null) return;
+    const timer = setTimeout(() => setStamping(null), STAMP_VISIBLE_MS);
+    return () => clearTimeout(timer);
+  }, [stamping]);
 
   /*
    * Awarding is a write — a prize needs an identity and a moment — so it cannot
@@ -195,7 +398,7 @@ export function App() {
   useEffect(() => {
     if (prizeView.due === 0) return;
     void prizeStore.awardDue(view.stars).then(setPrizes);
-  }, [prizeView.due, view.stars]);
+  }, [prizeView.due, view.stars, prizeStore]);
 
   /** Awarded and not yet opened, oldest first — the one the child is owed next. */
   const waiting = prizeView.pending[0] ?? null;
@@ -205,7 +408,7 @@ export function App() {
    * `pending`: opening a gift moves it to `"opened"`, which drops it out of
    * `pending` on the very next render. Deriving the ceremony's prize from
    * `pending` would lose it at exactly the moment a child taps `¡Ábrelo!` —
-   * the screen would fall through to the map, or to whatever prize is next in
+   * the screen would fall through to the world, or to whatever prize is next in
    * `pending`. Reading the full list by id is what lets the reveal's render
    * see the same prize's `"opened"` state instead.
    */
@@ -217,8 +420,8 @@ export function App() {
 
   /*
    * The gift takes the screen the first time it exists, because a wrapped box
-   * appearing quietly in the corner of a busy map is a thing a child does not
-   * find. Once dismissed it waits on the map instead — `shown` is what keeps
+   * appearing quietly in the corner of a busy world is a thing a child does not
+   * find. Once dismissed it waits on the world instead — `shown` is what keeps
    * the ceremony from re-entering every render for a prize already shown.
    *
    * Guarded on `ceremonyPrizeId === null` as well: opening the prize on
@@ -226,33 +429,53 @@ export function App() {
    * next — without this guard that would swap the ceremony to the next prize
    * mid-reveal, a second gift jumping the queue in front of the one the child
    * is still looking at.
+   *
+   * And it waits for the animal's stamp to land. A chapter that both owes a
+   * chest and reaches the goal pays two ceremonies in a row, and the book is a
+   * layer over the world rather than a screen — a gift taking the screen while
+   * it is up would replace the very frame the stamp is drawn in, so the child
+   * would never see the animal arrive.
    */
   const shown = useRef<PrizeId | null>(null);
   useEffect(() => {
-    if (!waiting || ceremonyPrizeId !== null || shown.current === waiting.id) {
+    if (
+      !waiting ||
+      stamping !== null ||
+      ceremonyPrizeId !== null ||
+      shown.current === waiting.id
+    ) {
       return;
     }
     shown.current = waiting.id;
     setCeremonyPrizeId(waiting.id);
     setDetour("gift");
-  }, [waiting, ceremonyPrizeId]);
+  }, [waiting, ceremonyPrizeId, stamping]);
 
-  const openGift = useCallback((id: PrizeId) => {
-    void prizeStore.open(id).then(setPrizes);
-  }, []);
+  const openGift = useCallback(
+    (id: PrizeId) => {
+      void prizeStore.open(id).then(setPrizes);
+    },
+    [prizeStore]
+  );
 
   const continueFromGift = useCallback(() => {
     setDetour("none");
     setCeremonyPrizeId(null);
   }, []);
 
-  const setPrizeGoal = useCallback((goal: number) => {
-    void prizeStore.setGoal(goal).then(setPrizes);
-  }, []);
+  const setPrizeGoal = useCallback(
+    (goal: number) => {
+      void prizeStore.setGoal(goal).then(setPrizes);
+    },
+    [prizeStore]
+  );
 
-  const configure = useCallback((id: PrizeId, content: PrizeContent) => {
-    void prizeStore.configure(id, content).then(setPrizes);
-  }, []);
+  const configure = useCallback(
+    (id: PrizeId, content: PrizeContent) => {
+      void prizeStore.configure(id, content).then(setPrizes);
+    },
+    [prizeStore]
+  );
 
   /**
    * Takes what an adult picked, shrinks it, and keeps it under its own key.
@@ -263,18 +486,21 @@ export function App() {
    * prize gets saved by someone who believes a photo is attached. The form
    * saves the words regardless — the half an adult actually reads aloud.
    */
-  const pickImage = useCallback(async (file: File): Promise<PrizePick> => {
-    const id = systemImageId();
-    let dataUrl: string;
-    try {
-      dataUrl = await downscaleToDataUrl(file);
-    } catch {
-      return { ok: false, problem: "unreadable-picture" };
-    }
-    return (await imageStore.save(id, dataUrl))
-      ? { ok: true, id }
-      : { ok: false, problem: "no-room" };
-  }, []);
+  const pickImage = useCallback(
+    async (file: File): Promise<PrizePick> => {
+      const id = systemImageId();
+      let dataUrl: string;
+      try {
+        dataUrl = await downscaleToDataUrl(file);
+      } catch {
+        return { ok: false, problem: "unreadable-picture" };
+      }
+      return (await imageStore.save(id, dataUrl))
+        ? { ok: true, id }
+        : { ok: false, problem: "no-room" };
+    },
+    [imageStore]
+  );
 
   /**
    * Drops a picture no prize points at any more.
@@ -283,9 +509,12 @@ export function App() {
    * away from would sit in storage for ever — deletion is a capability, not an
    * afterthought, and this is the smallest place it belongs.
    */
-  const discardImage = useCallback((id: PrizeImageId) => {
-    void imageStore.remove(id);
-  }, []);
+  const discardImage = useCallback(
+    (id: PrizeImageId) => {
+      void imageStore.remove(id);
+    },
+    [imageStore]
+  );
 
   /*
    * `giftImage` is the custom picture, read from the image store for whatever
@@ -311,17 +540,49 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [ceremonyPrize]);
+  }, [ceremonyPrize, imageStore]);
 
   useEffect(() => {
     const parent = host.current;
     if (!activeNode || !parent) return;
 
-    const game = createGame(parent, createResourceForNode(activeNode), () =>
+    const game = createGame(parent, createResourceForNode(activeNode, roster), () =>
       complete(activeNode.id)
     );
     return () => game.destroy(true);
-  }, [activeNode, complete]);
+  }, [activeNode, complete, roster]);
+
+  /*
+   * Profiles that cannot be read stop everything, deliberately.
+   *
+   * Invariant 6: this is a broken invariant, not a missing nicety, and the
+   * alternative — carrying on with an invented profile — would write a fresh
+   * book over the one that failed to parse and destroy a family's progress
+   * with it. Nothing is written until an adult has seen this.
+   */
+  if (profileError !== null) {
+    return (
+      <main className="profile-failure" role="alert">
+        <h1>No se pueden leer los perfiles</h1>
+        <p>{profileError}</p>
+        <p>
+          No se ha borrado nada. Vuelve a abrir la aplicación; si sigue igual,
+          avisa a quien la instaló.
+        </p>
+      </main>
+    );
+  }
+
+  /*
+   * Nothing is playable until the app knows whose progress it would be writing.
+   *
+   * The window is a microtask against local storage, but it is not nothing: a
+   * chapter finished inside it would have no profile to pay, and the stars
+   * would be dropped. Waiting is the only answer that cannot lose them.
+   */
+  if (book === null) {
+    return <main className="loading" aria-busy="true" aria-label="Cargando" />;
+  }
 
   if (activeNode) {
     return (
@@ -344,14 +605,29 @@ export function App() {
   }
 
   if (revealed) {
-    return <Reveal animal={revealed} onContinue={() => setRevealed(null)} />;
+    return (
+      <Reveal
+        animal={revealed.animal}
+        onContinue={() => acknowledgeReveal(revealed.nodeId)}
+      />
+    );
   }
 
   if (view.pendingReward) {
     return <Chests reward={view.pendingReward} onOpen={openChest} />;
   }
 
-  if (detour === "gift" && ceremonyPrize) {
+  /*
+   * The stamp finishes before the gift takes the screen.
+   *
+   * A chapter can both owe a chest and reach the goal, and the book is a layer
+   * over the world rather than a screen of its own — so a gift returning here
+   * while the animal is landing would replace the very frame the stamp is drawn
+   * in, and the child would never see it arrive. The gift is not lost by
+   * waiting: it is held in `detour`, and this renders it the moment the book
+   * has taken itself away.
+   */
+  if (detour === "gift" && ceremonyPrize && stamping === null) {
     return (
       <Gift
         prize={ceremonyPrize}
@@ -377,19 +653,23 @@ export function App() {
     );
   }
 
-  const before = view.regions[regionIndex - 1];
-  const after = view.regions[regionIndex + 1];
+  const standing = tab === "juegos" ? view.games : view.resources;
+  const playing =
+    book.profiles.find((profile) => profile.id === book.selectedId) ?? null;
 
   return (
-    /*
-     * The scene is the region's, passed as a custom property rather than set
-     * in the stylesheet: which place a child is standing in is content, and the
-     * stylesheet is not where the world's geography should be written down.
-     */
-    <main
-      className="map"
-      style={{ "--map-scene": `url("${region.background}")` } as CSSProperties}
-    >
+    <main className="world">
+      {playing ? (
+        <button
+          type="button"
+          className="profile-button"
+          aria-label={`Quién juega: ${playing.name}`}
+          onClick={() => setMenuOpen(true)}
+        >
+          <img src={avatarImageUrl(playing.avatarId)} alt="" />
+        </button>
+      ) : null}
+      <StarCounter stars={view.stars} />
       <PrizeMeter filled={prizeView.filled} goal={prizeView.goal} />
       <button
         type="button"
@@ -402,7 +682,7 @@ export function App() {
       {waiting ? (
         <button
           type="button"
-          className="map__gift"
+          className="world__gift"
           aria-label="Tu regalo"
           onClick={() => {
             setCeremonyPrizeId(waiting.id);
@@ -413,51 +693,202 @@ export function App() {
         </button>
       ) : null}
       {/*
-        An ordered list because the world is a sequence: that is what a screen
+        An ordered list because a section is a sequence: that is what a screen
         reader should hear, and it is what the connecting line draws.
 
-        Named "Mundo" whichever region is on screen: it is one map showing one
-        place at a time, not two navigations. Which place that is comes from the
-        doors at its ends, which say where they lead.
+        Named "Mundo" whichever section is on screen: it is one row of places to
+        go, not two navigations. Which section it is showing is said by the bar
+        below it, which is where that question belongs.
       */}
-      <nav aria-label="Mundo" className="map__world" ref={panWorld}>
+      <nav aria-label="Mundo" className="world__row" ref={panWorld}>
         <ol className="world-path">
-          {before ? (
-            <li>
-              <RegionDoor
-                region={before}
-                direction="back"
-                onEnter={() => setRegionIndex(regionIndex - 1)}
-              />
-            </li>
-          ) : null}
-          {region.nodes.map((node) => (
+          {/*
+            The tint comes from the card's place in the row rather than from
+            the node, because it is decoration: what colour a chapter is is not
+            a fact about the chapter, and the stylesheet is where colour lives.
+            Cycling by position is also what guarantees no two neighbours match.
+          */}
+          {standing.map((node, index) => (
             <li key={node.id}>
-              <WorldNode node={node} onSelect={select} />
+              <WorldNode
+                node={node}
+                tint={index % CARD_TINTS}
+                onSelect={select}
+              />
             </li>
           ))}
-          {after ? (
-            <li>
-              <RegionDoor
-                region={after}
-                direction="on"
-                onEnter={() => setRegionIndex(regionIndex + 1)}
-              />
-            </li>
-          ) : null}
         </ol>
       </nav>
-      <Collection slots={view.collection} />
+      <TabBar tab={tab} onChange={setTab} />
+      <button
+        type="button"
+        className="collection-button"
+        aria-label="Mis animales"
+        onClick={() => setAnimalBookOpen(true)}
+      >
+        <PawIcon />
+      </button>
+      {menuOpen ? (
+        <ProfileMenu
+          book={book}
+          today={new Date()}
+          onClose={() => setMenuOpen(false)}
+          onSelect={(id) => applyProfileChange(profiles.select(id))}
+          onAdd={(draft: ProfileDraft) =>
+            applyProfileChange(profiles.add(draft))
+          }
+          onUpdate={(id, draft) =>
+            applyProfileChange(profiles.update(id, draft))
+          }
+          onRemove={(id) => applyProfileChange(profiles.remove(id))}
+        />
+      ) : null}
+      {/*
+        Above the world rather than instead of it. The book is a record, so
+        opening it must not move a child anywhere, and closing it must not cost
+        them the section and the scroll position they were standing in.
+      */}
+      {(animalBookOpen || stamping !== null) && (
+        <AnimalBook
+          slots={view.collection}
+          stamping={stamping}
+          onClose={() => {
+            setAnimalBookOpen(false);
+            setStamping(null);
+          }}
+        />
+      )}
     </main>
   );
 }
 
 /**
- * How close the child is to the next regalo, in the map's top-left corner.
+ * The three sections, as a bar along the bottom.
+ *
+ * Low and central, because unlike the star counter and the menu this is
+ * something a child uses: the corners are for the app talking, the bottom band
+ * is where hands land.
+ *
+ * Multijugador is a button that refuses rather than a section that is missing.
+ * A child shown three doors who finds one shut has learned the shape of the
+ * app; one shown two learns it again the day the third appears.
+ */
+function TabBar({
+  tab,
+  onChange
+}: {
+  tab: TabId;
+  onChange: (tab: TabId) => void;
+}) {
+  return (
+    <nav className="tab-bar" aria-label="Secciones">
+      <ul className="tab-bar__tabs">
+        <li>
+          <Tab id="juegos" label="Juegos" tab={tab} onChange={onChange}>
+            <GamesIcon />
+          </Tab>
+        </li>
+        <li>
+          <Tab id="recursos" label="Recursos" tab={tab} onChange={onChange}>
+            <ShelfIcon />
+          </Tab>
+        </li>
+        <li>
+          <button type="button" className="tab" disabled data-state="locked">
+            <span className="tab__icon" aria-hidden="true">
+              <LockIcon />
+            </span>
+            <span className="tab__label">Multijugador</span>
+            {/*
+              Spoken but not drawn. The dimming says "shut" to someone looking
+              at it; this is the same sentence for someone who is not.
+            */}
+            <span className="visually-hidden">Bloqueado</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+  );
+}
+
+function Tab({
+  id,
+  label,
+  tab,
+  onChange,
+  children
+}: {
+  id: TabId;
+  label: string;
+  tab: TabId;
+  onChange: (tab: TabId) => void;
+  children: ReactNode;
+}) {
+  const current = tab === id;
+  return (
+    <button
+      type="button"
+      className="tab"
+      /*
+       * `aria-current`, not `aria-pressed`: these are destinations, and where
+       * you are standing is not a switch you have turned on.
+       */
+      {...(current ? { "aria-current": "page" as const } : {})}
+      onClick={() => onChange(id)}
+    >
+      <span className="tab__icon" aria-hidden="true">
+        {children}
+      </span>
+      <span className="tab__label">{label}</span>
+    </button>
+  );
+}
+
+/**
+ * What to tell an adult when a profile operation fails.
+ *
+ * `ProfileStoreError` carries a message written for them; anything else is a
+ * defect, and saying so is more use than showing its internals.
+ */
+function describeProfileFailure(error: unknown): string {
+  return error instanceof ProfileStoreError
+    ? error.message
+    : "Ha ocurrido un fallo inesperado.";
+}
+
+/**
+ * Every letriestrella won so far, in the world's top-right corner.
+ *
+ * A running total rather than a per-chapter mark: stars are paid for playing,
+ * including replaying, and a number that only ever goes up is the part of the
+ * world a child can move on their own. It is display only — nothing here is
+ * pressable — and it lives on the world alone, because a total counting up
+ * beside a running game is a second thing to watch.
+ *
+ * It moved here from the left when the avatar took that corner. The rule it
+ * was placed by is unchanged: what was won and what an adult can change never
+ * share a corner. They traded sides, and the child's own face earned the more
+ * prominent one because it is what a pre-reader reads first.
+ *
+ * It is not the same number as the meter below it. This one only ever climbs;
+ * the meter empties every time a regalo is paid for, so a child who has just
+ * spent thirty letriestrellas on a gift can still see the thirty they earned.
+ */
+function StarCounter({ stars }: { stars: number }) {
+  return (
+    <section className="star-counter" aria-label="Letriestrellas">
+      <StarIcon />
+      <span className="star-counter__count">{stars}</span>
+    </section>
+  );
+}
+
+/**
+ * How close the child is to the next regalo, under the running total.
  *
  * Display only, and that is what keeps the reach-band rule intact: nothing a
- * child needs to touch sits at the top of an 86-inch panel. The star is still
- * the picture, because the stars are still what fills it.
+ * child needs to touch sits at the top of an 86-inch panel. The star is the
+ * picture here too, because the stars are what fills it.
  */
 function PrizeMeter({ filled, goal }: { filled: number; goal: number }) {
   return (
@@ -523,61 +954,133 @@ function StarAward({
 }
 
 /**
- * The animals won so far, one slot per chapter, in world order.
+ * The book of animals: one page per chapter, in world order.
  *
- * Display only: it is the record of what a child has done, not another way to
- * navigate. Its slots exist from the first screen so the row reads as a thing
- * to fill rather than a thing that grows.
+ * A modal over the world rather than a screen of its own. It is a record of
+ * what a child has done, not a place to go, so looking at it does not move
+ * them and closing it does not cost them where they were standing.
+ *
+ * Every page carries its chapter's animal from the very first screen. Until it
+ * is won it is drawn as that animal's shadow, so the book shows a child which
+ * animal is still owed rather than merely that something is. Display only:
+ * nothing on the page is a button.
  */
-function Collection({ slots }: { slots: readonly CollectionSlotView[] }) {
+function AnimalBook({
+  slots,
+  stamping,
+  onClose
+}: {
+  slots: readonly CollectionSlotView[];
+  /** The chapter whose animal is landing right now, if one is. */
+  stamping: string | null;
+  onClose: () => void;
+}) {
+  const dialog = useRef<HTMLDivElement>(null);
+  /*
+   * The stylesheet cannot count the chapters, and it must not guess: a fixed
+   * number of columns is what let an eleventh chapter add a row the paper had
+   * no room for. So both shapes are decided here and handed over, and the
+   * stylesheet picks between them on the shape of the room it has — which is
+   * the one thing it knows and this does not.
+   */
+  const wide = bookShape(slots.length);
+  const tall = bookShape(slots.length, true);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  /*
+   * Focus moves in and comes back out again.
+   *
+   * A screen replacing another took this for granted — there was nothing left
+   * behind to tab into. An overlay leaves the whole world underneath, so a
+   * keyboard or a screen reader would otherwise wander into a map nobody can
+   * see.
+   *
+   * It lands on the book itself rather than on a control, because there is no
+   * control: the book holds nothing to press.
+   */
+  useEffect(() => {
+    const restore = document.activeElement;
+    dialog.current?.focus();
+    return () => {
+      if (restore instanceof HTMLElement) restore.focus();
+    };
+  }, []);
+
   return (
-    <section
-      className="collection"
+    /*
+     * The way out is the world around it, not a cross in the corner.
+     *
+     * A child who wants to stop looking at their animals points at the thing
+     * they want instead, which is what tapping outside already is. The cross
+     * was a second thing to learn, drawn small in a corner and reading as chrome
+     * on a page that is meant to be a book.
+     *
+     * Only a tap on the scrim itself closes it — `currentTarget` rather than
+     * anything inside — so putting a finger on the animals leaves the book open.
+     * Escape does the same for a keyboard, which is what a dialog with nothing
+     * focusable in it needs.
+     */
+    <div
+      ref={dialog}
+      tabIndex={-1}
+      className="animal-book"
+      role="dialog"
+      aria-modal="true"
       aria-label="Mis animales"
-      ref={useDragScroll()}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
-      <ul className="collection__slots">
+      <ul
+        className="animal-book__pages"
+        style={
+          {
+            "--book-columns-wide": wide.columns,
+            "--book-rows-wide": wide.rows,
+            "--book-columns-tall": tall.columns,
+            "--book-rows-tall": tall.rows
+          } as CSSProperties
+        }
+      >
         {slots.map((slot) => (
           <li
             key={slot.nodeId}
-            className="collection__slot"
-            data-filled={slot.animal !== null}
+            className="animal-book__page"
+            data-earned={slot.earned}
+            data-stamping={slot.nodeId === stamping}
           >
-            {slot.animal ? (
-              <>
-                {/*
-                  Empty `alt`: the name is the accessible text, and a screen
-                  reader announcing the picture as well would say it twice.
+            {/*
+              The same picture in both states, in the same place and at the
+              same size: winning one changes its colour and nothing else, so a
+              child finds the animal they just won exactly where its shadow
+              was.
 
-                  Spoken but not drawn, like the empty slot below it. A child of
-                  three does not read the label, the picture is the animal they
-                  remember winning, and a word under every square turns a row of
-                  animals into a row of text.
-                */}
-                <img src={slot.animal.imageUrl} alt="" />
-                <span className="collection__name visually-hidden">
-                  {slot.animal.label}
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="collection__empty" aria-hidden="true">
-                  ?
-                </span>
-                {/*
-                  Spoken but not drawn. An empty slot must say what it is to a
-                  screen reader without putting "todavía no" six times across a
-                  screen a child is looking at.
-                */}
-                <span className="visually-hidden">
-                  {slot.title}: todavía no
-                </span>
-              </>
-            )}
+              Empty `alt` throughout — the text beside it is the accessible
+              name, and a screen reader announcing the picture as well would
+              say it twice.
+            */}
+            <span className="animal-book__well">
+              <img src={slot.animal.imageUrl} alt="" />
+            </span>
+            {/*
+              Spoken but not drawn. A child of three does not read the label,
+              the picture is the animal they remember winning, and a word under
+              every page would turn the book into a page of text.
+            */}
+            <span className="animal-book__name visually-hidden">
+              {slot.earned ? slot.animal.label : `${slot.title}: todavía no`}
+            </span>
           </li>
         ))}
       </ul>
-    </section>
+    </div>
   );
 }
 
@@ -593,7 +1096,7 @@ function Chests({
   onOpen
 }: {
   reward: PendingRewardView;
-  onOpen: (nodeId: string, animal: CollectibleAnimal) => void;
+  onOpen: (reward: PendingRewardView) => void;
 }) {
   return (
     <main className="reward">
@@ -605,14 +1108,20 @@ function Chests({
       */}
       <div className="reward__offer">
         <img className="duende" src="/world/duende.webp" alt="" />
+        {/*
+          Three chests, one animal. Which one a child opens changes nothing,
+          and that is the point: choosing is the ceremony, and a chapter that
+          could hand over any of three animals could not show the shadow of
+          what it owes in the book.
+        */}
         <ul className="chests">
-          {reward.choices.map((animal, index) => (
-            <li key={animal.animalId}>
+          {Array.from({ length: CHEST_COUNT }, (_unused, index) => (
+            <li key={index}>
               <button
                 type="button"
                 className="chest"
                 aria-label={`Abrir el cofre ${index + 1}`}
-                onClick={() => onOpen(reward.nodeId, animal)}
+                onClick={() => onOpen(reward)}
               >
                 <ChestIcon />
               </button>
@@ -654,78 +1163,25 @@ function Reveal({
 }
 
 /**
- * The way out of a region and into the one beside it.
+ * One chapter, as a card.
  *
- * It stands at the end of the path like a chapter and is built like one — same
- * disc, same size, same picture-first rule — because to a child it is the same
- * gesture: the next thing along the road. What it shows is the place it leads
- * to, so the door out of the farm is a window onto the forest.
+ * The card is the chapter's own picture, filling a rectangle edge to edge. A
+ * child of three does not read the title and cannot count, so a numbered disc
+ * named nothing: the picture is what they remember a chapter by and what they
+ * aim a finger at, and a rectangle is the shape that gives an illustration the
+ * most of itself. The title rides on a chip over the picture, for the adult and
+ * the screen reader.
  *
- * A door with nothing open behind it is locked and says so, exactly as a
- * chapter does. The way back is never locked: a child who walked here has to
- * be able to walk home, and the chapters that wait on this region are there.
- */
-function RegionDoor({
-  region,
-  direction,
-  onEnter
-}: {
-  region: MapRegionView;
-  direction: "back" | "on";
-  onEnter: () => void;
-}) {
-  const titleId = useId();
-  const stateId = useId();
-  const open = direction === "back" || region.reachable;
-
-  return (
-    <button
-      type="button"
-      className="world-node region-door"
-      data-direction={direction}
-      data-state={open ? "unlocked" : "locked"}
-      disabled={!open}
-      aria-labelledby={titleId}
-      aria-describedby={stateId}
-      onClick={onEnter}
-    >
-      <span className="world-node__marker" aria-hidden="true">
-        <img className="world-node__icon" src={region.background} alt="" />
-        {open ? (
-          /* Which way the road goes, for a child who reads neither the title
-             nor the position of the door on a path they have to scroll. */
-          <span className="region-door__way">
-            <BackArrow />
-          </span>
-        ) : (
-          <LockIcon />
-        )}
-      </span>
-      <span className="world-node__title" id={titleId}>
-        {region.title}
-      </span>
-      <span className="world-node__state" id={stateId}>
-        {open ? "Ir" : "Bloqueado"}
-      </span>
-    </button>
-  );
-}
-
-/**
- * One chapter on the path.
- *
- * The marker is the chapter's own picture, as large as the row allows. A child
- * of three does not read the title and cannot count, so a numbered disc named
- * nothing: the picture is what they remember a chapter by and what they aim a
- * finger at. Nothing on the marker is a glyph — the number is gone, and a
- * locked chapter says so with a padlock over its picture rather than by hiding
- * it, because what is behind the lock is the reason to come back.
+ * A locked chapter says so with a padlock over its picture rather than by
+ * hiding it, because what is behind the lock is the reason to come back.
  */
 function WorldNode({
   node,
+  tint,
   onSelect
 }: {
-  node: MapNodeView;
+  node: WorldNodeView;
+  tint: number;
   onSelect: (nodeId: string) => void;
 }) {
   const titleId = useId();
@@ -735,6 +1191,7 @@ function WorldNode({
       type="button"
       className="world-node"
       data-state={node.state}
+      data-tint={tint}
       disabled={!node.playable}
       /*
        * The node is named by its title alone and described by its state, so a
@@ -751,7 +1208,7 @@ function WorldNode({
           reader announcing the picture as well would say the chapter twice.
         */}
         <img className="world-node__icon" src={node.icon} alt="" />
-        {node.state === "locked" ? <LockIcon /> : null}
+        {node.playable ? null : <LockIcon />}
       </span>
       <span className="world-node__title" id={titleId}>
         {node.title}
@@ -759,17 +1216,38 @@ function WorldNode({
       <span className="world-node__state" id={stateId}>
         {stateLabel(node)}
       </span>
+      {/*
+        The one thing on this screen addressed to an adult rather than a child.
+        It is written on the card instead of waiting behind a tap, because the
+        card cannot be tapped: what is missing is not something a child can go
+        and get, so nothing here should invite them to try.
+      */}
+      {node.state === "needs-roster" ? (
+        <span className="world-node__note">{NEEDS_ROSTER_NOTE}</span>
+      ) : null}
     </button>
   );
 }
 
-/** Spoken by a screen reader and read by an adult; never carried by colour alone. */
-function stateLabel(node: MapNodeView): string {
-  if (node.state === "locked") return "Bloqueado";
-  if (node.state === "completed") return "Completado";
-  return node.kind === "cinematic" ? "Historia" : "Jugar";
-}
+const NEEDS_ROSTER_NOTE =
+  "Añade los nombres y las fotos de los niños para abrir este libro";
 
+/** Spoken by a screen reader and read by an adult; never carried by colour alone. */
+function stateLabel(node: WorldNodeView): string {
+  switch (node.state) {
+    case "locked":
+      return "Bloqueado";
+    /* Not "Bloqueado": nothing here is waiting on the child. */
+    case "needs-roster":
+      return "Faltan los nombres";
+    case "completed":
+      return "Completado";
+    case "unlocked":
+      return node.kind === "cinematic" ? "Historia" : "Jugar";
+    default:
+      return assertNever(node.state, "world node state");
+  }
+}
 
 /**
  * The padlock over a chapter that has not opened yet.
@@ -799,3 +1277,50 @@ function LockIcon() {
   );
 }
 
+/**
+ * A die: the one shape that reads as "things to play" without a word.
+ *
+ * Drawn rather than loaded, like every other icon here. The bar is on screen
+ * before anything else is, and on a classroom panel's cold cache a picture that
+ * arrives a beat late would leave a child with three unlabelled buttons.
+ */
+function GamesIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+      <rect x="3" y="3" width="18" height="18" rx="5" fill="currentColor" />
+      <circle cx="8.5" cy="8.5" r="1.8" fill="#2c1250" />
+      <circle cx="15.5" cy="15.5" r="1.8" fill="#2c1250" />
+      <circle cx="15.5" cy="8.5" r="1.8" fill="#2c1250" />
+      <circle cx="8.5" cy="15.5" r="1.8" fill="#2c1250" />
+    </svg>
+  );
+}
+
+/** An open book: the shelf holds one, and will hold more of the same kind. */
+function ShelfIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+      <path
+        d="M12 6.5C10.2 5.2 7.8 4.8 4 5.2v13c3.8-.4 6.2 0 8 1.3 1.8-1.3 4.2-1.7 8-1.3v-13c-3.8-.4-6.2 0-8 1.3Z"
+        fill="currentColor"
+      />
+      <path d="M12 6.5v13" fill="none" stroke="#2c1250" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+/** A paw: what the collection is full of, at a size where a word would not fit. */
+function PawIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+      <circle cx="7" cy="8" r="2.4" fill="currentColor" />
+      <circle cx="12" cy="6" r="2.4" fill="currentColor" />
+      <circle cx="17" cy="8" r="2.4" fill="currentColor" />
+      <circle cx="19.4" cy="13" r="2.1" fill="currentColor" />
+      <path
+        d="M12 11c3.2 0 5.6 2.4 5.6 4.9 0 2-1.6 3.1-3.4 3.1-1 0-1.6-.4-2.2-.4s-1.2.4-2.2.4c-1.8 0-3.4-1.1-3.4-3.1C6.4 13.4 8.8 11 12 11Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}

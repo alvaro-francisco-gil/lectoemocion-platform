@@ -1,3 +1,8 @@
+import {
+  childRecordId,
+  mediaAssetId,
+  type ChildRecord
+} from "@lectoemocion/domain";
 import { describe, expect, it } from "vitest";
 import {
   createIllustratedStoryResource,
@@ -5,6 +10,7 @@ import {
   createInitialSyllableGameResource,
   createInitialsGameResource,
   createLettersGameResource,
+  createNameBookResource,
   createNameStoryResource,
   createPairsGameResource,
   createSyllablesGameResource,
@@ -61,6 +67,37 @@ const mariposa = {
  * being well-formed.
  */
 const PINNED = [casa, flor, sol, luna, mariposa];
+
+/**
+ * A frozen roster, for the same reason as `PINNED`.
+ *
+ * Three children chosen to pin the two orderings a reader would get wrong:
+ * `Chema` is verified under the digraph `CH`, which sorts as a C word, and
+ * `Ñuria` under `Ñ`, which is its own letter following `N`.
+ */
+const PINNED_ROSTER: readonly ChildRecord[] = [
+  {
+    id: childRecordId("nuria"),
+    displayName: "Ñuria",
+    verifiedInitial: "Ñ",
+    photoAssetId: mediaAssetId("avatar-nuria"),
+    pronunciationAssetId: mediaAssetId("silent-nuria")
+  },
+  {
+    id: childRecordId("chema"),
+    displayName: "Chema",
+    verifiedInitial: "CH",
+    photoAssetId: mediaAssetId("avatar-chema"),
+    pronunciationAssetId: mediaAssetId("silent-chema")
+  },
+  {
+    id: childRecordId("nora"),
+    displayName: "Nora",
+    verifiedInitial: "N",
+    photoAssetId: mediaAssetId("avatar-nora"),
+    pronunciationAssetId: mediaAssetId("silent-nora")
+  }
+];
 
 /**
  * Invariant 5 (AGENTS.md): published template and manifest versions are
@@ -336,6 +373,40 @@ describe("published versions are immutable", () => {
       template: { id: "letters-game", version: 1 },
       seed: "immutability-seed",
       vocabulary: [casa]
+    });
+  });
+
+  /**
+   * Fed a frozen roster rather than `syntheticClass`, for the same reason the
+   * vocabulary pins use `PINNED`: which children the fixture happens to hold is
+   * content, not version. If this read the live class, adding one synthetic
+   * child would present as a breaking version change.
+   *
+   * What it pins is the grouping and the ordering — the letter a name is filed
+   * under, and where `Ñ` sits — because those are the behaviour a published
+   * version promises, and changing either would silently reshape every book
+   * already in a classroom.
+   */
+  it("pins name-book version 1 output", () => {
+    const book = createNameBookResource(PINNED_ROSTER, "immutability-seed");
+
+    expect(book.schemaVersion).toBe(1);
+    expect(book.resourceId).toBe("name-book-immutability-seed");
+    expect(book.template).toEqual({ id: "name-book", version: 1 });
+    /* `CH` is a C word and sorts under it; `Ñ` is its own letter, after `N`. */
+    expect(book.pages.map((page) => page.grapheme)).toEqual(["CH", "N", "Ñ"]);
+    expect(book.pages[0]).toEqual({
+      pageId: "ch",
+      grapheme: "CH",
+      names: [
+        {
+          childRecordId: "chema",
+          displayName: "Chema",
+          verifiedInitial: "CH",
+          photoUrl: "/synthetic/avatar-chema.svg",
+          pronunciationUrl: "/synthetic/silent-chema.mp3"
+        }
+      ]
     });
   });
 });

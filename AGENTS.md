@@ -31,6 +31,16 @@ pronunciation recording, and verified initial letter/sound, which **overrides**
 those defaults slot by slot. Personalisation is an enhancement, never a
 prerequisite. There is no AI-generated content.
 
+**One template is the declared exception**: `name-book` — *El libro de los
+nombres* — whose content is the group's roster itself, a letter to a page. It
+has no defaults because a book of default names would be a book of invented
+children. With no roster its chapter is shown locked with an adult-facing
+reason rather than opened onto nothing. Do not read this as licence for a
+second such template: `TEMPLATES_NEEDING_ROSTER` in
+`packages/template-sdk/src/templateDefinition.ts` is total over every template
+and is where that decision is made, once, in the open. See
+[ADR 0010](docs/decisions/0010-one-template-may-require-a-roster.md).
+
 Tenancy is Account → Group → child records, where a group is a class or a
 family. No layer may assume a group is a school class.
 
@@ -107,6 +117,7 @@ above has an executable guardrail; `pnpm guardrails` runs them all, and
 |---|---|
 | 2 — engine-neutral contracts | `scripts/check-engine-neutral.mjs` |
 | 2 — templates never read progress | `scripts/check-progress-boundary.mjs` |
+| A progress namespace comes only from a profile id | `scripts/check-progress-namespace.mjs` |
 | 3 — Firebase boundary | `scripts/check-firebase-boundary.mjs` |
 | 4 — adult area behind its gate | `scripts/check-adult-gate.mjs` |
 | 5 — immutable published versions | `packages/template-catalog/src/publishedVersions.test.ts` |

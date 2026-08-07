@@ -9,6 +9,8 @@ export type {
   ParticipantSlot,
   PersonalisedCharacter
 } from "./participantSlot";
+export { NameBookPageSchema, pageLetterLabel } from "./nameBookPage";
+export type { NameBookPage } from "./nameBookPage";
 export { StoryPageSchema, pageLabel, pageShortLabel } from "./storyPage";
 export type { StoryPage } from "./storyPage";
 export {
@@ -19,6 +21,7 @@ export {
   LettersGameManifestSchema,
   MemoryAlbumManifestSchema,
   MultiSyllableVocabularyItemSchema,
+  NameBookManifestSchema,
   NameStoryManifestSchema,
   PairsGameManifestSchema,
   ResourceManifestSchema,
@@ -36,7 +39,6 @@ export type {
   VocabularyItem
 } from "./resourceManifest";
 export {
-  CHEST_COUNT,
   CollectibleAnimalSchema,
   WorldNodeSchema,
   WorldSchema,
@@ -48,6 +50,5 @@ export type {
   NodeResource,
   NodeReward,
   World,
-  WorldNode,
-  WorldRegion
+  WorldNode
 } from "./worldSchema";

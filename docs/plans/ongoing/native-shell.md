@@ -9,11 +9,21 @@
   `playerUrl` resolver with 11 tests; scripted Android emulator workflow
   (`scripts/mobile-emulator.mjs`, 30 tests) that creates the AVD, tunnels the
   ports, and reports what is up; `LectoEmocion_Tablet` AVD created and booting
-- **Next:** load the player in the emulator and confirm a minigame is playable
+- **Next:** the four seams under "Native feel", and the offline-launch test
+  [ADR 0009](../../decisions/0009-one-hosted-player.md) makes a release
+  criterion
 - **Blockers:** none.
-- **Handoff:** the hosted-versus-bundled player decision is deliberately
-  deferred — see "Open questions". Step 1 points at a dev server, which is a
-  development affordance and not the shipping answer.
+
+Two things bit during that first run and are now fixed and covered by tests.
+Metro's `disableHierarchicalLookup` was on, which is right for npm's flat
+`node_modules` and wrong for pnpm, where a package's dependencies sit beside it
+in the store — it failed with `Unable to resolve "expo-modules-core"`, which
+reads as a broken install. And Expo's LAN default made Expo Go fetch over the
+network and fail with `Failed to download remote update`; `--localhost` over the
+`adb reverse` tunnel avoids the network entirely.
+- **Handoff:** the hosted-versus-bundled decision is settled — see
+  [ADR 0009](../../decisions/0009-one-hosted-player.md). Step 1 points at a dev
+  server; a release build points the same variable at Firebase Hosting.
 
 The earlier WSL2 NAT blocker recorded here is resolved: `.wslconfig` now sets
 `networkingMode=mirrored`. It stopped mattering anyway — `adb reverse` tunnels
@@ -101,7 +111,9 @@ libraries it bundles. No EAS account, no store credentials, no Xcode.
       to load.
 - [x] Scripted emulator workflow: `scripts/mobile-emulator.mjs` plus the pure
       logic and tests in `scripts/lib/emulator.mjs`.
-- [ ] Verified in the Android emulator via Expo Go: map and one minigame.
+- [x] Verified in the Android emulator via Expo Go: the map hub renders
+      full-screen in landscape, and "El encuentro" plays through to its reward
+      screen. Touch input, progression, and the star counter all work.
 - [ ] Verified on physical hardware. Same commands — `adb reverse` makes
       `localhost` mean the dev machine over USB too.
 
@@ -142,11 +154,12 @@ unbounded content-duplication one, and the whole architecture exists to avoid it
 
 ## Open questions
 
-1. **Hosted or bundled player.** Hosted means the growing template catalogue
-   ships without a store review; bundled means the app works offline and
-   avoids the store-policy risk ADR 0003 lists under "Revisit when". Step 1
-   prejudges neither — it points at a dev server. This must be decided before
-   anything ships.
+1. ~~Hosted or bundled player.~~ **Settled** by
+   [ADR 0009](../../decisions/0009-one-hosted-player.md): one hosted player,
+   cached on the device, with no bundled copy in the shell. The shell keeps
+   pointing at `EXPO_PUBLIC_PLAYER_URL`; only its value changes between a dev
+   server and Firebase Hosting. Offline launch after a first successful launch
+   becomes a release criterion with a test.
 2. **Does the adult panel ever run on the classroom display itself?** If it
    never does, the aged-browser objection to React Native Web disappears and
    option B becomes the better call for the adult UI. Product question.
@@ -158,7 +171,7 @@ progress synchronisation. All of those need `packages/firebase/`, which does
 not exist. Step 1 is the embedding seam and nothing else.
 
 Also out of scope: moving
-[`mapView.ts`](../../../apps/player-web/src/world/mapView.ts) and
+[`worldView.ts`](../../../apps/player-web/src/world/worldView.ts) and
 [`progressStore.ts`](../../../apps/player-web/src/world/progressStore.ts) into
 a shared `packages/world/`. They are already DOM-free and already abstracted
 for Firestore, and native will need them — but that is a refactor, and it does

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { ManifestFor } from "@lectoemocion/resource-schema";
-import { ROUND_LIVES } from "./lives";
 import {
   assertSpellable,
   createLettersRound,
@@ -83,7 +82,6 @@ describe("createLettersRound", () => {
     expect(round.imageUrl).toBe("/vocabulary/pato.webp");
     expect(round.slots).toEqual([null, null, null, null]);
     expect(round.tray).toHaveLength(4);
-    expect(round.livesRemaining).toBe(ROUND_LIVES);
     expect(round.status).toBe("playing");
   });
 
@@ -125,19 +123,17 @@ describe("placeLetter", () => {
     expect(placed.attempt).toEqual({ kind: "placed" });
     expect(placed.round.slots[0]).toEqual(card);
     expect(placed.round.tray.map((each) => each.cardId)).not.toContain(card.cardId);
-    expect(placed.round.livesRemaining).toBe(ROUND_LIVES);
     /* The round keeps its own fields, not just the shared sequence ones. */
     expect(placed.round.word).toBe("pato");
     expect(placed.round.imageUrl).toBe("/vocabulary/pato.webp");
   });
 
-  it("returns a letter placed in the wrong slot and spends a life", () => {
+  it("returns a letter placed in the wrong slot, changing nothing", () => {
     const round = createLettersRound(pato);
     const placed = placeLetter(round, cardFor(round, 0).cardId, 1);
 
     expect(placed.attempt).toEqual({ kind: "rejected" });
-    expect(placed.round.slots).toEqual([null, null, null, null]);
-    expect(placed.round.livesRemaining).toBe(ROUND_LIVES - 1);
+    expect(placed.round).toEqual(round);
   });
 
   it("rejects a correct letter aimed at an occupied slot", () => {
@@ -146,7 +142,7 @@ describe("placeLetter", () => {
     const second = placeLetter(filled, cardFor(opening, 1).cardId, 0);
 
     expect(second.attempt).toEqual({ kind: "rejected" });
-    expect(second.round.livesRemaining).toBe(ROUND_LIVES - 1);
+    expect(second.round).toEqual(filled);
   });
 
   it("spells the word when every letter is placed", () => {
@@ -159,32 +155,37 @@ describe("placeLetter", () => {
     expect(round.status).toBe("won");
     expect(round.tray).toEqual([]);
     expect(round.slots.map((slot) => slot?.letter).join("")).toBe("pato");
-    expect(round.livesRemaining).toBe(ROUND_LIVES);
   });
 
-  it("loses once lives run out", () => {
+  it("stays playable however many times a letter lands wrong", () => {
     const opening = createLettersRound(pato);
     let round = opening;
     const card = cardFor(opening, 0);
-    for (let attempt = 0; attempt < ROUND_LIVES; attempt += 1) {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
       round = placeLetter(round, card.cardId, 1).round;
     }
 
-    expect(round.livesRemaining).toBe(0);
-    expect(round.status).toBe("lost");
+    expect(round).toEqual(opening);
+    expect(placeLetter(round, card.cardId, 0).attempt).toEqual({
+      kind: "placed"
+    });
   });
 
-  it("ignores placements once the round has ended", () => {
+  /*
+   * A won round has an empty tray, so a spent card is not a card this round
+   * knows: it fails rather than being quietly absorbed.
+   */
+  it("refuses a letter that has already been placed", () => {
     const opening = createLettersRound(pato);
     let round = opening;
-    const card = cardFor(opening, 0);
-    for (let attempt = 0; attempt < ROUND_LIVES; attempt += 1) {
-      round = placeLetter(round, card.cardId, 1).round;
+    for (let slot = 0; slot < 4; slot += 1) {
+      round = placeLetter(round, cardFor(opening, slot).cardId, slot).round;
     }
 
-    const after = placeLetter(round, card.cardId, 0);
-    expect(after.attempt).toEqual({ kind: "ignored" });
-    expect(after.round).toEqual(round);
+    const spent = cardFor(opening, 0).cardId;
+    expect(() => placeLetter(round, spent, 0)).toThrow(
+      `Unknown letter card: ${spent}`
+    );
   });
 
   it("names this game in its failures", () => {

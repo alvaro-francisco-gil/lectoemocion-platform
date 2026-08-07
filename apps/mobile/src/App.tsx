@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   Pressable,
   StatusBar,
   StyleSheet,
@@ -61,6 +62,36 @@ export function App() {
     setUnreachable(false);
     /* Remounts the WebView, so a retry is a genuine reload and not a no-op. */
     setAttempt((previous) => previous + 1);
+  }, []);
+
+  /*
+   * Android's back gesture must not leave the world.
+   *
+   * The player is a single page that pushes no history, so Android's default
+   * closes the application — from the map, and from the middle of a minigame
+   * alike. A child aged 3–5 brushing the gesture loses what they were doing,
+   * and being thrown out of a game is exactly the seam that reads as a website
+   * rather than an app. The shell is the only layer that can refuse.
+   *
+   * Returning `true` marks the event handled, which is the whole behaviour.
+   * Leaving is still possible through home and recents, both of which take a
+   * deliberate gesture — that distinction is the point.
+   *
+   * There is no "go back one page" branch, because there is nowhere to go and
+   * `react-native-webview`'s published types cannot express a `ref` under this
+   * repository's strictness: its class declares `Component<WebViewProps &
+   * undefined>`, so every prop resolves to `never` the moment a ref is added.
+   * When the player gains in-page navigation, that has to be solved first.
+   *
+   * Android only. `BackHandler` is inert on iOS, where the equivalent is the
+   * edge-swipe gesture and remains unhandled — see the plan's "Native feel".
+   */
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => true
+    );
+    return () => subscription.remove();
   }, []);
 
   if (player.kind === "unusable") {

@@ -6,7 +6,6 @@ import {
   selectInitialLetterCard,
   wordInitial
 } from "./initialLetterGame";
-import { ROUND_LIVES } from "./lives";
 
 const luna: VocabularyItem = {
   vocabularyItemId: "luna",
@@ -105,13 +104,13 @@ describe("an initial-letter round", () => {
     }
 
     expect(round.status).toBe("won");
-    expect(round.livesRemaining).toBe(ROUND_LIVES);
   });
 
-  it("charges a life for a wrong letter and loses after three", () => {
-    let round = createInitialLetterRound(manifest([luna, sol, pato]));
+  it("costs nothing for a wrong letter, however often it is tried", () => {
+    const opening = createInitialLetterRound(manifest([luna, sol, pato]));
+    let round = opening;
 
-    for (let attempt = 1; attempt <= ROUND_LIVES; attempt += 1) {
+    for (let attempt = 1; attempt <= 12; attempt += 1) {
       round = selectInitialLetterCard(round, "luna-picture").round;
       const wrong = selectInitialLetterCard(round, "S-letter");
       expect(wrong.attempt).toEqual({
@@ -119,24 +118,25 @@ describe("an initial-letter round", () => {
         cardIds: ["luna-picture", "S-letter"]
       });
       round = wrong.round;
-      expect(round.livesRemaining).toBe(ROUND_LIVES - attempt);
+      expect(round).toEqual(opening);
     }
 
-    expect(round.status).toBe("lost");
-    expect(selectInitialLetterCard(round, "luna-picture").attempt).toEqual({
-      kind: "ignored"
+    /* And the connection they kept missing is still there to be made. */
+    round = selectInitialLetterCard(round, "luna-picture").round;
+    expect(selectInitialLetterCard(round, "L-letter").attempt).toEqual({
+      kind: "matched",
+      initial: "L"
     });
   });
 
   /* Changing your mind about which picture you meant is not a wrong answer. */
-  it("clears the selection instead of charging a life within one column", () => {
+  it("clears the selection within one column", () => {
     const round = createInitialLetterRound(manifest([luna, sol, pato]));
     const first = selectInitialLetterCard(round, "luna-picture");
     const second = selectInitialLetterCard(first.round, "sol-picture");
 
     expect(second.attempt).toEqual({ kind: "cleared" });
     expect(second.round.selectedCardId).toBeNull();
-    expect(second.round.livesRemaining).toBe(ROUND_LIVES);
   });
 
   it("ignores a card whose letter is already connected", () => {

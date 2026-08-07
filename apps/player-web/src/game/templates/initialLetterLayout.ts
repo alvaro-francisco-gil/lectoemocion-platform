@@ -15,7 +15,6 @@ export const INITIAL_LETTER_LAYOUT = {
   canvasWidth: 1280,
   canvasHeight: 720,
   bannerY: 60,
-  livesY: 118,
   pictureRowY: 360,
   letterRowY: 590,
   /* The picture card's own size is the shared `CARD.size`, not repeated here. */

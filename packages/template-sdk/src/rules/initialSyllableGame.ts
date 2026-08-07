@@ -1,6 +1,6 @@
 import type { ManifestFor, VocabularyItem } from "@lectoemocion/resource-schema";
 import { seededShuffle } from "../seededRandom";
-import { ROUND_LIVES, type RoundStatus } from "./lives";
+import { type RoundStatus } from "./roundStatus";
 
 /**
  * Match a picture to the one above it by the syllable both words open with.
@@ -15,7 +15,6 @@ export interface InitialSyllableRound {
   readonly initialSyllable: string;
   readonly matchVocabularyItemId: string;
   readonly choices: readonly VocabularyItem[];
-  readonly livesRemaining: number;
   readonly status: RoundStatus;
 }
 
@@ -122,7 +121,6 @@ export function createInitialSyllableRound(
     initialSyllable: opening,
     matchVocabularyItemId,
     choices: seededShuffle(choices, manifest.seed),
-    livesRemaining: ROUND_LIVES,
     status: "playing"
   };
 }
@@ -146,13 +144,6 @@ export function chooseInitialSyllable(
     return { round: { ...round, status: "won" }, attempt: { kind: "correct" } };
   }
 
-  const livesRemaining = round.livesRemaining - 1;
-  return {
-    round: {
-      ...round,
-      livesRemaining,
-      status: livesRemaining === 0 ? "lost" : "playing"
-    },
-    attempt: { kind: "incorrect" }
-  };
+  /* The wrong picture goes back and the match stays there to be found. */
+  return { round, attempt: { kind: "incorrect" } };
 }

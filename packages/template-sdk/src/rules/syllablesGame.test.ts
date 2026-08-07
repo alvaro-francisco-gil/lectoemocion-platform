@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { ManifestFor } from "@lectoemocion/resource-schema";
-import { ROUND_LIVES } from "./lives";
 import { createSyllablesRound, placeSyllable } from "./syllablesGame";
 
 const manifestFor = (
@@ -32,7 +31,6 @@ describe("createSyllablesRound", () => {
     expect(round.imageUrl).toBe("/synthetic/mariposa.svg");
     expect(round.slots).toEqual([null, null, null, null]);
     expect(round.tray).toHaveLength(4);
-    expect(round.livesRemaining).toBe(ROUND_LIVES);
     expect(round.status).toBe("playing");
   });
 
@@ -63,17 +61,14 @@ describe("placeSyllable", () => {
     expect(placed.attempt).toEqual({ kind: "placed" });
     expect(placed.round.slots[0]).toEqual(card);
     expect(placed.round.tray.map((each) => each.cardId)).not.toContain(card.cardId);
-    expect(placed.round.livesRemaining).toBe(ROUND_LIVES);
   });
 
-  it("returns a card placed in the wrong slot and spends a life", () => {
+  it("returns a card placed in the wrong slot, changing nothing", () => {
     const round = createSyllablesRound(mariposa);
     const card = cardFor(round, 0);
     const placed = placeSyllable(round, card.cardId, 1);
     expect(placed.attempt).toEqual({ kind: "rejected" });
-    expect(placed.round.slots).toEqual([null, null, null, null]);
-    expect(placed.round.tray).toEqual(round.tray);
-    expect(placed.round.livesRemaining).toBe(ROUND_LIVES - 1);
+    expect(placed.round).toEqual(round);
   });
 
   it("rejects a correct card aimed at an occupied slot", () => {
@@ -82,7 +77,7 @@ describe("placeSyllable", () => {
     const occupier = cardFor(round, 1);
     const second = placeSyllable(first, occupier.cardId, 0);
     expect(second.attempt).toEqual({ kind: "rejected" });
-    expect(second.round.livesRemaining).toBe(ROUND_LIVES - 1);
+    expect(second.round).toEqual(first);
   });
 
   it("wins once every slot is filled", () => {
@@ -101,27 +96,34 @@ describe("placeSyllable", () => {
     expect(round.status).toBe("won");
   });
 
-  it("loses once lives run out", () => {
+  it("stays playable however many times a card lands wrong", () => {
     const opening = createSyllablesRound(mariposa);
     let round = opening;
     const card = cardFor(opening, 0);
-    for (let attempt = 0; attempt < ROUND_LIVES; attempt += 1) {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
       round = placeSyllable(round, card.cardId, 1).round;
     }
-    expect(round.livesRemaining).toBe(0);
-    expect(round.status).toBe("lost");
+    expect(round).toEqual(opening);
+    expect(placeSyllable(round, card.cardId, 0).attempt).toEqual({
+      kind: "placed"
+    });
   });
 
-  it("ignores placements once the round has ended", () => {
+  /*
+   * A won round has an empty tray, so a spent card is not a card this round
+   * knows: it fails rather than being quietly absorbed.
+   */
+  it("refuses a card that has already been placed", () => {
     const opening = createSyllablesRound(mariposa);
     let round = opening;
-    const wrong = cardFor(opening, 0);
-    for (let attempt = 0; attempt < ROUND_LIVES; attempt += 1) {
-      round = placeSyllable(round, wrong.cardId, 1).round;
+    for (let slotIndex = 0; slotIndex < 4; slotIndex += 1) {
+      round = placeSyllable(round, cardFor(opening, slotIndex).cardId, slotIndex)
+        .round;
     }
-    const after = placeSyllable(round, wrong.cardId, 0);
-    expect(after.attempt).toEqual({ kind: "ignored" });
-    expect(after.round).toEqual(round);
+    const spent = cardFor(opening, 0).cardId;
+    expect(() => placeSyllable(round, spent, 0)).toThrow(
+      `Unknown syllable card: ${spent}`
+    );
   });
 
   it("rejects a card that is not in the tray", () => {

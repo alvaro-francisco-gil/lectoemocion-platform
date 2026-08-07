@@ -21,10 +21,23 @@ const SECTIONS = [
     ]
   },
   {
+    title: "Native shell on an Android emulator",
+    commands: [
+      ["pnpm mobile:start", "Metro for the shell — long-lived, run this yourself"],
+      ["pnpm mobile:up", "boot the AVD, tunnel the ports, open the player"],
+      ["pnpm mobile", "doctor: what is up, what is not, what to run"],
+      ["pnpm mobile boot", "create and start the tablet AVD only"],
+      ["pnpm mobile shot", "screenshot the emulator to a file"],
+      ["pnpm mobile logs 30", "filtered logcat: JS and WebView errors"],
+      ["pnpm mobile stop", "shut the emulator down"]
+    ]
+  },
+  {
     title: "Guardrails (each runs standalone)",
     commands: [
       ["node scripts/check-engine-neutral.mjs", "invariant 2: contracts stay engine-neutral"],
       ["node scripts/check-progress-boundary.mjs", "invariant 2: templates never read progress"],
+      ["node scripts/check-progress-namespace.mjs", "one child's stars never become another's"],
       ["node scripts/check-firebase-boundary.mjs", "invariant 3: Firebase confined to its boundary"],
       ["node scripts/check-adult-gate.mjs", "invariant 4: the adult area stays behind its gate"],
       ["node scripts/check-strict-types.mjs", "no escapes from strict typing"],
@@ -32,9 +45,10 @@ const SECTIONS = [
     ]
   },
   {
-    title: "Content (one-off, network)",
+    title: "Content (one-off)",
     commands: [
-      ["node scripts/import-vocabulary-images.mjs", "re-import vocabulary pictures and their provenance"]
+      ["node scripts/import-vocabulary-images.mjs", "re-import vocabulary pictures and their provenance"],
+      ["node scripts/generate-synthetic-cast.mjs", "regenerate the synthetic class's avatars and silent audio"]
     ]
   }
 ];

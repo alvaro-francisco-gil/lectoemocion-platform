@@ -33,14 +33,6 @@ export function renderPairsGame(
     })
     .setOrigin(0.5);
 
-  const lives = scene.add
-    .text(640, 118, "", {
-      fontFamily: "system-ui",
-      fontSize: "30px",
-      color: "#7b2cbf"
-    })
-    .setOrigin(0.5);
-
   const views = new Map<string, CardView>();
 
   const rowOf = (group: PairsCard["group"]) =>
@@ -68,7 +60,6 @@ export function renderPairsGame(
   words.forEach((card, index) => place(card, index, words.length, WORD_ROW_Y));
 
   const paint = () => {
-    lives.setText(`Vidas: ${"♥".repeat(round.livesRemaining)}`);
     for (const entry of views.values()) {
       if (round.matched.includes(entry.card.vocabularyItemId)) {
         entry.view.paint(CARD.matched);
@@ -106,10 +97,10 @@ export function renderPairsGame(
         paint();
         finish(round);
         return;
+      /* The pair does not stick; nothing else about the board changes. */
       case "mismatched":
         paint();
         shake(outcome.cardIds);
-        finish(round);
         return;
       default:
         assertNever(outcome, "pairs attempt");
@@ -121,7 +112,6 @@ export function renderPairsGame(
       banner.setText("¡Muy bien!");
       onComplete();
     }
-    if (current.status === "lost") banner.setText("Vamos a intentarlo otra vez");
   };
 
   paint();

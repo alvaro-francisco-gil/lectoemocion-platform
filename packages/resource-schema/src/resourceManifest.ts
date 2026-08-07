@@ -1,5 +1,6 @@
 import { Type, type Static } from "@sinclair/typebox";
 import Ajv from "ajv";
+import { NameBookPageSchema } from "./nameBookPage";
 import { ParticipantSlotSchema } from "./participantSlot";
 import { StoryPageSchema } from "./storyPage";
 
@@ -242,8 +243,38 @@ export const IllustratedStoryManifestSchema = Type.Object(
   { additionalProperties: false }
 );
 
+/**
+ * The class's own names, a letter to a page.
+ *
+ * The first template whose content *is* the roster: it carries neither slots
+ * nor vocabulary nor authored pages, because the children recorded for a group
+ * are the whole book. It is therefore the one declared exception to
+ * "playable with no uploads" — a book of default names would be a book of
+ * invented children, which is the opposite of what makes it worth opening.
+ *
+ * With no roster there is no book at all. That is a gate the world resolves
+ * before this manifest is ever built (`templateNeedsRoster`), not a fallback:
+ * invariant 6's exception covers missing *personalised media*, and there is no
+ * default here to fall back to.
+ *
+ * Twenty-seven pages is the Spanish alphabet, and the most this book can hold
+ * however large the class grows.
+ */
+export const NameBookManifestSchema = Type.Object(
+  {
+    ...envelope,
+    template: Type.Object(
+      { id: Type.Literal("name-book"), version: Type.Literal(1) },
+      { additionalProperties: false }
+    ),
+    pages: Type.Array(NameBookPageSchema, { minItems: 1, maxItems: 27 })
+  },
+  { additionalProperties: false }
+);
+
 export const ResourceManifestSchema = Type.Union([
   NameStoryManifestSchema,
+  NameBookManifestSchema,
   IllustratedStoryManifestSchema,
   InitialsGameManifestSchema,
   MemoryAlbumManifestSchema,

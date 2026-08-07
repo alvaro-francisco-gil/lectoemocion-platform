@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { EMPTY_PROGRESS, STARS_PER_COMPLETION } from "./mapView";
+import { EMPTY_PROGRESS, STARS_PER_COMPLETION } from "./worldView";
 import { LOCAL_OWNER, LocalProgressStore, storageKey } from "./progressStore";
 
 const store = () => new LocalProgressStore(localStorage, LOCAL_OWNER);
@@ -93,13 +93,35 @@ describe("local progress", () => {
     expect(await store().read()).toEqual(claimed);
   });
 
-  /* A double tap must not swap an animal the child has already been shown. */
-  it("keeps the first claim for a node", async () => {
+  /*
+   * A double tap must not pay a chapter twice. A chapter grants one animal, so
+   * the second tap names the same one, and the claim is idempotent rather than
+   * a second entry.
+   */
+  it("keeps one claim per node however many times it is made", async () => {
     const subject = store();
     await subject.claimReward("encuentro", "gato");
-    const again = await subject.claimReward("encuentro", "perro");
+    const again = await subject.claimReward("encuentro", "gato");
 
     expect(again.rewards).toEqual([{ nodeId: "encuentro", animalId: "gato" }]);
+  });
+
+  /*
+   * The other way a node can be claimed twice is a content update: the chapter
+   * now grants a different animal, so `deriveWorldView` counts the stored one
+   * as unearned and offers the chests again. That offer has to be closable —
+   * refusing the new claim would leave the chapter owing a chest it can never
+   * be paid, and the ceremony would come back every time the app is opened.
+   */
+  it("replaces a claim naming an animal the chapter no longer grants", async () => {
+    const subject = store();
+    await subject.claimReward("encuentro", "perro");
+    const regranted = await subject.claimReward("encuentro", "gato");
+
+    expect(regranted.rewards).toEqual([
+      { nodeId: "encuentro", animalId: "gato" }
+    ]);
+    expect(await store().read()).toEqual(regranted);
   });
 
   it("keeps rewards when a later chapter is completed", async () => {

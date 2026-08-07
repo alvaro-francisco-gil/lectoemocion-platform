@@ -180,7 +180,7 @@ export interface PrizeView {
  * Projects the prize list onto what a child has earned.
  *
  * Pure, and the only place that decides whether a gift is owed — the same
- * division `deriveMapView` draws, so no screen grows its own opinion.
+ * division `deriveWorldView` draws, so no screen grows its own opinion.
  */
 export function derivePrizeView(
   prizes: Prizes,

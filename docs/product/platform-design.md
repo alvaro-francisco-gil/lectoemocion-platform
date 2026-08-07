@@ -9,9 +9,10 @@ Status: Approved product design. Runtime and distribution are decided in
 LectoEmoción is a personalised early-literacy world for Spanish children aged
 3–5.
 
-Children travel through a framing story told in animated chapters. A map is the
-hub of that world. Minigames unlock as the story advances and remain replayable
-afterwards. The games teach names, initial letters, and sounds.
+Children travel through a framing story told in animated chapters. A hub of
+picture cards, split into sections, is the way into that world. Minigames unlock
+as the story advances and remain replayable afterwards. The games teach names,
+initial letters, and sounds.
 
 The world is fully playable with no setup. Every game ships with
 product-authored default content. An adult may then upload a child's first
@@ -20,7 +21,20 @@ letter/sound. That content **overrides** the defaults slot by slot, and certain
 games become markedly more meaningful when the children on screen are the
 children in the room.
 
-Personalisation is an enhancement, never a prerequisite.
+Personalisation is an enhancement, never a prerequisite — with exactly one
+declared exception, *El libro de los nombres* (`name-book`). That template's
+content **is** the group's roster: a letter to a page, carrying the children
+whose verified initial it is. A book of default names would be a book of
+invented children, which is the opposite of what makes it worth opening, so
+with nobody recorded there is no book. The chapter stands on the shelf visibly
+locked, saying what it needs, and every other template remains playable with no
+uploads at all.
+
+The exception is declared in code rather than described here:
+`TEMPLATES_NEEDING_ROSTER` in `@lectoemocion/template-sdk` is total over every
+template, so a new one cannot silently inherit either answer. The reasoning,
+including what was rejected, is
+[ADR 0010](../decisions/0010-one-template-may-require-a-roster.md).
 
 The platform does not use AI to generate stories, animations, game mechanics,
 images, voices, or text. "Personalisation" means deterministic placement of
@@ -51,6 +65,11 @@ with default content and no uploads, so a genuine classroom pilot — real
 teachers, real children, real feedback — can run with **no personal data at
 all** while the institutional paperwork proceeds in parallel. Personalisation
 is enabled per deployment only once that deployment's artefacts are complete.
+
+*El libro de los nombres* is the one chapter a pilot cannot open, and it does
+not weaken this: a deployment with no roster shows it locked, which is exactly
+the state a pilot should be in until its artefacts exist. It is the only
+chapter whose availability tracks that paperwork.
 
 This staged pilot is the intended path, not a fallback. Enabling uploads before
 the artefacts exist is the single most likely way for this project to cause
@@ -139,7 +158,7 @@ first.
 ### 5.1 Play without setup
 
 1. An adult creates an account and signs in.
-2. The world opens on the map.
+2. The world opens on the hub, in its Juegos section.
 3. The first story chapter plays.
 4. Unlocked minigames are playable immediately using default content.
 
@@ -162,12 +181,12 @@ display.
 1. The adult opens LectoEmoción on the classroom display or tablet.
 2. The adult authenticates, or pairs the device using a short-lived code shown
    as a QR from the phone.
-3. The map appears, showing progress for that account.
+3. The hub appears, showing progress for that account.
 4. Children play story chapters, minigames, and non-interactive resources.
 5. The classroom display needs no library browser, no creation flow, and no
-   group management. The map is its navigation.
+   group management. The hub is its navigation.
 
-**The display is self-sufficient.** The adult moves between the map and a game
+**The display is self-sufficient.** The adult moves between the hub and a game
 by tapping the board. Playback must never require an active connection to the
 phone.
 
@@ -183,7 +202,8 @@ must not be placed where a child will hit them by accident during play.
 
 ### 6.1 The world
 
-- The map is a fixed, product-authored world, extended by product updates.
+- The world is fixed and product-authored, extended by product updates. Which
+  section a chapter stands in — Juegos or Recursos — is authored with it.
 - It is not user-composed, collaborative, or editable.
 - Progression is intended to be easy. Unlocking paces discovery; it is not a
   difficulty gate.
@@ -211,8 +231,18 @@ begins, so a lesson can be planned around what the class can actually reach.
   and validated parameters.
 - `Progress`: unlock and completion state.
 
-Progress belongs to the account. Per-child profiles within a single account are
-a possible future addition and must not be designed out, but are not required.
+Progress belongs to a **player profile**, not to the account as a whole. A
+device holds one profile per child — a name, a chosen avatar, and optionally a
+birth month and year — and each profile has its own progress namespace, so
+siblings sharing a tablet keep separate worlds.
+
+Profiles are local to the device today; there are no accounts yet. When
+accounts arrive a profile is read from a child record under a group, and the
+store behind the existing interface is replaced without the player changing.
+See `docs/plans/ongoing/child-profiles.md`.
+
+A profile is never a prerequisite for playing. Every device creates one
+automatically on first launch, inheriting whatever progress is already there.
 
 Deleting a child record must remove that child from every resource that
 references them, falling back to default content rather than failing.
@@ -226,9 +256,9 @@ Resources reference media; they never duplicate it.
   the account's uploaded pictures placed into it. It is rendered by the player
   at playback time, not encoded as a video file. It is **not exportable,
   downloadable, or shareable**; it plays inside the application only.
-- **map / hub** — reads progress and routes into the other kinds.
+- **hub** — reads progress and routes into the other kinds.
 
-The map belongs to the player shell, not the template catalogue, because it
+The hub belongs to the player shell, not the template catalogue, because it
 depends on progress state that templates must not access.
 
 ### 6.4 Template contract
@@ -237,6 +267,8 @@ Each template declares:
 
 - stable identifier and immutable version;
 - resource kind;
+- whether it can play without a roster — see
+  [ADR 0010](../decisions/0010-one-template-may-require-a-roster.md);
 - learning objective and target age;
 - product-authored default content for every personalisable slot;
 - personalisation slots, their media and text roles, and their selection
@@ -254,6 +286,11 @@ but cannot modify mechanics, timelines, or executable behaviour.
 Because default content is mandatory, every personalisable slot carries
 product-authored art, text, or audio. This is a standing content-production
 cost and must be budgeted per template.
+
+The one template that requires a roster has no personalisable slots at all: its
+content is the roster, so there is nothing for a default to stand in for. It
+carries no default-content cost and, in exchange, cannot be opened until an
+adult has recorded somebody.
 
 ### 6.5 Validation
 
@@ -424,7 +461,6 @@ model are defined.
 
 - Whether phone-driven control of the display is added as a later enhancement.
   The display remains self-sufficient regardless. See 5.3.
-- Whether per-child profiles within one account are added.
 - Whether offline playback becomes mandatory.
 - Pricing, licensing, and WooCommerce integration.
 - Photo background removal in a later privacy-reviewed release.

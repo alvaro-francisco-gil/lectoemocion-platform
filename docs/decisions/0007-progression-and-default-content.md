@@ -1,10 +1,15 @@
 # ADR 0007: Progression and default content
 
 Date: 2026-08-05  
-Status: Accepted
+Status: Accepted, amended by
+[ADR 0010](0010-one-template-may-require-a-roster.md)
 
 Distilled from the world-progression plan, which shipped and was verified on
 2026-08-05 (roadmap stage 3).
+
+ADR 0010 carves out exactly one exception to "every resource plays with no
+personalised content present": `name-book`, whose content *is* the roster. The
+slot machinery below is unchanged and still governs every other template.
 
 ## Context
 
@@ -113,11 +118,13 @@ still ship a bundle that reads the flag at runtime. This was not hypothetical.
 ## Consequences
 
 - Every resource in the catalogue plays with no personalised content present.
+  *(Amended by ADR 0010: `name-book` is the one declared exception.)*
 - Stage 4 replaces `LocalProgressStore` and supplies a real owner id; no other
   caller changes.
 - Adding a template requires: a schema branch, a kind in `TEMPLATE_KINDS`, a
   dispatcher case, and a renderer. Three of those four are compile errors if
-  forgotten.
+  forgotten. *(ADR 0010 adds a fifth, `TEMPLATES_NEEDING_ROSTER`, also a
+  compile error.)*
 - Content updates may reshape the graph freely without touching saved state.
 
 ## Revisit when

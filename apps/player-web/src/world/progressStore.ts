@@ -3,7 +3,7 @@ import {
   STARS_PER_COMPLETION,
   type ClaimedReward,
   type Progress
-} from "./mapView";
+} from "./worldView";
 
 /**
  * Where progress lives.
@@ -141,20 +141,30 @@ export class LocalProgressStore implements ProgressStore {
   }
 
   /**
-   * The first claim for a node wins.
+   * One claim per node, naming the animal the chapter grants now.
    *
    * Opening a chest is a one-off: a second claim — a double tap, a stale tab —
-   * must not swap the animal a child has already been shown and already sees
-   * in their collection.
+   * must not pay the chapter twice. A chapter grants exactly one animal, so a
+   * repeat names the same one and this is simply idempotent.
+   *
+   * A claim naming a *different* animal is not a double tap: it can only mean a
+   * content update has retired what the chapter used to grant, which is the
+   * case `deriveWorldView` re-offers the chests for. Keeping the stale entry
+   * would make that offer unpayable, and because the ceremony is derived from
+   * storage the child would meet it again on every visit with the world
+   * unreachable behind it. The stored claim follows the world.
    */
   async claimReward(nodeId: string, animalId: string): Promise<Progress> {
     const current = await this.read();
-    if (current.rewards.some((reward) => reward.nodeId === nodeId)) {
-      return current;
-    }
+    const claimed = current.rewards.find((reward) => reward.nodeId === nodeId);
+    if (claimed?.animalId === animalId) return current;
+
     return this.write({
       ...current,
-      rewards: [...current.rewards, { nodeId, animalId }]
+      rewards: [
+        ...current.rewards.filter((reward) => reward.nodeId !== nodeId),
+        { nodeId, animalId }
+      ]
     });
   }
 

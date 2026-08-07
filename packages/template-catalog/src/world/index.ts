@@ -5,6 +5,7 @@ import { GALLO_RAYO_STORY_ID } from "../fixtures/galloRayo";
 import { createIllustratedStoryResource } from "../illustratedStory";
 import { createInitialsGameResource } from "../initialsGame";
 import { createMemoryAlbumResource } from "../memoryAlbum";
+import { createNameBookResource } from "../nameBook";
 import { createNameStoryResource } from "../nameStory";
 import {
   createInitialLetterGameResource,
@@ -51,226 +52,195 @@ function animal(animalId: string, label: string): CollectibleAnimal {
  * rather than gating difficulty, so the graph is a gentle chain with one
  * branch rather than a tree of prerequisites.
  *
- * It is split into regions — places, not chapters of difficulty. A child walks
- * off the end of the farm into the forest and back again, and the prerequisite
- * graph deliberately crosses between them so that the walk is part of playing
- * rather than a one-way door.
- *
- * Every node plays on default content. Nothing here needs a roster.
+ * One flat list, in the order a child meets it. Every node plays on default
+ * content; nothing here needs a roster.
  */
 export const world: World = parseWorld({
-  regions: [
+  nodes: [
     {
-      id: "granja",
-      title: "La granja",
-      background: "/world/granero.webp",
-      nodes: [
-        {
-          id: "encuentro",
-          title: "El encuentro",
-          icon: "/world/duende.webp",
-          unlockedBy: [],
-          resource: { template: "name-story", seed: "encuentro" },
-          reward: {
-            choices: [animal("gato", "Gato"), animal("perro", "Perro"), animal("conejo", "Conejo")]
-          }
-        },
-        /*
-         * The book sits beside the first minigame rather than in front of it, on
-         * the branch the world already allows. It is thirty-one pages long — far
-         * the longest thing here — and putting it across the only path would make
-         * every child read all of it before they could play anything.
-         */
-        {
-          id: "gallo-rayo",
-          title: "El gallo Rayo",
-          icon: picture("gallo"),
-          unlockedBy: ["encuentro"],
-          resource: {
-            template: "illustrated-story",
-            seed: "gallo-rayo",
-            storyId: "gallo-rayo"
-          },
-          /* The three the book itself opens on: the rooster and his two mice. */
-          reward: {
-            choices: [
-              animal("gallo", "Gallo"),
-              animal("pollito", "Pollito"),
-              animal("raton", "Ratón")
-            ]
-          }
-        },
-        {
-          id: "iniciales",
-          title: "Las iniciales",
-          icon: picture("abeja"),
-          unlockedBy: ["encuentro"],
-          resource: {
-            template: "initials-game",
-            seed: "iniciales",
-            targetInitial: "A"
-          },
-          reward: {
-            choices: [
-              animal("koala", "Koala"),
-              animal("jirafa", "Jirafa"),
-              animal("elefante", "Elefante")
-            ]
-          }
-        },
-        {
-          id: "primeras-letras",
-          title: "Las primeras letras",
-          icon: picture("luna"),
-          unlockedBy: ["cual-es"],
-          /*
-           * Four letters a child can tell apart at a glance, on four unrelated
-           * pictures. No two may share an initial — a letter card that fitted two
-           * pictures would have no right answer — and the builder refuses a set
-           * that does.
-           */
-          resource: {
-            template: "initial-letter-game",
-            seed: "primeras-letras",
-            vocabulary: ["luna", "sol", "pato", "flor"]
-          },
-          reward: {
-            choices: [
-              animal("caballo", "Caballo"),
-              animal("vaca", "Vaca"),
-              animal("oveja", "Oveja")
-            ]
-          }
-        },
-        {
-          id: "silabas",
-          title: "El puente de sílabas",
-          icon: picture("mariposa"),
-          unlockedBy: ["parejas"],
-          resource: {
-            template: "syllables-game",
-            seed: "silabas",
-            targetVocabularyItemId: "mariposa"
-          },
-          reward: {
-            choices: [
-              animal("tigre", "Tigre"),
-              animal("leon", "León"),
-              animal("mono", "Mono")
-            ]
-          }
-        },
-        {
-          id: "letras",
-          title: "El taller de letras",
-          icon: picture("pato"),
-          unlockedBy: ["silabas"],
-          /* Four letters, four distinct ones: nothing to place by elimination. */
-          resource: {
-            template: "letters-game",
-            seed: "letras",
-            targetVocabularyItemId: "pato"
-          },
-          reward: {
-            choices: [
-              animal("zorro", "Zorro"),
-              animal("erizo", "Erizo"),
-              animal("tortuga", "Tortuga")
-            ]
-          }
-        },
-        {
-          id: "empieza-igual",
-          title: "Empieza igual",
-          icon: picture("gato"),
-          unlockedBy: ["letras"],
-          /*
-           * `GA-to` against `GA-llo` or `GA-fas`: the syllable, not the letter.
-           * It comes after the letters workshop on purpose — a child who has taken
-           * a word apart into letters is ready to hear the piece above them.
-           */
-          resource: {
-            template: "initial-syllable-game",
-            seed: "empieza-igual",
-            targetVocabularyItemId: "gato"
-          },
-          reward: {
-            choices: [
-              animal("buho", "Búho"),
-              animal("rana", "Rana"),
-              animal("flamenco", "Flamenco")
-            ]
-          }
-        },
-        {
-          id: "album",
-          title: "Nuestro álbum",
-          icon: picture("camara"),
-          unlockedBy: ["primeras-letras", "empieza-igual"],
-          resource: { template: "memory-album", seed: "album" },
-          reward: {
-            choices: [
-              animal("pinguino", "Pingüino"),
-              animal("foca", "Foca"),
-              animal("tucan", "Tucán")
-            ]
-          }
-        }
-      ]
+      id: "encuentro",
+      title: "El encuentro",
+      icon: "/world/duende.webp",
+      surface: "juegos",
+      unlockedBy: [],
+      resource: { template: "name-story", seed: "encuentro" },
+      reward: {
+        animal: animal("gato", "Gato")
+      }
     },
     /*
-     * The forest is a second place, not a second difficulty. Two chapters
-     * stand in it, and what unlocks them is still their own `unlockedBy` — a
-     * child reaches the door once there is something behind it to play.
-     *
-     * The farm needs the forest back: the chapters after these two are on the
-     * farm and wait on them. The walk is meant to go both ways.
+     * The book is on the shelf, not on the path, and it is open from the first
+     * screen. It is thirty-one pages long — far the longest thing here — and a
+     * book a child has to unlock is a book most of them never open. It still
+     * pays its letriestrellas and its chest: what a chapter is worth does not
+     * depend on which section it is reached from.
      */
     {
-      id: "bosque",
-      title: "El bosque",
-      background: "/world/bosque.webp",
-      nodes: [
-        {
-          id: "parejas",
-          title: "El bosque de parejas",
-          icon: picture("dados"),
-          unlockedBy: ["iniciales"],
-          /* Named, not drawn: three short, unrelated words a child can tell apart. */
-          resource: {
-            template: "pairs-game",
-            seed: "parejas",
-            vocabulary: ["gato", "luna", "mesa"]
-          },
-          reward: {
-            choices: [
-              animal("mariposa", "Mariposa"),
-              animal("abeja", "Abeja"),
-              animal("mariquita", "Mariquita")
-            ]
-          }
-        },
-        {
-          id: "cual-es",
-          title: "¿Cuál es?",
-          icon: picture("manzana"),
-          unlockedBy: ["parejas"],
-          resource: {
-            template: "word-picture-game",
-            seed: "cual-es",
-            targetVocabularyItemId: "manzana",
-            /* Wrong answers chosen to be plainly different, not near-misses. */
-            distractors: ["tren", "pelota"]
-          },
-          reward: {
-            choices: [
-              animal("delfin", "Delfín"),
-              animal("ballena", "Ballena"),
-              animal("pulpo", "Pulpo")
-            ]
-          }
-        }
-      ]
+      id: "gallo-rayo",
+      title: "El gallo Rayo",
+      icon: picture("gallo"),
+      surface: "recursos",
+      unlockedBy: [],
+      resource: {
+        template: "illustrated-story",
+        seed: "gallo-rayo",
+        storyId: "gallo-rayo"
+      },
+      /* The three the book itself opens on: the rooster and his two mice. */
+      reward: {
+        animal: animal("gallo", "Gallo")
+      }
+    },
+    /*
+     * The second thing on the shelf, and the only chapter in the world that
+     * cannot be played on defaults. With nobody recorded there is no book at
+     * all, so the player shows it locked with an adult-facing reason rather
+     * than opening it onto nothing — see `templateNeedsRoster`.
+     *
+     * It is on the shelf and not on the path for the same reason the story is:
+     * a book a child has to unlock is a book most of them never open.
+     */
+    {
+      id: "libro-nombres",
+      title: "El libro de los nombres",
+      icon: picture("corazon"),
+      surface: "recursos",
+      unlockedBy: [],
+      resource: { template: "name-book", seed: "libro-nombres" },
+      reward: {
+        animal: animal("llama", "Llama")
+      }
+    },
+    {
+      id: "iniciales",
+      title: "Las iniciales",
+      icon: picture("abeja"),
+      surface: "juegos",
+      unlockedBy: ["encuentro"],
+      resource: {
+        template: "initials-game",
+        seed: "iniciales",
+        targetInitial: "A"
+      },
+      reward: {
+        animal: animal("koala", "Koala")
+      }
+    },
+    {
+      id: "parejas",
+      title: "El bosque de parejas",
+      icon: picture("dados"),
+      surface: "juegos",
+      unlockedBy: ["iniciales"],
+      /* Named, not drawn: three short, unrelated words a child can tell apart. */
+      resource: {
+        template: "pairs-game",
+        seed: "parejas",
+        vocabulary: ["gato", "luna", "mesa"]
+      },
+      reward: {
+        animal: animal("mariposa", "Mariposa")
+      }
+    },
+    {
+      id: "cual-es",
+      title: "¿Cuál es?",
+      icon: picture("manzana"),
+      surface: "juegos",
+      unlockedBy: ["parejas"],
+      resource: {
+        template: "word-picture-game",
+        seed: "cual-es",
+        targetVocabularyItemId: "manzana",
+        /* Wrong answers chosen to be plainly different, not near-misses. */
+        distractors: ["tren", "pelota"]
+      },
+      reward: {
+        animal: animal("delfin", "Delfín")
+      }
+    },
+    {
+      id: "primeras-letras",
+      title: "Las primeras letras",
+      icon: picture("luna"),
+      surface: "juegos",
+      unlockedBy: ["cual-es"],
+      /*
+       * Four letters a child can tell apart at a glance, on four unrelated
+       * pictures. No two may share an initial — a letter card that fitted two
+       * pictures would have no right answer — and the builder refuses a set
+       * that does.
+       */
+      resource: {
+        template: "initial-letter-game",
+        seed: "primeras-letras",
+        vocabulary: ["luna", "sol", "pato", "flor"]
+      },
+      reward: {
+        animal: animal("caballo", "Caballo")
+      }
+    },
+    {
+      id: "silabas",
+      title: "El puente de sílabas",
+      icon: picture("mariposa"),
+      surface: "juegos",
+      unlockedBy: ["parejas"],
+      resource: {
+        template: "syllables-game",
+        seed: "silabas",
+        targetVocabularyItemId: "mariposa"
+      },
+      reward: {
+        animal: animal("tigre", "Tigre")
+      }
+    },
+    {
+      id: "letras",
+      title: "El taller de letras",
+      icon: picture("pato"),
+      surface: "juegos",
+      unlockedBy: ["silabas"],
+      /* Four letters, four distinct ones: nothing to place by elimination. */
+      resource: {
+        template: "letters-game",
+        seed: "letras",
+        targetVocabularyItemId: "pato"
+      },
+      reward: {
+        animal: animal("zorro", "Zorro")
+      }
+    },
+    {
+      id: "empieza-igual",
+      title: "Empieza igual",
+      icon: picture("gato"),
+      surface: "juegos",
+      unlockedBy: ["letras"],
+      /*
+       * `GA-to` against `GA-llo` or `GA-fas`: the syllable, not the letter.
+       * It comes after the letters workshop on purpose — a child who has taken
+       * a word apart into letters is ready to hear the piece above them.
+       */
+      resource: {
+        template: "initial-syllable-game",
+        seed: "empieza-igual",
+        targetVocabularyItemId: "gato"
+      },
+      reward: {
+        animal: animal("buho", "Búho")
+      }
+    },
+    {
+      id: "album",
+      title: "Nuestro álbum",
+      icon: picture("camara"),
+      surface: "juegos",
+      unlockedBy: ["primeras-letras", "empieza-igual"],
+      resource: { template: "memory-album", seed: "album" },
+      reward: {
+        animal: animal("pinguino", "Pingüino")
+      }
     }
   ]
 });
@@ -294,6 +264,14 @@ export function createResourceForNode(
       return createNameStoryResource(resource.seed, roster);
     case "illustrated-story":
       return createIllustratedStoryResource(resource.storyId, resource.seed);
+    /*
+     * The one template the default roster cannot satisfy. It throws rather than
+     * returning an empty book, and the player is expected to have refused to
+     * launch it — `templateNeedsRoster` is the gate, this is the proof the gate
+     * is the only way in.
+     */
+    case "name-book":
+      return createNameBookResource(roster, resource.seed);
     case "initials-game":
       return createInitialsGameResource(
         resource.targetInitial,

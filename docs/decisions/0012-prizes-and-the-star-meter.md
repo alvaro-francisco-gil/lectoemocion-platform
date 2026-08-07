@@ -1,4 +1,4 @@
-# ADR 0008: Prizes and the star meter
+# ADR 0012: Prizes and the star meter
 
 Date: 2026-08-08  
 Status: Accepted
@@ -11,8 +11,9 @@ Distilled from the prizes plan, which shipped and was verified on 2026-08-07.
 paid on replays too — with nothing that spent them. [PR #2][pr2] proposed a
 coupon shop: adults write priced offers, a child buys them, a balance goes
 down. That PR is closed. Its ADR, `0008-incentives-and-the-star-economy.md`,
-never reached `main`; this document takes the number in its place and, below,
-the record of why the concept changed.
+never reached `main`; this document carries the record of why the concept
+changed. It was drafted as 0008 and renumbered to 0012 when it merged: `main`
+had reached 0011 in the meantime, and two ADRs cannot share a number.
 
 [pr2]: https://github.com/alvaro-francisco-gil/lectoemocion-platform/pull/2
 
@@ -32,7 +33,7 @@ filled = starsEarned − Σ prize.costStars
 a prize is owed while filled ≥ goal
 ```
 
-The same trick `deriveMapView` already used for `pendingReward`: state
+The same trick `deriveWorldView` already used for `pendingReward`: state
 computable from what happened is computed, so closing the tab between the last
 frame of a game and the ceremony cannot quietly cost a reward. `costStars` is
 recorded on the prize at award time, which is what makes a later goal change
@@ -60,10 +61,19 @@ child nothing at the one that matters.
 `isPlausibleBirthYear` guards entry to the adult area as a whole, once per
 visit — not each individual control inside it. It is sized to the actual
 threat, a curious three-year-old with a finger, not to a determined adult:
-a four-digit year on a numeric keypad is past what that child can do, and
-costs a literate adult two seconds. Every present and future adult control
-inherits the one gate instead of growing its own, and there is one place to
-change if the mechanism ever needs to be stronger.
+a four-digit year is past what that child can do, and costs a literate adult
+two seconds. Every present and future adult control inherits the one gate
+instead of growing its own, and there is one place to change if the mechanism
+ever needs to be stronger.
+
+**This is currently untrue, and knowingly so.** Merging profiles brought a
+second gate — `src/app/AdultGate.tsx`, a full-screen keypad reading the same
+year through `src/profiles/adultYear.ts` — beside this one at
+`src/app/adult/AdultGate.tsx`. Two gates asking one question is exactly the
+duplication this section rules out, and consolidating them is tracked as its
+own change. Until it lands, `src/app/adult/` still has exactly one door and
+`scripts/check-adult-gate.mjs` still proves it; what is duplicated is the door,
+not the rule.
 
 ## Rejected alternatives
 
@@ -75,8 +85,8 @@ the child's only job is to notice progress, not to reason about value.
 
 **Resetting the meter only on opening.** Consuming `costStars` at open time
 instead of award time throws away every letriestrella earned while a gift sits
-unopened — exactly the tab-close failure `deriveMapView` already exists to
-avoid for the map's own reward. Consuming it at award time keeps the meter
+unopened — exactly the tab-close failure `deriveWorldView` already exists to
+avoid for the world's own reward. Consuming it at award time keeps the meter
 refilling immediately, so no star a child earns is ever provisionally at risk.
 
 **A branded `PrizePresetId`.** Reads as more disciplined than a literal union,
@@ -105,12 +115,18 @@ carries `unprepared` and `prepared` beside it. The rule is that
 screen that needs a different meaning asks for it there.
 
 **A touch target is proven reachable in the real layout it ships in, not only
-in a component test's DOM.** The map's waiting gift rendered correctly and
+in a component test's DOM.** The world's waiting gift rendered correctly and
 passed every component test while sharing a hit region with the collection
 strip below it on wider viewports, which absorbed the tap first — a class of
 overlap jsdom cannot detect. `pnpm test:e2e` in a real browser, at the
-viewports the player ships to, is required for any change touching the map or
+viewports the player ships to, is required for any change touching the world or
 a ceremony for exactly this reason.
+
+That strip is gone: the animals became a modal book, and `.world__gift` is now
+measured against `.tab-bar__tabs`, the tallest thing left in the bottom band.
+The rule is what survives the layout that produced it — a number in a
+stylesheet that clears something is only true of the something it was measured
+against, and it has to be re-measured when that changes.
 
 ## Revisit when
 

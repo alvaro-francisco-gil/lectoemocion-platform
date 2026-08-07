@@ -1,7 +1,7 @@
 import type { ManifestFor, VocabularyItem } from "@lectoemocion/resource-schema";
 import { vocabularyWord } from "@lectoemocion/resource-schema";
 import { seededShuffle } from "../seededRandom";
-import { ROUND_LIVES, type RoundStatus } from "./lives";
+import { type RoundStatus } from "./roundStatus";
 
 export type InitialLetterCardGroup = "picture" | "letter";
 
@@ -31,7 +31,6 @@ export interface InitialLetterRound {
   /** The initials already connected, which is also what "won" counts. */
   readonly matched: readonly string[];
   readonly selectedCardId: string | null;
-  readonly livesRemaining: number;
   readonly status: RoundStatus;
 }
 
@@ -123,7 +122,6 @@ export function createInitialLetterRound(
     cards: [...pictures, ...letters],
     matched: [],
     selectedCardId: null,
-    livesRemaining: ROUND_LIVES,
     status: "playing"
   };
 }
@@ -152,9 +150,9 @@ export function selectInitialLetterCard(
   }
 
   /*
-   * A second tap in the same column clears the selection rather than costing a
-   * life, exactly as the pairs game does: changing your mind about which
-   * picture you meant is not a wrong answer.
+   * A second tap in the same column clears the selection, exactly as the pairs
+   * game does: changing your mind about which picture you meant is not a wrong
+   * answer, and is reported as its own attempt rather than as a mismatch.
    */
   if (selected.group === card.group) {
     return {
@@ -177,14 +175,9 @@ export function selectInitialLetterCard(
     };
   }
 
-  const livesRemaining = round.livesRemaining - 1;
+  /* A picture filed under the wrong letter costs the selection and nothing else. */
   return {
-    round: {
-      ...round,
-      selectedCardId: null,
-      livesRemaining,
-      status: livesRemaining === 0 ? "lost" : "playing"
-    },
+    round: { ...round, selectedCardId: null },
     attempt: { kind: "mismatched", cardIds: [selected.cardId, card.cardId] }
   };
 }

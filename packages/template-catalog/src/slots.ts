@@ -1,9 +1,6 @@
 import type { ChildRecord } from "@lectoemocion/domain";
-import type {
-  Character,
-  ParticipantSlot,
-  PersonalisedCharacter
-} from "@lectoemocion/resource-schema";
+import type { Character, ParticipantSlot } from "@lectoemocion/resource-schema";
+import { toPersonalisedCharacter } from "./mediaUrl";
 
 /**
  * Turns product-authored characters into slots.
@@ -18,16 +15,6 @@ export function toSlots(cast: readonly Character[]): ParticipantSlot[] {
     slotId: `character-${index + 1}`,
     default: character
   }));
-}
-
-function toPersonalisedCharacter(child: ChildRecord): PersonalisedCharacter {
-  return {
-    childRecordId: child.id,
-    displayName: child.displayName,
-    verifiedInitial: child.verifiedInitial,
-    photoUrl: `/synthetic/${child.photoAssetId}.svg`,
-    pronunciationUrl: `/synthetic/${child.pronunciationAssetId}.mp3`
-  };
 }
 
 /**

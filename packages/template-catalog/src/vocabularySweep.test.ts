@@ -21,8 +21,7 @@ import {
   wordInitial,
   wordLetters,
   LETTERS_MAXIMUM,
-  LETTERS_MINIMUM,
-  ROUND_LIVES
+  LETTERS_MINIMUM
 } from "@lectoemocion/template-sdk";
 import {
   createInitialLetterGameResource,
@@ -135,7 +134,6 @@ describe("every multi-syllable word makes a winnable syllables round", () => {
       }
 
       expect(round.status).toBe("won");
-      expect(round.livesRemaining).toBe(ROUND_LIVES);
       expect(round.slots.map((each) => each?.syllable).join("")).toBe(
         item.vocabularyItemId
       );
@@ -172,7 +170,6 @@ describe("every spellable word makes a winnable letters round", () => {
       }
 
       expect(round.status).toBe("won");
-      expect(round.livesRemaining).toBe(ROUND_LIVES);
       expect(round.slots.map((each) => each?.letter).join("")).toBe(
         item.vocabularyItemId
       );
@@ -292,7 +289,6 @@ describe("pairs rounds over the real vocabulary", () => {
       round = selectPairsCard(round, `${item.vocabularyItemId}-word`).round;
     }
     expect(round.status).toBe("won");
-    expect(round.livesRemaining).toBe(ROUND_LIVES);
   });
 
   it("draws the same set for the same seed and a different one otherwise", () => {
@@ -328,7 +324,6 @@ describe("initial-letter rounds over the real vocabulary", () => {
       round = selectInitialLetterCard(round, `${wordInitial(item)}-letter`).round;
     }
     expect(round.status).toBe("won");
-    expect(round.livesRemaining).toBe(ROUND_LIVES);
   });
 
   /*

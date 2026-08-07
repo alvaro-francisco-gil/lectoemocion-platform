@@ -7,7 +7,11 @@
     "build": "turbo run build",
     "check": "pnpm guardrails && pnpm typecheck && pnpm test && pnpm build",
     "dev": "turbo run dev --filter=@lectoemocion/player-web",
-    "guardrails": "node scripts/check-engine-neutral.mjs && node scripts/check-firebase-boundary.mjs && node scripts/check-strict-types.mjs && node scripts/check-privacy.mjs && node scripts/check-progress-boundary.mjs && node scripts/check-adult-gate.mjs",
+    "mobile": "node scripts/mobile-emulator.mjs",
+    "mobile:up": "node scripts/mobile-emulator.mjs up",
+    "mobile:boot": "node scripts/mobile-emulator.mjs boot",
+    "mobile:start": "node scripts/mobile-emulator.mjs start",
+    "guardrails": "node scripts/check-engine-neutral.mjs && node scripts/check-firebase-boundary.mjs && node scripts/check-strict-types.mjs && node scripts/check-privacy.mjs && node scripts/check-progress-boundary.mjs && node scripts/check-progress-namespace.mjs && node scripts/check-adult-gate.mjs",
     "test": "vitest run",
     "test:e2e": "pnpm --filter @lectoemocion/player-web test:e2e",
     "typecheck": "turbo run typecheck"

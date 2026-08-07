@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { ManifestFor } from "@lectoemocion/resource-schema";
-import { ROUND_LIVES } from "./lives";
 import { chooseWordPicture, createWordPictureRound } from "./wordPictureGame";
 
 const manifest: ManifestFor<"word-picture-game"> = {
@@ -28,7 +27,6 @@ describe("createWordPictureRound", () => {
       "luna",
       "sol"
     ]);
-    expect(round.livesRemaining).toBe(ROUND_LIVES);
     expect(round.status).toBe("playing");
   });
 
@@ -56,29 +54,25 @@ describe("chooseWordPicture", () => {
     );
     expect(attempt).toEqual({ kind: "correct" });
     expect(round.status).toBe("won");
-    expect(round.livesRemaining).toBe(ROUND_LIVES);
   });
 
-  it("spends a life on a distractor and keeps playing", () => {
-    const { round, attempt } = chooseWordPicture(
-      createWordPictureRound(manifest),
-      "sol"
-    );
+  it("keeps playing after a distractor, changing nothing", () => {
+    const opening = createWordPictureRound(manifest);
+    const { round, attempt } = chooseWordPicture(opening, "sol");
     expect(attempt).toEqual({ kind: "incorrect" });
-    expect(round.status).toBe("playing");
-    expect(round.livesRemaining).toBe(ROUND_LIVES - 1);
+    expect(round).toEqual(opening);
   });
 
-  it("loses once lives run out", () => {
+  it("still offers the target after a dozen distractors", () => {
     let round = createWordPictureRound(manifest);
-    for (let attempt = 0; attempt < ROUND_LIVES; attempt += 1) {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
       round = chooseWordPicture(round, "sol").round;
     }
-    expect(round.livesRemaining).toBe(0);
-    expect(round.status).toBe("lost");
+    expect(round.status).toBe("playing");
+    expect(chooseWordPicture(round, "casa").round.status).toBe("won");
   });
 
-  it("ignores choices once the round has ended", () => {
+  it("ignores choices once the round is won", () => {
     const won = chooseWordPicture(createWordPictureRound(manifest), "casa").round;
     const { round, attempt } = chooseWordPicture(won, "sol");
     expect(attempt).toEqual({ kind: "ignored" });

@@ -9,15 +9,33 @@ inside the mobile shell. See
 
 ```text
 src/app/      React shell — routing, adult-facing UI
-src/world/    progression — progress storage and the map view derived from it
+src/world/    progression — progress storage and the world view derived from it
+src/profiles/ who is playing — the profile record's store and the avatar catalogue
 src/game/     the rendering adapter — the only place Phaser may appear
 ```
 
 Progression lives in `src/world/` and nowhere else.
+
+`src/profiles/` is deliberately separate from it. A profile is *who* is
+playing; progress is *what they have done*, and the only thing joining them is
+that a profile's id is the owner a `ProgressStore` is namespaced by. Keeping
+them apart is what lets accounts replace either one without touching the other.
+`src/profiles/` must not import from `src/world/` beyond `LOCAL_OWNER` and
+`storageKey` — the two names it needs to adopt existing progress and to delete
+a child's.
+
+**A profile's id is its progress namespace.** `storageKey(id)` is the only
+thing that may build `lectoemocion.progress.<id>`, and a profile id is the only
+thing that may be passed to it. That single derivation is what keeps two
+children's stars apart on a shared family tablet, and the failure when it
+breaks is completely silent — no error, no missing data, just a sibling's world
+quietly becoming yours. `scripts/check-progress-namespace.mjs` enforces it with
+no exceptions, tests included: a test that hand-builds the key is a test that
+keeps passing after the key changes shape.
 `scripts/check-progress-boundary.mjs` stops a template or a shared package
-importing it. The shell reads progress, derives a `MapView`, and hands the map
-scene that view plus a callback; it hands a template a manifest plus a
-completion callback. Neither ever sees `Progress`.
+importing it. The shell reads progress, derives a `WorldView`, and draws the
+sections from it; it hands a template a manifest plus a completion callback.
+No template ever sees `Progress`.
 
 `scripts/check-engine-neutral.mjs` enforces that boundary. Phaser types must not
 escape `src/game/` into the shell, shared packages, or manifests: the renderer
@@ -34,25 +52,52 @@ Screens receive a `PrizeView` and callbacks, never `Prizes`, so no screen grows
 its own opinion about whether a gift is owed. The adult area is reachable only
 through `src/app/adult/index.tsx`, which is what
 `scripts/check-adult-gate.mjs` enforces. Rationale is in
-[ADR 0008](../../docs/decisions/0008-prizes-and-the-star-meter.md).
+[ADR 0012](../../docs/decisions/0012-prizes-and-the-star-meter.md).
 
-## The map
+Two things about the prizes are knowingly unfinished, and neither is a licence
+to add more of the same:
 
-The map is what a child who cannot read navigates, so it is pictures first.
+- **There are two adult gates.** `src/app/AdultGate.tsx` — a full-screen keypad
+  over `src/profiles/adultYear.ts` — guards the profile drawer, and
+  `src/app/adult/AdultGate.tsx` — a field over `adultGate.ts` in
+  `@lectoemocion/domain` — guards the prize settings. One question, two
+  implementations, two sets of stylesheet classes (`.adult-gate*` and
+  `.prize-gate*`). A new adult surface uses one of these; it does not write a
+  third.
+- **The prizes are the device's, not a child's.** `progressStore` is namespaced
+  by the playing profile's id; `prizeStore` and `prizeImageStore` are still
+  keyed by `LOCAL_OWNER`, so on a shared family tablet one child's regalo is
+  every child's. Both are built in `App` beside the progress store, which is
+  where that changes.
 
-- **A chapter is its own illustration, never a glyph.** No numbers, no letters,
-  no ordinal on the marker. The picture is authored per node as `icon` in the
-  world schema; the title under it is for the adult and the screen reader.
-- **One region is on screen at a time**, with its backdrop behind it and a door
-  at each end leading to the region beside it. `--map-scene` carries the
-  backdrop from the shell into the stylesheet — which place a child is standing
-  in is content, not CSS.
-- **A door is open when something inside the region it leads to is open.**
-  Derived by `deriveMapView` from the same `unlockedBy` rule as the nodes;
-  there is no second progression counting chapters. The way back is always
-  open.
-- **Which region a child is in is session state, not stored progress.** The app
-  opens where the world begins.
+## The world
+
+The world is what a child who cannot read navigates, so it is pictures first.
+
+- **A chapter is its own illustration on a card, never a glyph.** No numbers,
+  no letters, no ordinal. The picture is authored per node as `icon` in the
+  world schema and fills the card; the title on the chip over it is for the
+  adult and the screen reader.
+- **There are three sections and one of them is shut.** Juegos and Recursos come
+  from `WorldNode.surface`, authored per node and never derived from the
+  template — "a book belongs on the shelf" is a rule that breaks silently the
+  first time it is wrong. Multijugador is a disabled button, not a member of the
+  shell's `TabId` union: a screen that cannot be built is a state that cannot be
+  represented.
+- **What a chapter is worth does not depend on the section it is in.** The story
+  on the shelf pays letriestrellas and a chest exactly as a game does, and keeps
+  its slot in the collection. Rewards belong to the world, not to a tab.
+- **Which section a child is in is session state, not stored progress.** The app
+  opens on Juegos.
+- **Exactly one screen is on at a time**: a playing resource, the stars, the
+  reveal, the chests, the gift ceremony, the adult area, or a section.
+  Exclusive rather than layered, so nothing a child can touch is ever hidden
+  behind something else. The profile drawer and the animal book are the two
+  declared layers over the world, for the reasons given above them in `App.tsx`.
+- **A ceremony does not interrupt a ceremony.** A chapter can both owe a chest
+  and reach the prize goal. The gift is held in `detour` until the animal's
+  stamp has landed, because the book is a layer over the world and a screen
+  returning early would replace the frame the stamp is drawn in.
 
 ## Rendering rules
 

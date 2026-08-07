@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  CHEST_COUNT,
   parseResourceManifest,
   parseWorld,
   worldNodes
 } from "@lectoemocion/resource-schema";
-import { templateKind } from "@lectoemocion/template-sdk";
+import { templateKind, templateNeedsRoster } from "@lectoemocion/template-sdk";
 import { defaultVocabulary } from "../fixtures/defaultVocabulary";
+import { syntheticClass } from "../fixtures/syntheticClass";
 import { createResourceForNode, world } from ".";
 
 describe("the authored world", () => {
@@ -14,9 +14,48 @@ describe("the authored world", () => {
     expect(parseWorld(world)).toEqual(world);
   });
 
-  it("has exactly one entry node", () => {
-    const entries = worldNodes(world).filter((node) => node.unlockedBy.length === 0);
-    expect(entries).toHaveLength(1);
+  it("has exactly one entry node under Juegos", () => {
+    const entries = worldNodes(world).filter(
+      (node) => node.surface === "juegos" && node.unlockedBy.length === 0
+    );
+    expect(entries.map((node) => node.id)).toEqual(["encuentro"]);
+  });
+
+  /*
+   * The shelf is not a reward. A book a child has to unlock is a book most of
+   * them never open, so the story is reachable from the very first screen —
+   * and it is the only thing on the shelf, which is why this names it.
+   */
+  it("keeps the books on the shelf, open from the first screen", () => {
+    const shelf = worldNodes(world).filter(
+      (node) => node.surface === "recursos"
+    );
+    expect(shelf.map((node) => node.id)).toEqual(["gallo-rayo", "libro-nombres"]);
+    expect(shelf.every((node) => node.unlockedBy.length === 0)).toBe(true);
+  });
+
+  /**
+   * The book of names is gated by whether a roster exists, and by nothing in
+   * the graph. `unlockedBy` describes what a child has played; needing a
+   * roster is a different question with a different answer, asked of the
+   * player rather than of progress — see `templateNeedsRoster`.
+   */
+  it("does not express the roster requirement as a prerequisite", () => {
+    const book = worldNodes(world).find((node) => node.id === "libro-nombres");
+    expect(book?.unlockedBy).toEqual([]);
+    expect(book?.resource.template).toBe("name-book");
+  });
+
+  /* It is still a chapter of the world: it pays its stars and its chest, and
+     it keeps its slot in the collection. */
+  it("still pays a chest for the story on the shelf", () => {
+    const story = worldNodes(world).find((node) => node.id === "gallo-rayo");
+    expect(story?.reward.animal.animalId).toBe("gallo");
+  });
+
+  it("puts every other chapter under Juegos", () => {
+    const games = worldNodes(world).filter((node) => node.surface === "juegos");
+    expect(games).toHaveLength(worldNodes(world).length - 2);
   });
 
   it("reaches every node from the entry", () => {
@@ -41,51 +80,6 @@ describe("the authored world", () => {
     expect(reachable.size).toBe(worldNodes(world).length);
   });
 
-  /*
-   * The world is meant to be two places a child walks between, and the entry
-   * chapter has to be in the first one — a child who opens the app somewhere
-   * they cannot start is a child who cannot start.
-   */
-  it("puts the entry chapter in the first region", () => {
-    const [first] = world.regions;
-    expect(first?.id).toBe("granja");
-    expect(first?.nodes.map((node) => node.id)).toContain("encuentro");
-  });
-
-  it("stands the forest chapters in the forest", () => {
-    const bosque = world.regions.find((region) => region.id === "bosque");
-    expect(bosque?.nodes.map((node) => node.id)).toEqual([
-      "parejas",
-      "cual-es"
-    ]);
-  });
-
-  /*
-   * The forest is not a dead end. Chapters on the farm wait on both of its
-   * chapters, so the door back is on the way through the world rather than a
-   * courtesy — if this ever stopped holding, the forest would become a room a
-   * child had no reason to leave.
-   */
-  it("makes the farm wait on the forest, so the walk goes both ways", () => {
-    const forest = new Set(
-      world.regions
-        .find((region) => region.id === "bosque")
-        ?.nodes.map((node) => node.id)
-    );
-    const waiting = world.regions
-      .find((region) => region.id === "granja")
-      ?.nodes.filter((node) =>
-        node.unlockedBy.some((required) => forest.has(required))
-      );
-
-    expect(waiting?.length).toBeGreaterThan(0);
-  });
-
-  it("gives every region a backdrop of its own", () => {
-    const scenes = world.regions.map((region) => region.background);
-    expect(new Set(scenes).size).toBe(scenes.length);
-  });
-
   it("offers all three resource kinds, so the world is not only minigames", () => {
     const kinds = new Set(
       worldNodes(world).map((node) => templateKind(node.resource.template))
@@ -95,34 +89,52 @@ describe("the authored world", () => {
     );
   });
 
-  it("builds a valid manifest for every node, with no roster", () => {
+  /**
+   * Every chapter but one plays with no uploads at all, which is what lets an
+   * institutional pilot ship with no child data present. `name-book` is the
+   * single declared exception — it is the class's own names, so there is
+   * nothing for it to be without them — and `templateNeedsRoster` is where that
+   * exception is declared rather than inferred here.
+   */
+  it("builds a valid manifest for every node that plays on defaults", () => {
     for (const node of worldNodes(world)) {
+      if (templateNeedsRoster(node.resource.template)) continue;
       const manifest = createResourceForNode(node);
       expect(parseResourceManifest(manifest)).toEqual(manifest);
     }
   });
 
+  it("fails closed on the one node that cannot play without a roster", () => {
+    const book = worldNodes(world).find(
+      (node) => node.resource.template === "name-book"
+    );
+    expect(book).toBeDefined();
+    expect(() => createResourceForNode(book!)).toThrow(/needs a roster/);
+  });
+
+  it("builds the book of names once it has one", () => {
+    const book = worldNodes(world).find(
+      (node) => node.resource.template === "name-book"
+    )!;
+    const manifest = createResourceForNode(book, syntheticClass);
+    expect(parseResourceManifest(manifest)).toEqual(manifest);
+  });
+
   it("gives every node a distinct resource", () => {
-    const ids = worldNodes(world).map((node) => createResourceForNode(node).resourceId);
+    const ids = worldNodes(world).map(
+      (node) => createResourceForNode(node, syntheticClass).resourceId
+    );
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("offers a chest for every node, each hiding a different animal", () => {
-    for (const node of worldNodes(world)) {
-      expect(node.reward.choices, node.id).toHaveLength(CHEST_COUNT);
-      const animals = node.reward.choices.map((choice) => choice.animalId);
-      expect(new Set(animals).size, node.id).toBe(animals.length);
-    }
-  });
-
   /*
-   * A collection with the same animal in two slots reads as a bug to a child
-   * who has just been told they found something new.
+   * One page of the book per chapter, and a different animal on each. The book
+   * shows a child the shadow of what is still owed, so two chapters granting
+   * the same animal would draw the same shadow twice and leave one page that
+   * can never be filled.
    */
-  it("never offers the same animal in two nodes", () => {
-    const animals = worldNodes(world).flatMap((node) =>
-      node.reward.choices.map((choice) => choice.animalId)
-    );
+  it("grants a different animal in every chapter", () => {
+    const animals = worldNodes(world).map((node) => node.reward.animal.animalId);
     expect(new Set(animals).size).toBe(animals.length);
   });
 
@@ -140,50 +152,46 @@ describe("the authored world", () => {
     );
 
     for (const node of worldNodes(world)) {
-      for (const choice of node.reward.choices) {
-        expect(known.get(choice.animalId), choice.animalId).toBe(
-          choice.imageUrl
-        );
-      }
+      const { animalId, imageUrl } = node.reward.animal;
+      expect(known.get(animalId), animalId).toBe(imageUrl);
     }
   });
 });
 
 describe("world validation", () => {
-  /** Three animals, so a fixture exercises the graph rules and not the reward. */
+  /** One animal each, so a fixture exercises the graph rules and not the reward. */
   const reward = {
-    choices: [
-      { animalId: "gato", label: "Gato", imageUrl: "/vocabulary/gato.webp" },
-      { animalId: "perro", label: "Perro", imageUrl: "/vocabulary/perro.webp" },
-      { animalId: "pato", label: "Pato", imageUrl: "/vocabulary/pato.webp" }
-    ]
+    animal: { animalId: "gato", label: "Gato", imageUrl: "/vocabulary/gato.webp" }
+  };
+  const otherReward = {
+    animal: { animalId: "pato", label: "Pato", imageUrl: "/vocabulary/pato.webp" }
   };
 
-  /**
-   * One region holding the nodes under test.
-   *
-   * These cases are about the graph rather than the geography, and every one of
-   * them would otherwise repeat the same backdrop and title.
-   */
-  const worldOf = (...nodes: unknown[]) => ({
-    regions: [
-      {
-        id: "region",
-        title: "Región",
-        background: "/world/granero.webp",
-        nodes
-      }
-    ]
-  });
+  /** A world holding the nodes under test. */
+  const worldOf = (...nodes: unknown[]) => ({ nodes });
 
   const entry = {
     id: "start",
     title: "Comienzo",
     icon: "/vocabulary/gato.webp",
+    surface: "juegos",
     unlockedBy: [],
     resource: { template: "name-story", seed: "start" },
     reward
   };
+
+  /* Where a chapter stands is authored, never guessed from its template: a
+     node with no surface would be a node missing from both tabs. */
+  it("rejects a node that does not say which surface it stands on", () => {
+    const { surface: _dropped, ...homeless } = entry;
+    expect(() => parseWorld(worldOf(homeless))).toThrow("Invalid world");
+  });
+
+  it("rejects a surface the shell has no tab for", () => {
+    expect(() =>
+      parseWorld(worldOf({ ...entry, surface: "multijugador" }))
+    ).toThrow("Invalid world");
+  });
 
   it("rejects an unlock pointing at a node that does not exist", () => {
     expect(() =>
@@ -192,35 +200,42 @@ describe("world validation", () => {
           id: "second",
           title: "Segundo",
           icon: "/vocabulary/perro.webp",
+          surface: "juegos",
           unlockedBy: ["nowhere"],
+          resource: { template: "pairs-game", seed: "second", pairCount: 3 },
+          reward: otherReward
+        })
+      )
+    ).toThrow("nowhere");
+  });
+
+  /*
+   * The book draws one page per chapter and fills it with that chapter's
+   * animal. Two chapters granting the same one would draw the same shadow in
+   * two places and leave a page that can never be filled.
+   */
+  it("rejects the same animal granted by two chapters", () => {
+    expect(() =>
+      parseWorld(
+        worldOf(entry, {
+          id: "second",
+          title: "Segundo",
+          icon: "/vocabulary/perro.webp",
+          surface: "juegos",
+          unlockedBy: ["start"],
           resource: { template: "pairs-game", seed: "second", pairCount: 3 },
           reward
         })
       )
-    ).toThrow("nowhere");
+    ).toThrow("gato");
   });
 
   it("rejects a duplicate node id", () => {
     expect(() => parseWorld(worldOf(entry, entry))).toThrow("start");
   });
 
-  /* Two regions with one id is the same defect as two nodes with one: it makes
-     "which place is this" a question the world cannot answer. */
-  it("rejects a duplicate region id", () => {
-    const [region] = worldOf(entry).regions;
-    expect(() => parseWorld({ regions: [region, region] })).toThrow(
-      "Duplicate world region id"
-    );
-  });
-
-  /* A region is a place a child can walk into. An empty one is a room with
-     nothing in it, reachable and pointless. */
-  it("rejects a region with no chapters in it", () => {
-    expect(() => parseWorld(worldOf())).toThrow("Invalid world");
-  });
-
-  it("rejects a world with no regions at all", () => {
-    expect(() => parseWorld({ regions: [] })).toThrow("Invalid world");
+  it("rejects a world with no nodes at all", () => {
+    expect(() => parseWorld({ nodes: [] })).toThrow("Invalid world");
   });
 
   it("rejects a world with no entry node", () => {
@@ -238,78 +253,36 @@ describe("world validation", () => {
             id: "a",
             title: "A",
             icon: "/vocabulary/luna.webp",
+            surface: "juegos",
             unlockedBy: ["b"],
             resource: { template: "pairs-game", seed: "a", pairCount: 3 },
-            reward
+            reward: otherReward
           },
           {
             id: "b",
             title: "B",
             icon: "/vocabulary/sol.webp",
+            surface: "juegos",
             unlockedBy: ["a"],
             resource: { template: "pairs-game", seed: "b", pairCount: 3 },
-            reward
+            reward: {
+              animal: {
+                animalId: "luna",
+                label: "Luna",
+                imageUrl: "/vocabulary/luna.webp"
+              }
+            }
           }
         )
       )
     ).toThrow("Unreachable world nodes: a, b");
   });
 
-  /* A cycle across regions is still a cycle: the graph is the world's, not the
-     region's, and a prerequisite that crosses a door must be checked the same. */
-  it("rejects a cycle that spans two regions", () => {
-    expect(() =>
-      parseWorld({
-        regions: [
-          {
-            id: "granja",
-            title: "La granja",
-            background: "/world/granero.webp",
-            nodes: [
-              entry,
-              {
-                id: "a",
-                title: "A",
-                icon: "/vocabulary/luna.webp",
-                unlockedBy: ["b"],
-                resource: { template: "pairs-game", seed: "a", pairCount: 3 },
-                reward
-              }
-            ]
-          },
-          {
-            id: "bosque",
-            title: "El bosque",
-            background: "/world/bosque.webp",
-            nodes: [
-              {
-                id: "b",
-                title: "B",
-                icon: "/vocabulary/sol.webp",
-                unlockedBy: ["a"],
-                resource: { template: "pairs-game", seed: "b", pairCount: 3 },
-                reward
-              }
-            ]
-          }
-        ]
-      })
-    ).toThrow("Unreachable world nodes: a, b");
-  });
-
-  /* The map is a row of pictures: a chapter without one cannot be found by a
+  /* The world is a row of pictures: a chapter without one cannot be found by a
      child who does not read, so it is a content defect, not a missing nicety. */
   it("rejects a node with no map icon", () => {
     const { icon: _dropped, ...iconless } = entry;
     expect(() => parseWorld(worldOf(iconless))).toThrow("Invalid world");
-  });
-
-  /* Same reasoning one level up: a region with no backdrop is a place with
-     nowhere to stand. */
-  it("rejects a region with no backdrop", () => {
-    const [region] = worldOf(entry).regions;
-    const { background: _dropped, ...sceneless } = region!;
-    expect(() => parseWorld({ regions: [sceneless] })).toThrow("Invalid world");
   });
 
   it("rejects a node with no reward to give", () => {
@@ -317,25 +290,10 @@ describe("world validation", () => {
     expect(() => parseWorld(worldOf(rewardless))).toThrow("Invalid world");
   });
 
-  it("rejects a number of chests other than three", () => {
-    expect(() =>
-      parseWorld(
-        worldOf({ ...entry, reward: { choices: reward.choices.slice(0, 2) } })
-      )
-    ).toThrow("Invalid world");
-  });
-
-  it("rejects the same animal hidden in two chests", () => {
-    expect(() =>
-      parseWorld(
-        worldOf({
-          ...entry,
-          reward: {
-            choices: [reward.choices[0], reward.choices[0], reward.choices[1]]
-          }
-        })
-      )
-    ).toThrow("the same animal in two chests");
+  it("rejects a chapter that grants no animal", () => {
+    expect(() => parseWorld(worldOf({ ...entry, reward: {} }))).toThrow(
+      "Invalid world"
+    );
   });
 
   it("rejects an unknown template", () => {

@@ -20,6 +20,21 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, "node_modules")
 ];
 config.resolver.unstable_enableSymlinks = true;
-config.resolver.disableHierarchicalLookup = true;
+
+/*
+ * Hierarchical lookup stays ON, which is the opposite of the usual advice.
+ *
+ * That advice assumes npm or yarn, where every package is hoisted flat and
+ * walking parent directories only finds duplicates. pnpm is the other shape: a
+ * package's own dependencies sit beside it inside the store, so
+ * `expo/src/Expo.ts` reaches `expo-modules-core` through its *sibling*, and
+ * only a parent-directory walk gets there. `nodeModulesPaths` cannot substitute
+ * — the store path contains a content hash and is not a fixed directory to
+ * list.
+ *
+ * Disabling it bundles nothing and fails with `Unable to resolve
+ * "expo-modules-core" from .../expo/src/Expo.ts`, which reads as a broken
+ * install rather than a resolver setting.
+ */
 
 module.exports = config;

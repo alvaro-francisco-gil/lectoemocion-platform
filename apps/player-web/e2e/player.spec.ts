@@ -5,7 +5,8 @@ import { createResourceForNode, world } from "@lectoemocion/template-catalog";
 import {
   createInitialLetterRound,
   createInitialSyllableRound,
-  createLettersRound
+  createLettersRound,
+  createSyllablesRound
 } from "@lectoemocion/template-sdk";
 import {
   DEFAULT_PRIZE_GOAL,
@@ -24,7 +25,27 @@ import {
   LETTERS_LAYOUT,
   letterColumnX
 } from "../src/game/templates/lettersLayout";
-import { STARS_PER_COMPLETION } from "../src/world/mapView";
+import {
+  SYLLABLES_LAYOUT,
+  syllableColumnX
+} from "../src/game/templates/syllablesLayout";
+import { STARS_PER_COMPLETION } from "../src/world/worldView";
+import { LOCAL_OWNER, storageKey } from "../src/world/progressStore";
+import { prizeStorageKey } from "../src/world/prizeStore";
+
+/*
+ * The starter profile's progress, by the app's own key builder.
+ *
+ * Spelling the key out here would keep this suite passing after the real key
+ * changed shape, which is the one thing an end-to-end test must never do.
+ */
+const STARTER_PROGRESS_KEY = storageKey(LOCAL_OWNER);
+
+/** A point on the page, in screen pixels. */
+interface Point {
+  readonly x: number;
+  readonly y: number;
+}
 
 const ENTRY = "El encuentro";
 const SECOND = "Las iniciales";
@@ -45,13 +66,13 @@ async function withProgress(page: Page, completedNodes: string[]) {
   const rewards = completedNodes.map((nodeId) => {
     const node = worldNodes(world).find((candidate) => candidate.id === nodeId);
     if (!node) throw new Error(`No such world node: ${nodeId}`);
-    return { nodeId, animalId: node.reward.choices[0]!.animalId };
+    return { nodeId, animalId: node.reward.animal.animalId };
   });
 
   await page.addInitScript(
-    ({ nodes, rewards: claimed }) => {
+    ({ key, nodes, rewards: claimed }) => {
       localStorage.setItem(
-        "lectoemocion.progress.local",
+        key,
         JSON.stringify({
           completedNodes: nodes,
           lastPlayedNode: nodes.at(-1),
@@ -60,7 +81,7 @@ async function withProgress(page: Page, completedNodes: string[]) {
         })
       );
     },
-    { nodes: completedNodes, rewards }
+    { key: STARTER_PROGRESS_KEY, nodes: completedNodes, rewards }
   );
   await withPrizes(page, { goal: MAX_PRIZE_GOAL, prizes: [] });
 }
@@ -76,9 +97,12 @@ async function withPrizes(
   page: Page,
   prizes: { goal: number; prizes: unknown[] }
 ) {
-  await page.addInitScript((seed) => {
-    localStorage.setItem("lectoemocion.prizes.local", JSON.stringify(seed));
-  }, prizes);
+  await page.addInitScript(
+    ({ key, seed }) => {
+      localStorage.setItem(key, JSON.stringify(seed));
+    },
+    { key: prizeStorageKey(LOCAL_OWNER), seed: prizes }
+  );
 }
 
 /**
@@ -88,44 +112,42 @@ async function withPrizes(
  * play for real.
  */
 async function withBankedStars(page: Page, stars: number) {
-  await page.addInitScript((banked) => {
-    localStorage.setItem(
-      "lectoemocion.progress.local",
-      JSON.stringify({
-        completedNodes: [],
-        lastPlayedNode: null,
-        rewards: [],
-        stars: banked
-      })
-    );
-  }, stars);
+  await page.addInitScript(
+    ({ key, banked }) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          completedNodes: [],
+          lastPlayedNode: null,
+          rewards: [],
+          stars: banked
+        })
+      );
+    },
+    { key: STARTER_PROGRESS_KEY, banked: stars }
+  );
 }
 
 /**
- * Walks to the region a chapter stands in and opens it.
+ * Opens a chapter, moving to the section it stands in first.
  *
- * The map shows one place at a time, so a chapter in the forest is not on the
- * screen until a child has walked there. This retraces that walk rather than
- * assuming where the map happens to be: back through every door home, then
- * forward through the doors to the region the chapter is in.
+ * Which section that is comes from the world rather than from a list here, so a
+ * chapter that moves to the shelf does not quietly stop being covered.
  */
 async function openChapter(page: Page, nodeId: string) {
-  const target = world.regions.findIndex((region) =>
-    region.nodes.some((node) => node.id === nodeId)
-  );
-  if (target < 0) throw new Error(`No such world node: ${nodeId}`);
+  const node = worldNodes(world).find((candidate) => candidate.id === nodeId);
+  if (!node) throw new Error(`No such world node: ${nodeId}`);
 
-  const back = page.locator('.region-door[data-direction="back"]');
-  while ((await back.count()) > 0) await back.click();
-  for (let step = 0; step < target; step += 1) {
-    await page.locator('.region-door[data-direction="on"]').click();
-  }
-
-  const node = world.regions[target]!.nodes.find(
-    (candidate) => candidate.id === nodeId
-  )!;
+  await page
+    .getByRole("button", {
+      name: node.surface === "recursos" ? "Recursos" : "Juegos"
+    })
+    .click();
   await page.getByRole("button", { name: node.title, exact: true }).click();
 }
+
+/** Every chapter on the path. The shelf is reached by its own section. */
+const GAMES = worldNodes(world).filter((node) => node.surface === "juegos");
 
 /**
  * Takes the letriestrellas every finish pays and, when the chapter is owed
@@ -158,9 +180,7 @@ async function completed(page: Page, nodeId: string, timeout = 120_000) {
   await expect
     .poll(
       () =>
-        page.evaluate(() =>
-          localStorage.getItem("lectoemocion.progress.local")
-        ),
+        page.evaluate((key) => localStorage.getItem(key), STARTER_PROGRESS_KEY),
       { timeout }
     )
     .toContain(nodeId);
@@ -213,10 +233,23 @@ test("finishing a chapter hands out an animal for the collection", async ({
   page
 }) => {
   await page.goto("/");
-  /* One slot per chapter, counted from the world so a new one does not fail
-     this test for having been added. */
-  const empty = page.locator('.collection__slot[data-filled="false"]');
-  await expect(empty).toHaveCount(worldNodes(world).length);
+
+  const book = page.getByRole("dialog", { name: "Mis animales" });
+  const openBook = () =>
+    page.getByRole("button", { name: "Mis animales" }).click();
+  /* Shut by tapping the world around it, which is the only way out it has. */
+  const closeBook = () => book.click({ position: { x: 4, y: 4 } });
+  const owed = page.locator('.animal-book__page[data-earned="false"]');
+  const earned = page.locator('.animal-book__page[data-earned="true"]');
+
+  /* One page per chapter, counted from the world so a new one does not fail
+     this test for having been added. Every one of them draws its animal from
+     the first screen: the book shows which animal is owed, not merely that one
+     is. */
+  await openBook();
+  await expect(owed).toHaveCount(worldNodes(world).length);
+  await expect(owed.first().locator("img")).toBeVisible();
+  await closeBook();
 
   await page.getByRole("button", { name: ENTRY }).click();
   await completed(page, "encuentro");
@@ -228,32 +261,102 @@ test("finishing a chapter hands out an animal for the collection", async ({
   await chests.nth(1).click();
   await page.getByRole("button", { name: "Seguir" }).click();
 
-  const filled = page.locator('.collection__slot[data-filled="true"]');
-  await expect(filled).toHaveCount(1);
-  await expect(filled.locator("img")).toBeVisible();
-  await expect(empty).toHaveCount(worldNodes(world).length - 1);
+  /* The book opens itself, stamps the animal in, and takes itself away. */
+  await expect(earned).toHaveCount(1);
+  await expect(earned.locator("img")).toBeVisible();
+  await expect(owed).toHaveCount(worldNodes(world).length - 1);
+  await expect(book).toBeHidden();
+
+  /* And it is still there when the child goes back to look. */
+  await openBook();
+  await expect(earned).toHaveCount(1);
 });
 
-test("the collection sits below the path, and the path is centred", async ({
-  page
-}) => {
+/*
+ * The whole book on one page is the point, so it has to actually fit one.
+ *
+ * The stickers were laid out in a fixed number of columns with square cells, so
+ * the rows were sized from the column width and knew nothing about the height
+ * they had: an eleventh chapter added a third row and pushed the bottom of it
+ * off the paper. This measures what a child sees rather than the rule that
+ * produced it, so any future way of overflowing fails here too.
+ */
+test("every sticker sits on the page, at every size", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Mis animales" }).click();
+
+  const sheet = (await page.locator(".animal-book__pages").boundingBox())!;
+  const viewport = page.viewportSize()!;
+
+  /* The paper itself is on screen. */
+  expect(sheet.x).toBeGreaterThanOrEqual(0);
+  expect(sheet.y).toBeGreaterThanOrEqual(0);
+  expect(sheet.x + sheet.width).toBeLessThanOrEqual(viewport.width + 1);
+  expect(sheet.y + sheet.height).toBeLessThanOrEqual(viewport.height + 1);
+
+  const pages = page.locator(".animal-book__page");
+  const count = await pages.count();
+  expect(count).toBe(worldNodes(world).length);
+
+  for (let index = 0; index < count; index += 1) {
+    const box = (await pages.nth(index).boundingBox())!;
+    expect(box.x, `sticker ${index} left`).toBeGreaterThanOrEqual(sheet.x - 1);
+    expect(box.y, `sticker ${index} top`).toBeGreaterThanOrEqual(sheet.y - 1);
+    expect(
+      box.x + box.width,
+      `sticker ${index} right`
+    ).toBeLessThanOrEqual(sheet.x + sheet.width + 1);
+    expect(
+      box.y + box.height,
+      `sticker ${index} bottom`
+    ).toBeLessThanOrEqual(sheet.y + sheet.height + 1);
+  }
+});
+
+test("the bar sits below the cards without covering them", async ({ page }) => {
   await withProgress(page, ["encuentro"]);
   await page.goto("/");
 
-  const path = (await page.locator(".world-path").boundingBox())!;
-  const collection = (await page.locator(".collection").boundingBox())!;
+  const row = (await page.locator(".world-path").boundingBox())!;
+  const bar = (await page.locator(".tab-bar__tabs").boundingBox())!;
   const viewport = await page.evaluate(() => ({ height: innerHeight }));
 
-  /* Below, and not overlapping: the row is a footer, not a second path. */
-  expect(collection.y).toBeGreaterThanOrEqual(path.y + path.height);
+  /* Below, and not overlapping: the bar is chrome, not a second row. */
+  expect(bar.y).toBeGreaterThanOrEqual(row.y + row.height);
 
-  /*
-   * The path holds the middle band rather than the bottom edge it used to sit
-   * on, with the collection taking the space underneath it.
-   */
-  const centre = path.y + path.height / 2;
-  expect(centre).toBeGreaterThan(viewport.height * 0.2);
+  /* The cards hold the middle band rather than the bottom edge. */
+  const centre = row.y + row.height / 2;
+  expect(centre).toBeGreaterThan(viewport.height * 0.15);
   expect(centre).toBeLessThan(viewport.height * 0.7);
+});
+
+/* The shelf is open from the first screen, and what is on it is not on the
+   path: two sections, not one list shown twice. */
+test("the story is on the shelf, open to a brand new player", async ({
+  page
+}) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "El gallo Rayo" })).toHaveCount(
+    0
+  );
+
+  await page.getByRole("button", { name: "Recursos" }).click();
+  const story = page.getByRole("button", { name: "El gallo Rayo" });
+  await expect(story).toBeEnabled();
+  await expect(page.getByRole("button", { name: ENTRY })).toHaveCount(0);
+
+  await story.click();
+  await expect(page.locator("canvas")).toBeVisible();
+});
+
+/* Shut, and refused: dimming a section a child cannot reach is presentation,
+   not the rule. */
+test("Multijugador is shut", async ({ page }) => {
+  await page.goto("/");
+  const blocked = page.getByRole("button", { name: /Multijugador/ });
+
+  await expect(blocked).toBeDisabled();
+  await expect(page.getByRole("button", { name: ENTRY })).toBeVisible();
 });
 
 test("a completed chapter stays replayable", async ({ page }) => {
@@ -409,11 +512,18 @@ test("the world list is gone while a resource plays", async ({ page }) => {
   await expect(page.locator("canvas")).toBeVisible();
   await expect(worldList).toBeHidden();
   await expect(page.getByRole("button", { name: SECOND })).toHaveCount(0);
-  /* The star counter belongs to the map too: nothing counts up beside a
-     running game. */
+  /* The counter, the meter and the bar belong to the world screens too:
+     nothing counts up, nothing fills, and nothing offers a way out sideways,
+     beside a running game. */
+  await expect(page.getByRole("region", { name: "Letriestrellas" })).toHaveCount(
+    0
+  );
   await expect(
     page.getByRole("meter", { name: "Letriestrellas hacia el próximo regalo" })
   ).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Secciones" })).toHaveCount(
+    0
+  );
 
   await page.getByRole("button", { name: "Volver al mapa" }).click();
   await expect(worldList).toBeVisible();
@@ -428,13 +538,11 @@ test("the world reads as one horizontal path, with no page header", async ({
   await expect(page.locator("header")).toHaveCount(0);
   await expect(page.locator("h1")).toHaveCount(0);
 
-  /* Derived, not written down: adding a chapter must not fail this test. The
-     first region's chapters, plus the door standing at the end of them. */
+  /* Derived, not written down: adding a chapter must not fail this test. */
   const nodes = page.locator(".world-node");
-  await expect(nodes).toHaveCount(world.regions[0]!.nodes.length + 1);
+  await expect(nodes).toHaveCount(GAMES.length);
 
-  /* Every node shares a row, doors included: same top edge, strictly
-     increasing left edge. */
+  /* Every card shares a row: same top edge, strictly increasing left edge. */
   const boxes = await nodes.evaluateAll((elements) =>
     elements.map((element) => {
       const { x, y } = element.getBoundingClientRect();
@@ -450,90 +558,37 @@ test("the world reads as one horizontal path, with no page header", async ({
 });
 
 /*
- * The marker is a picture, and only a picture.
+ * The card is a picture.
  *
  * A child of three cannot read the title and cannot count, so what tells one
- * chapter from another has to be the illustration — and a digit or a letter
- * inside the disc is a thing on the map that says nothing to the person the
- * map is for. Big enough to aim a finger at, too: a marker measured here so
- * that a layout change cannot quietly shrink it back to a bullet.
+ * chapter from another has to be the illustration. Big enough to aim a finger
+ * at, too: measured here so that a layout change cannot quietly shrink a card
+ * back to a bullet.
  */
-test("every chapter is a picture, drawn large and with no glyph on it", async ({
-  page
-}) => {
+test("every chapter is a picture card, drawn large", async ({ page }) => {
   await withProgress(page, ["encuentro"]);
   await page.goto("/");
 
-  /* The chapters only: a door carries a backdrop, which is measured with the
-     regions rather than here. */
-  const markers = page.locator(".world-node:not(.region-door) .world-node__marker");
-  await expect(markers).toHaveCount(world.regions[0]!.nodes.length);
+  const markers = page.locator(".world-node__marker");
+  await expect(markers).toHaveCount(GAMES.length);
 
   const drawn = await markers.evaluateAll((elements) =>
-    elements.map((element) => ({
-      text: element.textContent?.trim() ?? "",
-      hasPicture: element.querySelector("img") !== null,
-      size: element.getBoundingClientRect().width
-    }))
+    elements.map((element) => {
+      const box = element.getBoundingClientRect();
+      return {
+        hasPicture: element.querySelector("img") !== null,
+        width: box.width,
+        height: box.height
+      };
+    })
   );
 
   for (const marker of drawn) {
-    expect(marker.text, "no digit or letter on the marker").toBe("");
     expect(marker.hasPicture, "the chapter's own picture").toBe(true);
-    expect(marker.size).toBeGreaterThanOrEqual(96);
+    expect(marker.width).toBeGreaterThanOrEqual(120);
+    /* A rectangle, not a disc: wider than it is tall. */
+    expect(marker.width).toBeGreaterThan(marker.height);
   }
-});
-
-/*
- * The world is two places, and the door between them is a real move: the path
- * changes, and so does the ground it is drawn on. The scene is what a child
- * actually reads as "somewhere else" — the titles under the markers are for
- * the adult — so it is what this measures.
- */
-test("walking through the door changes the place, and the way back leads home", async ({
-  page
-}) => {
-  const [farm, forest] = world.regions;
-  /* Enough to open the forest: its first chapter waits on the initials game. */
-  await withProgress(page, ["encuentro", "iniciales"]);
-  await page.goto("/");
-
-  const scene = () =>
-    page
-      .locator(".map")
-      .evaluate((element) => getComputedStyle(element).backgroundImage);
-
-  expect(await scene()).toContain(farm!.background);
-
-  const door = page.getByRole("button", { name: forest!.title, exact: true });
-  await expect(door).toBeEnabled();
-  await door.click();
-
-  expect(await scene()).toContain(forest!.background);
-  for (const node of forest!.nodes) {
-    await expect(
-      page.getByRole("button", { name: node.title, exact: true })
-    ).toBeVisible();
-  }
-  /* The farm's chapters are not merely dimmed here: they are somewhere else. */
-  await expect(page.getByRole("button", { name: ENTRY })).toHaveCount(0);
-
-  await page.getByRole("button", { name: farm!.title, exact: true }).click();
-  expect(await scene()).toContain(farm!.background);
-  await expect(page.getByRole("button", { name: ENTRY })).toBeVisible();
-});
-
-/* A door with nothing open behind it is refused, exactly as a locked chapter
-   is: walking into a region where everything is locked is a way to get lost. */
-test("the door to a region with nothing open in it stays shut", async ({
-  page
-}) => {
-  const [, forest] = world.regions;
-  await page.goto("/");
-
-  const door = page.getByRole("button", { name: forest!.title, exact: true });
-  await expect(door).toBeDisabled();
-  await expect(door).toHaveAttribute("data-state", "locked");
 });
 
 test("playing shows only the way back", async ({ page }) => {
@@ -568,33 +623,140 @@ test("a locked node cannot be opened from the map", async ({ page }) => {
 });
 
 /**
+ * Waits for the page to actually paint `count` frames.
+ *
+ * Paced against the browser's own frame clock rather than the wall clock. A
+ * fixed millisecond wait is a bet on how long a frame takes, and that bet is
+ * lost exactly when three viewport projects — one of them 4K — are rendering
+ * at once, which is when this suite runs.
+ *
+ * Six is not a tuned number: it is "comfortably more than the one frame Phaser
+ * strictly needs", bought in the only currency that stays honest under load.
+ * On an idle machine it costs about a tenth of a second per stage; on a loaded
+ * one it costs longer, which is the entire point.
+ */
+async function nextFrames(page: Page, count = 6) {
+  await page.evaluate(
+    (frames: number) =>
+      new Promise<void>((resolve) => {
+        let left = frames;
+        const tick = () => {
+          if (left <= 0) {
+            resolve();
+            return;
+          }
+          left -= 1;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }),
+    count
+  );
+}
+
+/**
  * One drag, paced so the game sees it as a drag.
  *
  * Phaser reads its pointer queue once per frame. A press, a move, and a
- * release delivered inside a single frame collapse into something that is not
- * a drag at all, so the letter lands nowhere — and three of those lose the
- * round, after which the chapter can never be finished and the test can only
- * time out. Delivered fast enough, that is exactly what happens: this passed
- * run alone and timed out under a loaded three-project run.
+ * release delivered inside a single frame collapse into a click, which these
+ * games deliberately do nothing with, so the card lands nowhere and the
+ * chapter is never finished — the test can only time out.
  *
- * The waits buy a frame at each stage on a machine that is rendering two other
- * viewports at the same time. They are not a guess at how long the app takes:
- * every assertion after this still polls.
+ * That is not hypothetical: it is what made this suite flaky under load, on
+ * three separate tests, before the pacing below stopped being measured in
+ * milliseconds. Every stage now waits for real frames, so a loaded machine
+ * takes longer rather than dropping the gesture. Every assertion after this
+ * still polls.
  */
 async function dragAcrossCanvas(
   page: Page,
   from: { x: number; y: number },
   to: { x: number; y: number }
 ) {
-  const frames = 100;
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
-  await page.waitForTimeout(frames);
+  await nextFrames(page);
   /* Stepped, because a single jump can be read as a click rather than a drag. */
   await page.mouse.move(to.x, to.y, { steps: 12 });
-  await page.waitForTimeout(frames);
+  await nextFrames(page);
   await page.mouse.up();
-  await page.waitForTimeout(frames);
+  await nextFrames(page);
+}
+
+/**
+ * Plays an ordering game to its end by dragging, and tolerates a dropped
+ * gesture without tolerating a broken one.
+ *
+ * Winning one of these chapters takes every card placed, so the chance of the
+ * harness losing *some* synthetic drag compounds with the length of the word.
+ * A trace of one such failure shows three letters seated and the fourth still
+ * in the row: nothing wrong with the game, one gesture that never arrived.
+ *
+ * So the pass is repeated. Re-dragging a card already in its slot is a no-op —
+ * its card is hidden and its pointer target disabled — so a repeat only ever
+ * retries what did not land. This cannot paper over a drag that does not work:
+ * if the wiring were broken, every pass would place nothing and the poll below
+ * would still fail. It absorbs dropped input, which is the harness's problem,
+ * and nothing else.
+ */
+async function winBySequenceOfDrags(
+  page: Page,
+  nodeId: string,
+  drags: readonly { from: Point; to: Point }[],
+  passes = 3
+) {
+  for (let pass = 1; pass <= passes; pass += 1) {
+    for (const { from, to } of drags) await dragAcrossCanvas(page, from, to);
+
+    const progress = await page.evaluate(
+      (key) => localStorage.getItem(key),
+      STARTER_PROGRESS_KEY
+    );
+    if (progress?.includes(nodeId)) return;
+  }
+
+  /* Every pass placed nothing, or not everything: report it as the failure. */
+  await completed(page, nodeId, 5_000);
+}
+
+/**
+ * Plays a chapter to its end, reopening it from the map if a gesture is lost.
+ *
+ * The counterpart of `winBySequenceOfDrags` for a game answered by taps, where
+ * replaying in place is not safe: a lost second tap leaves a card selected, and
+ * a fresh pass starting against that selection pairs the wrong two cards and
+ * thrashes. Going back to the map and opening the chapter again deals a new
+ * round with nothing selected, so each attempt starts from a state the caller
+ * can reason about.
+ *
+ * As with the drags, this absorbs input the harness dropped and nothing else:
+ * a game that could not be won by tapping fails every attempt, and the poll at
+ * the end still fails the test.
+ */
+async function winByReplayingChapter(
+  page: Page,
+  nodeId: string,
+  chapterName: string,
+  play: () => Promise<void>,
+  attempts = 3
+) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    await play();
+
+    const progress = await page.evaluate(
+      (key) => localStorage.getItem(key),
+      STARTER_PROGRESS_KEY
+    );
+    if (progress?.includes(nodeId)) return;
+    if (attempt === attempts) break;
+
+    await page.getByRole("button", { name: "Volver al mapa" }).click();
+    await expect(page.getByRole("navigation", { name: "Mundo" })).toBeVisible();
+    await page.getByRole("button", { name: chapterName }).click();
+    await canvasBox(page);
+  }
+
+  await completed(page, nodeId, 5_000);
 }
 
 /**
@@ -638,20 +800,75 @@ test("the letters game is won by dragging each letter into its slot", async ({
     y: box.y + box.height / 2 + (y - LETTERS_LAYOUT.canvasHeight / 2) * scale
   });
 
-  for (const [trayIndex, card] of round.tray.entries()) {
-    const from = at(
-      letterColumnX(trayIndex, round.tray.length),
-      LETTERS_LAYOUT.trayRowY
-    );
-    const to = at(
-      letterColumnX(card.slotIndex, round.slots.length),
-      LETTERS_LAYOUT.slotRowY
-    );
+  await winBySequenceOfDrags(
+    page,
+    "letras",
+    round.tray.map((card, trayIndex) => ({
+      from: at(
+        letterColumnX(trayIndex, round.tray.length),
+        LETTERS_LAYOUT.trayRowY
+      ),
+      to: at(
+        letterColumnX(card.slotIndex, round.slots.length),
+        LETTERS_LAYOUT.slotRowY
+      )
+    }))
+  );
+  expect(failures).toEqual([]);
+});
 
-    await dragAcrossCanvas(page, from, to);
+/**
+ * The syllables game, won by dragging.
+ *
+ * The same reason the letters drag is played for real, and the same shape: two
+ * games that share `sequenceRound` still have their own wiring between the
+ * pointer and the rules, and a chapter nobody can finish is invisible to every
+ * rules test. This one earns its place twice over, because the syllables game
+ * is where tap-then-tap was removed — if that removal took the drag with it,
+ * only a test through the canvas would say so.
+ */
+test("the syllables game is won by dragging each syllable into its slot", async ({
+  page
+}) => {
+  const failures: string[] = [];
+  page.on("pageerror", (error) => failures.push(error.message));
+
+  await withProgress(page, ["encuentro", "iniciales", "parejas"]);
+  await page.goto("/");
+  await page.getByRole("button", { name: "El puente de sílabas" }).click();
+
+  const box = await canvasBox(page);
+  const node = worldNodes(world).find((candidate) => candidate.id === "silabas")!;
+  const resource = createResourceForNode(node);
+  if (resource.template.id !== "syllables-game") {
+    throw new Error("The syllables chapter no longer plays the syllables game");
   }
+  const round = createSyllablesRound(resource);
 
-  await completed(page, "letras");
+  /* Logical canvas units to screen pixels: the canvas letterboxes to fit. */
+  const scale = Math.min(
+    box.width / SYLLABLES_LAYOUT.canvasWidth,
+    box.height / SYLLABLES_LAYOUT.canvasHeight
+  );
+  const at = (x: number, y: number) => ({
+    x: box.x + box.width / 2 + (x - SYLLABLES_LAYOUT.canvasWidth / 2) * scale,
+    y: box.y + box.height / 2 + (y - SYLLABLES_LAYOUT.canvasHeight / 2) * scale
+  });
+
+  await winBySequenceOfDrags(
+    page,
+    "silabas",
+    round.tray.map((card, trayIndex) => ({
+      from: at(
+        syllableColumnX(trayIndex, round.tray.length),
+        SYLLABLES_LAYOUT.trayRowY
+      ),
+      to: at(
+        syllableColumnX(card.slotIndex, round.slots.length),
+        SYLLABLES_LAYOUT.slotRowY
+      )
+    }))
+  );
   expect(failures).toEqual([]);
 });
 
@@ -707,24 +924,31 @@ test("the initial-letter game is won by tapping each picture and its letter", as
   const pictures = row("picture");
   const letters = row("letter");
 
-  for (const [index, picture] of pictures.entries()) {
-    const letterIndex = letters.findIndex(
-      (card) => card.initial === picture.initial
-    );
-    const from = at(
-      initialLetterColumnX(index, pictures.length),
-      INITIAL_LETTER_LAYOUT.pictureRowY
-    );
-    const to = at(
-      initialLetterColumnX(letterIndex, letters.length),
-      INITIAL_LETTER_LAYOUT.letterRowY
-    );
+  const connectEveryPair = async () => {
+    for (const [index, picture] of pictures.entries()) {
+      const letterIndex = letters.findIndex(
+        (card) => card.initial === picture.initial
+      );
+      const from = at(
+        initialLetterColumnX(index, pictures.length),
+        INITIAL_LETTER_LAYOUT.pictureRowY
+      );
+      const to = at(
+        initialLetterColumnX(letterIndex, letters.length),
+        INITIAL_LETTER_LAYOUT.letterRowY
+      );
 
-    await page.mouse.click(from.x, from.y);
-    await page.mouse.click(to.x, to.y);
-  }
+      await page.mouse.click(from.x, from.y);
+      await page.mouse.click(to.x, to.y);
+    }
+  };
 
-  await completed(page, "primeras-letras");
+  await winByReplayingChapter(
+    page,
+    "primeras-letras",
+    "Las primeras letras",
+    connectEveryPair
+  );
   expect(failures).toEqual([]);
 });
 
@@ -780,16 +1004,19 @@ test("the initial-syllable game is won by dragging the match onto the target", a
   );
   expect(matchIndex).toBeGreaterThanOrEqual(0);
 
-  await dragAcrossCanvas(
-    page,
-    at(
-      choiceColumnX(matchIndex, round.choices.length),
-      INITIAL_SYLLABLE_LAYOUT.choiceRowY
-    ),
-    at(INITIAL_SYLLABLE_LAYOUT.canvasWidth / 2, INITIAL_SYLLABLE_LAYOUT.targetY)
+  await winByReplayingChapter(page, "empieza-igual", "Empieza igual", () =>
+    dragAcrossCanvas(
+      page,
+      at(
+        choiceColumnX(matchIndex, round.choices.length),
+        INITIAL_SYLLABLE_LAYOUT.choiceRowY
+      ),
+      at(
+        INITIAL_SYLLABLE_LAYOUT.canvasWidth / 2,
+        INITIAL_SYLLABLE_LAYOUT.targetY
+      )
+    )
   );
-
-  await completed(page, "empieza-igual");
   expect(failures).toEqual([]);
 });
 
@@ -816,8 +1043,14 @@ async function reachGiftScreen(page: Page): Promise<void> {
   await takeTheReward(page);
 }
 
-/** Enters the birth year every gate in this suite accepts. */
-async function passAdultGate(page: Page): Promise<void> {
+/**
+ * Enters the birth year the prize area's gate accepts.
+ *
+ * The profile drawer has a gate of its own — a keypad, answered by tapping
+ * digits — so this one is named for the area it opens. Folding the two into
+ * one is the adult-gate follow-up.
+ */
+async function passPrizeGate(page: Page): Promise<void> {
   await page.getByLabel("¿En qué año naciste?").fill("1988");
   await page.getByRole("button", { name: "Entrar" }).click();
 }
@@ -826,7 +1059,7 @@ async function passAdultGate(page: Page): Promise<void> {
 async function openGiftForm(page: Page): Promise<void> {
   await reachGiftScreen(page);
   await page.getByRole("button", { name: "Preparar el regalo" }).click();
-  await passAdultGate(page);
+  await passPrizeGate(page);
 }
 
 test("the meter reads 0 / 30 on a fresh session", async ({ page }) => {
@@ -869,7 +1102,7 @@ test("Preparar el regalo reaches the gate, refuses an implausible year, and 1988
     "Ese año no puede ser. Inténtalo otra vez."
   );
 
-  await passAdultGate(page);
+  await passPrizeGate(page);
 
   await expect(
     page.getByLabel("Letriestrellas para el próximo regalo")
@@ -930,7 +1163,7 @@ test("the goal field refuses 0 and accepts 12, and the meter then reads against 
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Menú" }).click();
-  await passAdultGate(page);
+  await passPrizeGate(page);
 
   const goalField = page.getByLabel("Letriestrellas para el próximo regalo");
   await goalField.fill("0");
@@ -946,4 +1179,78 @@ test("the goal field refuses 0 and accepts 12, and the meter then reads against 
   await expect(
     page.getByRole("meter", { name: "Letriestrellas hacia el próximo regalo" })
   ).toHaveText("0 / 12");
+});
+
+/*
+ * The drawer is the one thing in this app that floats over the world, so it is
+ * the one thing that can push the page out of the viewport without any other
+ * test noticing. On a phone it is most of the screen; on a 4K panel it must not
+ * stretch to the width of the room.
+ */
+test("the profile drawer fits the viewport and covers the world", async ({
+  page
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Quién juega/ }).click();
+
+  const drawer = page.getByRole("dialog", { name: "Quién juega" });
+  await expect(drawer).toBeVisible();
+
+  const viewport = await page.evaluate(() => ({
+    width: innerWidth,
+    height: innerHeight
+  }));
+  const box = (await drawer.boundingBox())!;
+  expect(box.width).toBeLessThanOrEqual(viewport.width);
+  expect(box.height).toBeLessThanOrEqual(viewport.height + 1);
+
+  const scroll = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    scrollHeight: document.documentElement.scrollHeight
+  }));
+  expect(scroll.scrollWidth).toBeLessThanOrEqual(viewport.width);
+  expect(scroll.scrollHeight).toBeLessThanOrEqual(viewport.height);
+
+  /* The scrim is what makes the world behind it untouchable. */
+  const scrim = (await page.locator(".profile-menu__scrim").boundingBox())!;
+  expect(scrim.width).toBeGreaterThanOrEqual(viewport.width - 1);
+  expect(scrim.height).toBeGreaterThanOrEqual(viewport.height - 1);
+});
+
+/*
+ * The gate is the only surface in this app that covers everything, so it is the
+ * only one whose own fit nothing else would catch. On a phone the pad has to
+ * reach the thumb; on an 86-inch panel it must not stretch across the room.
+ */
+test("the adult gate covers the screen and its pad fits", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Quién juega/ }).click();
+  await page.getByRole("button", { name: /^Editar a/ }).click();
+
+  const gate = page.getByRole("dialog", { name: "Sólo para adultos" });
+  await expect(gate).toBeVisible();
+
+  const viewport = await page.evaluate(() => ({
+    width: innerWidth,
+    height: innerHeight
+  }));
+  const box = (await gate.boundingBox())!;
+  expect(box.width).toBeGreaterThanOrEqual(viewport.width - 1);
+  expect(box.height).toBeGreaterThanOrEqual(viewport.height - 1);
+
+  /* Every key inside the viewport, and each one big enough for a thumb. */
+  for (const digit of "0123456789") {
+    const key = (await page.getByRole("button", { name: digit }).boundingBox())!;
+    expect(key.width).toBeGreaterThanOrEqual(44);
+    expect(key.height).toBeGreaterThanOrEqual(44);
+    expect(key.y + key.height).toBeLessThanOrEqual(viewport.height + 1);
+    expect(key.x + key.width).toBeLessThanOrEqual(viewport.width + 1);
+  }
+
+  const scroll = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    scrollHeight: document.documentElement.scrollHeight
+  }));
+  expect(scroll.scrollWidth).toBeLessThanOrEqual(viewport.width);
+  expect(scroll.scrollHeight).toBeLessThanOrEqual(viewport.height);
 });

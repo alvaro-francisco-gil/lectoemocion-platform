@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ManifestFor, VocabularyItem } from "@lectoemocion/resource-schema";
-import { ROUND_LIVES, type RoundStatus } from "./lives";
+import { type RoundStatus } from "./roundStatus";
 import { createPairsRound, selectPairsCard, type PairsRound } from "./pairsGame";
 import {
   chooseWordPicture,
@@ -24,8 +24,14 @@ import {
  * rather than on one hand-picked example.
  *
  * The per-game files pin specific behaviour. These pin the rules that no game
- * may break however it is played: lives only fall, a finished round stays
- * finished, and no sequence of taps can drive a round somewhere illegal.
+ * may break however it is played: a wrong answer costs nothing but the
+ * attempt, a won round stays won, and no sequence of taps can drive a round
+ * somewhere illegal.
+ *
+ * "Costs nothing" is the property that replaced a lives budget, and it is
+ * stronger than the arithmetic it replaced: a rejected attempt must leave the
+ * round *equal to what it was*, so there is nowhere for a hidden penalty to
+ * accumulate. A game that grew one would fail here rather than in play.
  */
 
 const SEEDS = ["a", "b", "c", "lesson-1", "lesson-2", "seed-42", "ñ", "0"];
@@ -99,7 +105,7 @@ const syllablesManifest = (
   ]
 });
 
-/** A round may only ever move from playing to a decided end, and stay there. */
+/** A round may only ever move from playing to won, and stay there. */
 function assertStatusProgression(
   previous: RoundStatus,
   next: RoundStatus
@@ -127,7 +133,7 @@ describe("pairs rounds, over many seeds and sizes", () => {
     }
   });
 
-  it.each(sizes)("can always be won without losing a life at %i pairs", (size) => {
+  it.each(sizes)("can always be won at %i pairs", (size) => {
     for (const seed of SEEDS) {
       let round = createPairsRound(pairsManifest(size, seed));
       for (const item of vocabulary(size)) {
@@ -135,12 +141,11 @@ describe("pairs rounds, over many seeds and sizes", () => {
         round = selectPairsCard(round, `${item.vocabularyItemId}-word`).round;
       }
       expect(round.status).toBe("won");
-      expect(round.livesRemaining).toBe(ROUND_LIVES);
       expect(round.matched).toHaveLength(size);
     }
   });
 
-  it("never lets lives fall below zero or status regress", () => {
+  it("never regresses however it is tapped", () => {
     for (const seed of SEEDS) {
       let round: PairsRound = createPairsRound(pairsManifest(4, seed));
       const ids = round.cards.map((card) => card.cardId);
@@ -152,25 +157,33 @@ describe("pairs rounds, over many seeds and sizes", () => {
         const result = selectPairsCard(round, cardId);
         round = result.round;
 
-        expect(round.livesRemaining).toBeGreaterThanOrEqual(0);
-        expect(round.livesRemaining).toBeLessThanOrEqual(previous.livesRemaining);
         expect(round.matched.length).toBeGreaterThanOrEqual(
           previous.matched.length
         );
         assertStatusProgression(previous.status, round.status);
-        if (round.status === "lost") expect(round.livesRemaining).toBe(0);
       }
     }
   });
 
-  it("loses after exactly three wrong pairings", () => {
+  /*
+   * The mismatch is where a life used to be spent. Nothing is spent now, so a
+   * wrong pairing may clear the selection and nothing else — the board a child
+   * comes back to is the board they left.
+   */
+  it("costs nothing but the selection when two cards do not pair", () => {
     let round = createPairsRound(pairsManifest(4, "wrong"));
-    for (let attempt = 1; attempt <= ROUND_LIVES; attempt += 1) {
+    const opening = structuredClone(round);
+
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
       round = selectPairsCard(round, "item-0-picture").round;
-      round = selectPairsCard(round, "item-1-word").round;
-      expect(round.livesRemaining).toBe(ROUND_LIVES - attempt);
+      const result = selectPairsCard(round, "item-1-word");
+      expect(result.attempt).toEqual({
+        kind: "mismatched",
+        cardIds: ["item-0-picture", "item-1-word"]
+      });
+      round = result.round;
+      expect(round).toEqual(opening);
     }
-    expect(round.status).toBe("lost");
   });
 
   it("does not mutate the round it is given", () => {
@@ -201,25 +214,31 @@ describe("word-picture rounds, over many seeds and sizes", () => {
       const result = chooseWordPicture(round, round.targetVocabularyItemId);
       expect(result.attempt).toEqual({ kind: "correct" });
       expect(result.round.status).toBe("won");
-      expect(result.round.livesRemaining).toBe(ROUND_LIVES);
     }
   });
 
-  it("never lets lives fall below zero or status regress", () => {
+  /* The target stays reachable however many wrong pictures came before it. */
+  it("costs nothing when a wrong picture is chosen", () => {
     for (const seed of SEEDS) {
-      let round: WordPictureRound = createWordPictureRound(
-        wordPictureManifest(4, seed)
+      const opening = createWordPictureRound(wordPictureManifest(4, seed));
+      let round: WordPictureRound = opening;
+      const wrong = opening.choices.filter(
+        (choice) => choice.vocabularyItemId !== opening.targetVocabularyItemId
       );
-      const ids = round.choices.map((choice) => choice.vocabularyItemId);
 
       for (let step = 0; step < 20; step += 1) {
-        const previous = round;
-        round = chooseWordPicture(round, ids[(step * 3) % ids.length]!).round;
-
-        expect(round.livesRemaining).toBeGreaterThanOrEqual(0);
-        expect(round.livesRemaining).toBeLessThanOrEqual(previous.livesRemaining);
-        assertStatusProgression(previous.status, round.status);
+        const result = chooseWordPicture(
+          round,
+          wrong[step % wrong.length]!.vocabularyItemId
+        );
+        expect(result.attempt).toEqual({ kind: "incorrect" });
+        round = result.round;
+        expect(round).toEqual(opening);
       }
+
+      expect(
+        chooseWordPicture(round, round.targetVocabularyItemId).round.status
+      ).toBe("won");
     }
   });
 
@@ -247,7 +266,7 @@ describe("initial-letter rounds, over many seeds and sizes", () => {
     }
   });
 
-  it.each(sizes)("can always be won without losing a life at %i", (size) => {
+  it.each(sizes)("can always be won at %i", (size) => {
     for (const seed of SEEDS) {
       let round = createInitialLetterRound(initialLetterManifest(size, seed));
       for (const item of vocabulary(size)) {
@@ -261,12 +280,11 @@ describe("initial-letter rounds, over many seeds and sizes", () => {
         ).round;
       }
       expect(round.status).toBe("won");
-      expect(round.livesRemaining).toBe(ROUND_LIVES);
       expect(round.matched).toHaveLength(size);
     }
   });
 
-  it("never lets lives fall below zero or status regress", () => {
+  it("never regresses however it is tapped", () => {
     for (const seed of SEEDS) {
       let round: InitialLetterRound = createInitialLetterRound(
         initialLetterManifest(4, seed)
@@ -279,13 +297,10 @@ describe("initial-letter rounds, over many seeds and sizes", () => {
         const cardId = ids[(step * 7 + 3) % ids.length]!;
         round = selectInitialLetterCard(round, cardId).round;
 
-        expect(round.livesRemaining).toBeGreaterThanOrEqual(0);
-        expect(round.livesRemaining).toBeLessThanOrEqual(previous.livesRemaining);
         expect(round.matched.length).toBeGreaterThanOrEqual(
           previous.matched.length
         );
         assertStatusProgression(previous.status, round.status);
-        if (round.status === "lost") expect(round.livesRemaining).toBe(0);
       }
     }
   });
@@ -332,11 +347,15 @@ describe("syllables rounds, over many seeds and word shapes", () => {
       expect(round.slots.map((slot) => slot?.syllable).join("")).toBe(
         syllables.join("")
       );
-      expect(round.livesRemaining).toBe(ROUND_LIVES);
     }
   });
 
-  it("charges a life for every wrong or occupied slot, never below zero", () => {
+  /*
+   * The card that went to the wrong slot does not stick, and the round it came
+   * from is the round it goes back to. A child may miss the same slot twenty
+   * times and still be able to finish the word.
+   */
+  it("leaves the round untouched by a wrong or occupied slot", () => {
     for (const seed of SEEDS) {
       const opening = createSyllablesRound(
         syllablesManifest(["ma", "ri", "po", "sa"], seed)
@@ -344,17 +363,19 @@ describe("syllables rounds, over many seeds and word shapes", () => {
       let round: SyllablesRound = opening;
 
       for (let step = 0; step < 20; step += 1) {
-        const previous = round;
         const card = opening.tray[step % opening.tray.length]!;
         const slot = (card.slotIndex + 1) % opening.slots.length;
         const result = placeSyllable(round, card.cardId, slot);
+        expect(result.attempt).toEqual({ kind: "rejected" });
         round = result.round;
-
-        expect(round.livesRemaining).toBeGreaterThanOrEqual(0);
-        expect(round.livesRemaining).toBeLessThanOrEqual(previous.livesRemaining);
-        assertStatusProgression(previous.status, round.status);
+        expect(round).toEqual(opening);
       }
-      expect(round.status).toBe("lost");
+
+      for (let slotIndex = 0; slotIndex < 4; slotIndex += 1) {
+        const card = opening.tray.find((each) => each.slotIndex === slotIndex)!;
+        round = placeSyllable(round, card.cardId, slotIndex).round;
+      }
+      expect(round.status).toBe("won");
     }
   });
 
