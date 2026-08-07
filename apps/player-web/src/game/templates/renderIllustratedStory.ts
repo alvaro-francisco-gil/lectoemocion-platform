@@ -5,6 +5,7 @@ import {
   type ManifestFor,
   type StoryPage
 } from "@lectoemocion/resource-schema";
+import { createPicker, createPill, createProgressBar } from "./bookChrome";
 import {
   layOutPage,
   PAGE,
@@ -13,7 +14,6 @@ import {
 } from "./storyPageFrame";
 
 const OVERLAY_DEPTH = 100;
-const PICKER_COLUMNS = 8;
 
 /** The one thing a child is asked to do before the book will speak. */
 const OPEN_PROMPT = "Toca para leer";
@@ -41,7 +41,7 @@ export function renderIllustratedStory(
   scene.cameras.main.setBackgroundColor(PAGE.backdrop);
 
   const sheet = scene.add.graphics();
-  const progress = scene.add.graphics();
+  const progress = createProgressBar(scene);
   let picture: Phaser.GameObjects.Image | null = null;
   let voice: Phaser.Sound.BaseSound | null = null;
   /** What is on screen. `-1` until the first page arrives. */
@@ -105,21 +105,6 @@ export function renderIllustratedStory(
     return result;
   }
 
-  /**
-   * How far through the book, as a bar along the very bottom.
-   *
-   * The source application computed this on every page and never drew it. It is
-   * worth drawing: thirty-one pages is long enough that an adult deciding
-   * whether to start one before break wants to see where the end is.
-   */
-  function drawProgress(index: number): void {
-    progress.clear();
-    progress.fillStyle(PAGE.sheetEdge, 1);
-    progress.fillRect(0, 714, 1280, 6);
-    progress.fillStyle(PAGE.accent, 1);
-    progress.fillRect(0, 714, (1280 * (index + 1)) / pages.length, 6);
-  }
-
   /* -------------------------------------------------------------- playback */
 
   function stopVoice(): void {
@@ -171,8 +156,8 @@ export function renderIllustratedStory(
     layOutPage(sheet, picture);
     label.setText(pageLabel(page));
     counter.setText(`${index + 1} / ${pages.length}`);
-    drawProgress(index);
-    highlightPicker(index);
+    progress.draw(index, pages.length);
+    picker.highlight(index);
     updateArrows();
 
     if (!scene.cache.audio.exists(storyAudioKey(page))) curtain.waiting();
@@ -212,65 +197,35 @@ export function renderIllustratedStory(
 
   /* -------------------------------------------------------------- controls */
 
-  function pill(
-    x: number,
-    width: number,
-    text: string,
-    fill: number,
-    colour: string,
-    onTap: () => void
-  ): {
-    readonly setText: (value: string) => void;
-    readonly setEnabled: (on: boolean) => void;
-  } {
-    const shape = scene.add.graphics();
-    const caption = scene.add
-      .text(x, PAGE.controlsY, text, {
-        fontFamily: "system-ui",
-        fontSize: "26px",
-        color: colour,
-        fontStyle: "bold"
-      })
-      .setOrigin(0.5);
-    const hit = scene.add
-      .zone(x, PAGE.controlsY, width, 64)
-      .setInteractive({ useHandCursor: true });
-    hit.on("pointerdown", onTap);
-
-    const draw = (enabled: boolean) => {
-      shape.clear();
-      shape.fillStyle(fill, enabled ? 1 : 0.35);
-      shape.fillRoundedRect(x - width / 2, PAGE.controlsY - 30, width, 60, 30);
-      shape.lineStyle(2, PAGE.controlEdge, enabled ? 1 : 0.35);
-      shape.strokeRoundedRect(x - width / 2, PAGE.controlsY - 30, width, 60, 30);
-    };
-    draw(true);
-
-    return {
-      setText: (value: string) => caption.setText(value),
-      setEnabled: (on: boolean) => {
-        draw(on);
-        caption.setAlpha(on ? 1 : 0.35);
-        if (on) hit.setInteractive({ useHandCursor: true });
-        else hit.disableInteractive();
-      }
-    };
-  }
-
   /*
    * A page turned by hand reads itself, exactly like one turned by the book.
    * Somebody who presses `▶`, or picks `Ñ` out of the list, wants to hear that
    * page — making them press play afterwards is a second step for one intent.
    */
-  const back = pill(470, 110, "◀", PAGE.control, PAGE.ink, () =>
-    goTo(current - 1, true)
-  );
-  const playPause = pill(640, 190, "Reproducir", PAGE.accent, "#ffffff", () =>
-    togglePlay()
-  );
-  const forward = pill(810, 110, "▶", PAGE.control, PAGE.ink, () =>
-    goTo(current + 1, true)
-  );
+  const back = createPill(scene, {
+    x: 470,
+    width: 110,
+    text: "◀",
+    fill: PAGE.control,
+    colour: PAGE.ink,
+    onTap: () => goTo(current - 1, true)
+  });
+  const playPause = createPill(scene, {
+    x: 640,
+    width: 190,
+    text: "Reproducir",
+    fill: PAGE.accent,
+    colour: "#ffffff",
+    onTap: () => togglePlay()
+  });
+  const forward = createPill(scene, {
+    x: 810,
+    width: 110,
+    text: "▶",
+    fill: PAGE.control,
+    colour: PAGE.ink,
+    onTap: () => goTo(current + 1, true)
+  });
 
   function setPlaying(playing: boolean): void {
     playPause.setText(playing ? "Pausar" : "Reproducir");
@@ -298,89 +253,12 @@ export function renderIllustratedStory(
 
   /* ----------------------------------------------------------- page picker */
 
-  /**
-   * Every page, reachable in one press.
-   *
-   * The source application had this as an adult's dropdown, and it is what
-   * makes a thirty-one page book usable in a twenty minute lesson: a teacher
-   * working on `Ñ` opens `Ñ` instead of sitting through twenty-six letters
-   * first. It sits at the top of the display, out of the band a child reaches
-   * during play.
-   */
-  const picker = scene.add
-    .container(0, 0)
-    .setDepth(OVERLAY_DEPTH)
-    .setVisible(false);
-  const cells: Phaser.GameObjects.Graphics[] = [];
-
-  function cellCentre(position: number): { readonly x: number; readonly y: number } {
-    return {
-      x: 190 + (position % PICKER_COLUMNS) * 137,
-      y: 160 + Math.floor(position / PICKER_COLUMNS) * 104
-    };
-  }
-
-  const pickerButton = scene.add
-    .text(1216, 44, "Páginas", {
-      fontFamily: "system-ui",
-      fontSize: "24px",
-      color: PAGE.ink,
-      backgroundColor: "#ffffff",
-      padding: { x: 16, y: 10 }
-    })
-    .setOrigin(1, 0.5)
-    .setInteractive({ useHandCursor: true });
-  pickerButton.on("pointerdown", () => picker.setVisible(!picker.visible));
-
-  const veil = scene.add
-    .rectangle(640, 360, 1280, 720, 0x1b2a3a, 0.85)
-    .setInteractive();
-  veil.on("pointerdown", () => picker.setVisible(false));
-  picker.add(veil);
-  picker.add(
-    scene.add
-      .text(640, 62, "Ir a una página", {
-        fontFamily: "system-ui",
-        fontSize: "34px",
-        color: "#ffffff",
-        fontStyle: "bold"
-      })
-      .setOrigin(0.5)
-  );
-
-  pages.forEach((page, index) => {
-    const { x, y } = cellCentre(index);
-    const cell = scene.add.graphics();
-    cells.push(cell);
-
-    const caption = scene.add
-      .text(x, y, pageShortLabel(page), {
-        fontFamily: "system-ui",
-        fontSize: page.kind === "cover" ? "20px" : "30px",
-        color: "#ffffff",
-        fontStyle: "bold"
-      })
-      .setOrigin(0.5);
-
-    const hit = scene.add
-      .zone(x, y, 124, 88)
-      .setInteractive({ useHandCursor: true });
-    hit.on("pointerdown", () => {
-      picker.setVisible(false);
-      goTo(index, true);
-    });
-
-    picker.add([cell, caption, hit]);
+  const picker = createPicker(scene, {
+    buttonLabel: "Páginas",
+    title: "Ir a una página",
+    labels: pages.map(pageShortLabel),
+    onPick: (index) => goTo(index, true)
   });
-
-  function highlightPicker(index: number): void {
-    cells.forEach((cell, position) => {
-      const { x, y } = cellCentre(position);
-      cell.clear();
-      cell.fillStyle(position === index ? PAGE.accent : 0x3d5163, 1);
-      cell.fillRoundedRect(x - 62, y - 44, 124, 88, 14);
-    });
-  }
 
   /* ---------------------------------------------------------- the curtain */
 
