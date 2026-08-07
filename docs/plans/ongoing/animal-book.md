@@ -3,12 +3,23 @@
 ## Status
 
 - **Updated:** 2026-08-07
-- **Stage:** starting — the schema is first
+- **Stage:** built and verified; not yet merged
 - **Branch:** `feat/animal-book`, worktree `.worktrees/animal-book`
-- **Done:** the design below, agreed with mockups of the page and of the stamp.
-- **Next:** one animal per chapter in `worldSchema.ts`, distinct across the
-  world, then the catalog, the view, and the book itself.
+- **Done:** all of it. One animal per chapter with the distinctness rule and its
+  tests; the ten authored animals; `CollectionSlotView` carrying its animal and
+  `earned`; three chests over one animal; the book as a modal over the world,
+  one page, silhouettes for what is owed; the stamp, opening and closing itself.
+  `pnpm check` passes (1012 tests) and `pnpm test:e2e` passes bar one
+  pre-existing flake — see below.
+- **Next:** merge to `main`, then distil this into a decision record and delete
+  the file.
 - **Blockers:** none.
+
+**Pre-existing flake, not from this work:** "the letters game is won by dragging
+each letter into its slot" times out at `classroom-hd` and `classroom-4k` under
+full-suite load, and passes in isolation in 7.6s. It fails identically at
+`2445482`, before any of this branch, so it is untouched by these changes and
+wants a scoped fix of its own.
 
 ## Goal
 
