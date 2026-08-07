@@ -24,6 +24,8 @@ import {
   type Progress
 } from "../world/mapView";
 import { LOCAL_OWNER, LocalProgressStore } from "../world/progressStore";
+import { derivePrizeView, EMPTY_PRIZES, type Prizes } from "../world/prizes";
+import { LocalPrizeStore, systemMinter } from "../world/prizeStore";
 import { unlockAllEnabled } from "../world/unlockAll";
 import { useDragScroll } from "./useDragScroll";
 import {
@@ -34,12 +36,13 @@ import {
   StarIcon
 } from "./icons";
 
-const store = new LocalProgressStore(
+const storage =
   typeof localStorage === "undefined"
     ? { getItem: () => null, setItem: () => undefined }
-    : localStorage,
-  LOCAL_OWNER
-);
+    : localStorage;
+
+const store = new LocalProgressStore(storage, LOCAL_OWNER);
+const prizeStore = new LocalPrizeStore(storage, LOCAL_OWNER, systemMinter());
 
 /**
  * The world shell.
@@ -60,6 +63,7 @@ const store = new LocalProgressStore(
  */
 export function App() {
   const [progress, setProgress] = useState<Progress>(EMPTY_PROGRESS);
+  const [prizes, setPrizes] = useState<Prizes>(EMPTY_PRIZES);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   /*
    * The stars just paid, held only until the child acknowledges them. Like the
@@ -90,6 +94,9 @@ export function App() {
     void store.read().then((stored) => {
       if (!cancelled) setProgress(stored);
     });
+    void prizeStore.read().then((stored) => {
+      if (!cancelled) setPrizes(stored);
+    });
     return () => {
       cancelled = true;
     };
@@ -98,6 +105,11 @@ export function App() {
   const view = useMemo(
     () => deriveMapView(world, progress, { unlockAll: unlockAllEnabled() }),
     [progress]
+  );
+
+  const prizeView = useMemo(
+    () => derivePrizeView(prizes, view.stars),
+    [prizes, view.stars]
   );
 
   const activeNode = useMemo(
@@ -202,7 +214,7 @@ export function App() {
       className="map"
       style={{ "--map-scene": `url("${region.background}")` } as CSSProperties}
     >
-      <StarCounter stars={view.stars} />
+      <PrizeMeter filled={prizeView.filled} goal={prizeView.goal} />
       <button
         type="button"
         className="menu-button"
@@ -252,19 +264,36 @@ export function App() {
 }
 
 /**
- * Every letriestrella won so far, in the map's top-left corner.
+ * How close the child is to the next regalo, in the map's top-left corner.
  *
- * A running total rather than a per-chapter mark: stars are paid for playing,
- * including replaying, and a number that only ever goes up is the part of the
- * world a child can move on their own. It is display only — nothing here is
- * pressable — and it lives on the map alone, because a total counting up
- * beside a running game is a second thing to watch.
+ * Display only, and that is what keeps the reach-band rule intact: nothing a
+ * child needs to touch sits at the top of an 86-inch panel. The star is still
+ * the picture, because the stars are still what fills it.
  */
-function StarCounter({ stars }: { stars: number }) {
+function PrizeMeter({ filled, goal }: { filled: number; goal: number }) {
   return (
-    <section className="star-counter" aria-label="Letriestrellas">
+    <section
+      className="prize-meter"
+      role="meter"
+      aria-label="Letriestrellas hacia el próximo regalo"
+      aria-valuenow={filled}
+      aria-valuemin={0}
+      aria-valuemax={goal}
+    >
       <StarIcon />
-      <span className="star-counter__count">{stars}</span>
+      <span className="prize-meter__count">
+        {filled} / {goal}
+      </span>
+      {/*
+        Decoration: the count above is what says how far along the child is,
+        and a screen reader reading the bar as well would say it twice.
+      */}
+      <span className="prize-meter__track" aria-hidden="true">
+        <span
+          className="prize-meter__fill"
+          style={{ width: `${(filled / goal) * 100}%` }}
+        />
+      </span>
     </section>
   );
 }

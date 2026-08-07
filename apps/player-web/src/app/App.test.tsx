@@ -47,11 +47,16 @@ async function collectStars(): Promise<string> {
   return won;
 }
 
-/** The running total in the map's corner. */
+/** The fill meter in the map's corner. */
+function prizeMeter(): HTMLElement {
+  return screen.getByRole("meter", {
+    name: "Letriestrellas hacia el próximo regalo"
+  });
+}
+
+/** What the meter reads, as "filled / goal". */
 function starTotal(): string {
-  return (
-    screen.getByRole("region", { name: "Letriestrellas" }).textContent ?? ""
-  );
+  return prizeMeter().textContent ?? "";
 }
 
 /**
@@ -503,7 +508,7 @@ describe("the letriestrellas every finish is worth", () => {
 
   it("starts a new player at zero", () => {
     render(<App />);
-    expect(starTotal()).toBe("0");
+    expect(starTotal()).toBe("0 / 30");
   });
 
   it("pays three stars the moment a chapter is finished", async () => {
@@ -516,7 +521,7 @@ describe("the letriestrellas every finish is worth", () => {
     expect(screen.getByRole("button", { name: "Abrir el cofre 1" })).toBeInTheDocument();
 
     await openChest();
-    await waitFor(() => expect(starTotal()).toBe("3"));
+    await waitFor(() => expect(starTotal()).toBe("3 / 30"));
   });
 
   /* The animals are once each; the stars are every time. */
@@ -530,7 +535,7 @@ describe("the letriestrellas every finish is worth", () => {
     expect(await collectStars()).toContain("+3");
 
     /* Straight back to the map: no second chest for the same chapter. */
-    await waitFor(() => expect(starTotal()).toBe("6"));
+    await waitFor(() => expect(starTotal()).toBe("6 / 30"));
     expect(screen.queryByRole("button", { name: /Abrir el cofre/ })).toBeNull();
   });
 
@@ -539,31 +544,55 @@ describe("the letriestrellas every finish is worth", () => {
     finish("El encuentro");
     await collectStars();
     await openChest();
-    await waitFor(() => expect(starTotal()).toBe("3"));
+    await waitFor(() => expect(starTotal()).toBe("3 / 30"));
 
     cleanup();
     render(<App />);
 
-    await waitFor(() => expect(starTotal()).toBe("3"));
+    await waitFor(() => expect(starTotal()).toBe("3 / 30"));
   });
 
   it("keeps the counter off a running game and out of the ceremonies", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
-    expect(screen.queryByRole("region", { name: "Letriestrellas" })).toBeNull();
+    expect(
+      screen.queryByRole("meter", {
+        name: "Letriestrellas hacia el próximo regalo"
+      })
+    ).toBeNull();
 
     completeActiveResource();
     await screen.findByRole("status");
-    expect(screen.queryByRole("region", { name: "Letriestrellas" })).toBeNull();
+    expect(
+      screen.queryByRole("meter", {
+        name: "Letriestrellas hacia el próximo regalo"
+      })
+    ).toBeNull();
   });
 
   /* A readout, not a route: nothing in the corner opens anything. */
   it("keeps the counter unpressable", () => {
     render(<App />);
-    expect(
-      screen
-        .getByRole("region", { name: "Letriestrellas" })
-        .querySelectorAll("button")
-    ).toHaveLength(0);
+    expect(prizeMeter().querySelectorAll("button")).toHaveLength(0);
+  });
+});
+
+describe("the prize meter", () => {
+  it("shows what is filled against the goal", async () => {
+    render(<App />);
+    const meter = await screen.findByRole("meter", {
+      name: "Letriestrellas hacia el próximo regalo"
+    });
+    expect(meter).toHaveAttribute("aria-valuenow", "0");
+    expect(meter).toHaveAttribute("aria-valuemax", "30");
+    expect(meter).toHaveTextContent("0 / 30");
+  });
+
+  it("is display only, so nothing a child touches sits out of reach", async () => {
+    render(<App />);
+    const meter = await screen.findByRole("meter", {
+      name: "Letriestrellas hacia el próximo regalo"
+    });
+    expect(within(meter).queryByRole("button")).toBeNull();
   });
 });
