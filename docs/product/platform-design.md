@@ -21,7 +21,18 @@ letter/sound. That content **overrides** the defaults slot by slot, and certain
 games become markedly more meaningful when the children on screen are the
 children in the room.
 
-Personalisation is an enhancement, never a prerequisite.
+Personalisation is an enhancement, never a prerequisite — with exactly one
+declared exception, *El libro de los nombres* (`name-book`). That template's
+content **is** the group's roster: a letter to a page, carrying the children
+whose verified initial it is. A book of default names would be a book of
+invented children, which is the opposite of what makes it worth opening, so
+with nobody recorded there is no book. The chapter stands on the shelf visibly
+locked, saying what it needs, and every other template remains playable with no
+uploads at all.
+
+The exception is declared in code rather than described here:
+`TEMPLATES_NEEDING_ROSTER` in `@lectoemocion/template-sdk` is total over every
+template, so a new one cannot silently inherit either answer.
 
 The platform does not use AI to generate stories, animations, game mechanics,
 images, voices, or text. "Personalisation" means deterministic placement of
@@ -52,6 +63,11 @@ with default content and no uploads, so a genuine classroom pilot — real
 teachers, real children, real feedback — can run with **no personal data at
 all** while the institutional paperwork proceeds in parallel. Personalisation
 is enabled per deployment only once that deployment's artefacts are complete.
+
+*El libro de los nombres* is the one chapter a pilot cannot open, and it does
+not weaken this: a deployment with no roster shows it locked, which is exactly
+the state a pilot should be in until its artefacts exist. It is the only
+chapter whose availability tracks that paperwork.
 
 This staged pilot is the intended path, not a fallback. Enabling uploads before
 the artefacts exist is the single most likely way for this project to cause
