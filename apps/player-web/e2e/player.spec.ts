@@ -1,3 +1,4 @@
+import { writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { worldNodes } from "@lectoemocion/resource-schema";
 import { createResourceForNode, world } from "@lectoemocion/template-catalog";
@@ -6,6 +7,11 @@ import {
   createInitialSyllableRound,
   createLettersRound
 } from "@lectoemocion/template-sdk";
+import {
+  DEFAULT_PRIZE_GOAL,
+  MAX_PRIZE_GOAL,
+  MIN_PRIZE_GOAL
+} from "@lectoemocion/domain";
 import {
   INITIAL_LETTER_LAYOUT,
   initialLetterColumnX
@@ -18,6 +24,7 @@ import {
   LETTERS_LAYOUT,
   letterColumnX
 } from "../src/game/templates/lettersLayout";
+import { STARS_PER_COMPLETION } from "../src/world/mapView";
 
 const ENTRY = "El encuentro";
 const SECOND = "Las iniciales";
@@ -29,7 +36,10 @@ const ALBUM = "Nuestro álbum";
  * Each completed chapter is seeded with its chest already opened and its
  * letriestrellas already paid. A completed chapter with no animal is a chapter
  * that owes a ceremony, and these tests are about the world and the resources
- * rather than the reward.
+ * rather than the reward — so the goal is pushed out past anywhere that many
+ * letriestrellas can reach, one layer up in the same seed, for the same
+ * reason: a gift owed on top of the chests would take the very screen these
+ * tests are reading, over a prize none of them is about.
  */
 async function withProgress(page: Page, completedNodes: string[]) {
   const rewards = completedNodes.map((nodeId) => {
@@ -52,6 +62,43 @@ async function withProgress(page: Page, completedNodes: string[]) {
     },
     { nodes: completedNodes, rewards }
   );
+  await withPrizes(page, { goal: MAX_PRIZE_GOAL, prizes: [] });
+}
+
+/**
+ * Seeds the adults' side: the goal, and any prizes already awarded.
+ *
+ * Through the same key the app reads, for the same reason `withProgress` does:
+ * a test that reaches past the store is testing something the product does not
+ * do.
+ */
+async function withPrizes(
+  page: Page,
+  prizes: { goal: number; prizes: unknown[] }
+) {
+  await page.addInitScript((seed) => {
+    localStorage.setItem("lectoemocion.prizes.local", JSON.stringify(seed));
+  }, prizes);
+}
+
+/**
+ * Seeds a previous session's letriestrellas alone, with nothing completed
+ * yet — an adult picking up a device mid-way through an earlier sitting. The
+ * shape mirrors `withProgress`'s, minus the completion this test still has to
+ * play for real.
+ */
+async function withBankedStars(page: Page, stars: number) {
+  await page.addInitScript((banked) => {
+    localStorage.setItem(
+      "lectoemocion.progress.local",
+      JSON.stringify({
+        completedNodes: [],
+        lastPlayedNode: null,
+        rewards: [],
+        stars: banked
+      })
+    );
+  }, stars);
 }
 
 /**
@@ -140,8 +187,10 @@ test("playing the first chapter unlocks the next node and persists", async ({
   page
 }) => {
   await page.goto("/");
-  const stars = page.getByRole("region", { name: "Letriestrellas" });
-  await expect(stars).toHaveText("0");
+  const stars = page.getByRole("meter", {
+    name: "Letriestrellas hacia el próximo regalo"
+  });
+  await expect(stars).toHaveText(`0 / ${DEFAULT_PRIZE_GOAL}`);
 
   await page.getByRole("button", { name: ENTRY }).click();
   await expect(page.locator("canvas")).toBeVisible();
@@ -153,11 +202,11 @@ test("playing the first chapter unlocks the next node and persists", async ({
      letriestrellas it paid, and then the chests it owes. */
   await takeTheReward(page);
   await expect(page.getByRole("button", { name: SECOND })).toBeEnabled();
-  await expect(stars).toHaveText("3");
+  await expect(stars).toHaveText(`3 / ${DEFAULT_PRIZE_GOAL}`);
 
   await page.reload();
   await expect(page.getByRole("button", { name: SECOND })).toBeEnabled();
-  await expect(stars).toHaveText("3");
+  await expect(stars).toHaveText(`3 / ${DEFAULT_PRIZE_GOAL}`);
 });
 
 test("finishing a chapter hands out an animal for the collection", async ({
@@ -362,9 +411,9 @@ test("the world list is gone while a resource plays", async ({ page }) => {
   await expect(page.getByRole("button", { name: SECOND })).toHaveCount(0);
   /* The star counter belongs to the map too: nothing counts up beside a
      running game. */
-  await expect(page.getByRole("region", { name: "Letriestrellas" })).toHaveCount(
-    0
-  );
+  await expect(
+    page.getByRole("meter", { name: "Letriestrellas hacia el próximo regalo" })
+  ).toHaveCount(0);
 
   await page.getByRole("button", { name: "Volver al mapa" }).click();
   await expect(worldList).toBeVisible();
@@ -742,4 +791,159 @@ test("the initial-syllable game is won by dragging the match onto the target", a
 
   await completed(page, "empieza-igual");
   expect(failures).toEqual([]);
+});
+
+/**
+ * The regalo, played through a real browser rather than jsdom.
+ *
+ * A goal at its own floor: any goal reachable by banking `goal -
+ * STARS_PER_COMPLETION` letriestrellas and then playing one chapter for real
+ * lands exactly on it, and the lowest legal goal proves that boundary rather
+ * than picking a number arbitrarily far from it.
+ */
+const PRIZE_GOAL = MIN_PRIZE_GOAL;
+
+/**
+ * Plays the one chapter needed to reach a gift, and stops on the ceremony's
+ * first screen: the unconfigured "Un regalo te está esperando".
+ */
+async function reachGiftScreen(page: Page): Promise<void> {
+  await withBankedStars(page, PRIZE_GOAL - STARS_PER_COMPLETION);
+  await withPrizes(page, { goal: PRIZE_GOAL, prizes: [] });
+  await page.goto("/");
+  await page.getByRole("button", { name: ENTRY }).click();
+  await completed(page, "encuentro");
+  await takeTheReward(page);
+}
+
+/** Enters the birth year every gate in this suite accepts. */
+async function passAdultGate(page: Page): Promise<void> {
+  await page.getByLabel("¿En qué año naciste?").fill("1988");
+  await page.getByRole("button", { name: "Entrar" }).click();
+}
+
+/** Reaches the gift, then the adult area past its gate, form open. */
+async function openGiftForm(page: Page): Promise<void> {
+  await reachGiftScreen(page);
+  await page.getByRole("button", { name: "Preparar el regalo" }).click();
+  await passAdultGate(page);
+}
+
+test("the meter reads 0 / 30 on a fresh session", async ({ page }) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("meter", { name: "Letriestrellas hacia el próximo regalo" })
+  ).toHaveText(`0 / ${DEFAULT_PRIZE_GOAL}`);
+});
+
+test("reaching the goal shows the gift screen after the letriestrellas", async ({
+  page
+}) => {
+  await reachGiftScreen(page);
+  await expect(
+    page.getByText("Un regalo te está esperando")
+  ).toBeVisible();
+});
+
+test("Seguir leaves the gift reachable on the map, and the meter restarts", async ({
+  page
+}) => {
+  await reachGiftScreen(page);
+  await page.getByRole("button", { name: "Seguir" }).click();
+
+  await expect(page.getByRole("button", { name: "Tu regalo" })).toBeVisible();
+  await expect(
+    page.getByRole("meter", { name: "Letriestrellas hacia el próximo regalo" })
+  ).toHaveText(`0 / ${PRIZE_GOAL}`);
+});
+
+test("Preparar el regalo reaches the gate, refuses an implausible year, and 1988 opens the settings", async ({
+  page
+}) => {
+  await reachGiftScreen(page);
+  await page.getByRole("button", { name: "Preparar el regalo" }).click();
+
+  await page.getByLabel("¿En qué año naciste?").fill("2024");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Ese año no puede ser. Inténtalo otra vez."
+  );
+
+  await passAdultGate(page);
+
+  await expect(
+    page.getByLabel("Letriestrellas para el próximo regalo")
+  ).toBeVisible();
+  await expect(
+    page.getByRole("radio", { name: "Encuentra tu regalo en el patio" })
+  ).toBeVisible();
+});
+
+test("choosing a place makes the gift openable, and opening it reveals the phrase", async ({
+  page
+}) => {
+  await openGiftForm(page);
+  const phrase = "Encuentra tu regalo en el patio";
+
+  await page.getByRole("radio", { name: phrase }).click();
+  await page.getByRole("button", { name: "Guardar el regalo" }).click();
+  await page.getByRole("button", { name: "Cerrar los ajustes" }).click();
+  await page.getByRole("button", { name: "Tu regalo" }).click();
+  await page.getByRole("button", { name: "¡Ábrelo!" }).click();
+
+  await expect(page.getByText(phrase)).toBeVisible();
+});
+
+/**
+ * A minimal, synthetic 2x2 JPEG, generated for this suite rather than
+ * committed as a binary fixture. It is real enough for the browser's own
+ * image decoder to downscale — which is what a custom prize's photo actually
+ * needs — and it is written only into Playwright's own output directory,
+ * never into source control.
+ */
+const TINY_JPEG_BASE64 =
+  "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/2wBDARESEhgVGC8aGi9jQjhCY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2P/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDOooor3DpP/9k=";
+
+test("a custom gift with a photo reveals both the words and the picture", async ({
+  page
+}, testInfo) => {
+  await openGiftForm(page);
+
+  await page.getByRole("radio", { name: "Escribirlo yo" }).click();
+  await page.getByLabel("¿Qué hay dentro?").fill("un abrazo");
+
+  const photo = testInfo.outputPath("prize-photo.jpg");
+  await writeFile(photo, Buffer.from(TINY_JPEG_BASE64, "base64"));
+  await page.getByLabel("Añadir una foto").setInputFiles(photo);
+
+  await page.getByRole("button", { name: "Guardar el regalo" }).click();
+  await page.getByRole("button", { name: "Cerrar los ajustes" }).click();
+  await page.getByRole("button", { name: "Tu regalo" }).click();
+  await page.getByRole("button", { name: "¡Ábrelo!" }).click();
+
+  await expect(page.getByText("un abrazo")).toBeVisible();
+  await expect(page.locator(".gift__reveal img")).toBeVisible();
+});
+
+test("the goal field refuses 0 and accepts 12, and the meter then reads against 12", async ({
+  page
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Menú" }).click();
+  await passAdultGate(page);
+
+  const goalField = page.getByLabel("Letriestrellas para el próximo regalo");
+  await goalField.fill("0");
+  await page.getByRole("button", { name: "Guardar" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Elige un número entre 5 y 200"
+  );
+
+  await goalField.fill("12");
+  await page.getByRole("button", { name: "Guardar" }).click();
+  await page.getByRole("button", { name: "Cerrar los ajustes" }).click();
+
+  await expect(
+    page.getByRole("meter", { name: "Letriestrellas hacia el próximo regalo" })
+  ).toHaveText("0 / 12");
 });

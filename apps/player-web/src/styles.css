@@ -783,10 +783,20 @@ main { height: 100dvh; }
  * reach. This is the one control down here that a child does touch, so it sits
  * where their hands actually land, with a touch target no smaller than the
  * chests they already tap to choose an animal.
+ *
+ * Clear of the collection rather than low enough to sit on top of it: the
+ * strip along the very bottom of the map is `.collection`, and it is not
+ * decoration a child can tap through — the row of animal tiles inside it
+ * happily eats the tap instead, on any viewport wide enough for that row to
+ * reach this corner. `9.5rem` clears the strip at its own tallest, which the
+ * strip's own rules cap at 9rem (a `2rem` bottom padding, a `1.25rem` top
+ * padding, and a slot no bigger than `92px`/`5.75rem`, all three at their
+ * clamped maximum together) — so the two never share a pixel at the phone,
+ * the classroom-HD panel, or the classroom-4K panel this ships to.
  */
 .map__gift {
   position: absolute;
-  bottom: 2rem;
+  bottom: 9.5rem;
   left: 2rem;
   z-index: 1;
   min-width: 6rem;
