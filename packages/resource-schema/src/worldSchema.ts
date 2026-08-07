@@ -17,6 +17,19 @@ const NodeResourceSchema = Type.Union([
     { additionalProperties: false }
   ),
   /*
+   * The book of names carries a seed and nothing else. What is in it is the
+   * group's own roster, which the player supplies at play time — naming
+   * children here would put child data in authored content, where it must
+   * never live.
+   */
+  Type.Object(
+    {
+      template: Type.Literal("name-book"),
+      seed: Type.String({ minLength: 1 })
+    },
+    { additionalProperties: false }
+  ),
+  /*
    * A story is named, not inlined. Thirty-one pages written out here would
    * bury the shape of the world in content, and the catalogue is where
    * authored content lives.

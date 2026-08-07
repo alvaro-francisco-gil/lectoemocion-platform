@@ -295,6 +295,31 @@ main { height: 100dvh; }
 }
 
 /*
+ * The one message on this screen written for an adult.
+ *
+ * It breaks the rule above — that a card's state is spoken and never drawn —
+ * and it is the only thing that should. Every other state is about what the
+ * child has played, and the padlock already says it; this one is about
+ * something only an adult can do, and nothing on a wordless card could ask for
+ * it. It sits over the picture like the title, dimmed to sit behind the name of
+ * the chapter rather than compete with it.
+ */
+.world-node__note {
+  place-self: end start;
+  z-index: 1;
+  max-width: 92%;
+  margin-bottom: 0.15rem;
+  padding: 0.25em 0.9em;
+  border-radius: 0 999px 999px 0;
+  background: rgb(36 17 51 / 82%);
+  color: #fff;
+  font-weight: 600;
+  font-size: clamp(0.6rem, 1.05vw, 0.78rem);
+  line-height: 1.25;
+  text-align: left;
+}
+
+/*
  * A finished chapter is not marked on the card at all.
  *
  * Nothing is hidden by that: a completed chapter stays playable, so "finished"

@@ -43,9 +43,10 @@ const SECTIONS = [
     ]
   },
   {
-    title: "Content (one-off, network)",
+    title: "Content (one-off)",
     commands: [
-      ["node scripts/import-vocabulary-images.mjs", "re-import vocabulary pictures and their provenance"]
+      ["node scripts/import-vocabulary-images.mjs", "re-import vocabulary pictures and their provenance"],
+      ["node scripts/generate-synthetic-cast.mjs", "regenerate the synthetic class's avatars and silent audio"]
     ]
   }
 ];

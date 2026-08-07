@@ -159,6 +159,11 @@ describe("deriving the world from progress", () => {
     const view = deriveWorldView(chain, EMPTY_PROGRESS, { unlockAll: true });
     expect(view.nodes.every((node) => node.playable)).toBe(true);
   });
+
+  it("says nothing about a roster for a world with no book of names", () => {
+    const view = deriveWorldView(chain, EMPTY_PROGRESS);
+    expect(view.nodes.some((node) => node.state === "needs-roster")).toBe(false);
+  });
 });
 
 describe("the world's two surfaces", () => {
@@ -272,9 +277,56 @@ describe("the collection and the chests owed for it", () => {
 });
 
 describe("the authored world through the shell", () => {
-  it("starts a real player on one game and the whole shelf", () => {
-    const view = deriveWorldView(world, EMPTY_PROGRESS);
+  it("starts a real player on one game and the story", () => {
+    const view = deriveWorldView(world, EMPTY_PROGRESS, { hasRoster: true });
     expect(view.games.filter((node) => node.playable)).toHaveLength(1);
     expect(view.resources.every((node) => node.playable)).toBe(true);
+  });
+
+  it("holds the book of names back until there are names", () => {
+    const view = deriveWorldView(world, EMPTY_PROGRESS);
+    const book = view.resources.find((node) => node.id === "libro-nombres");
+    expect(book?.state).toBe("needs-roster");
+    expect(book?.playable).toBe(false);
+  });
+});
+
+/**
+ * A fourth state, and not a second flavour of `locked`.
+ *
+ * The two say different things to the adult standing next to the child: one is
+ * *not yet*, and the other is *this needs you*. Collapsing them would leave the
+ * only actionable case in the world indistinguishable from the ordinary one.
+ */
+describe("a chapter that has nothing to be made of", () => {
+  it("needs a roster before it can be opened", () => {
+    const view = deriveWorldView(world, EMPTY_PROGRESS, { hasRoster: false });
+    expect(stateOf(view, "libro-nombres")).toBe("needs-roster");
+  });
+
+  it("opens once a roster exists", () => {
+    const view = deriveWorldView(world, EMPTY_PROGRESS, { hasRoster: true });
+    expect(stateOf(view, "libro-nombres")).toBe("unlocked");
+  });
+
+  it("leaves every other chapter alone", () => {
+    const without = deriveWorldView(world, EMPTY_PROGRESS);
+    const with_ = deriveWorldView(world, EMPTY_PROGRESS, { hasRoster: true });
+    const others = (view: typeof without) =>
+      view.nodes.filter((node) => node.id !== "libro-nombres");
+    expect(others(without)).toEqual(others(with_));
+  });
+
+  /*
+   * The development bypass skips progression, which is a question about what
+   * the child has played. Whether a book of names has any names is a different
+   * question, and no bypass can answer it: there is still nothing to render.
+   */
+  it("is not opened by the development bypass", () => {
+    const view = deriveWorldView(world, EMPTY_PROGRESS, { unlockAll: true });
+    expect(stateOf(view, "libro-nombres")).toBe("needs-roster");
+    expect(
+      view.nodes.filter((node) => node.id !== "libro-nombres").every((node) => node.playable)
+    ).toBe(true);
   });
 });
