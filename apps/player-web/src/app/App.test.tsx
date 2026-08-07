@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChildRecord } from "@lectoemocion/domain";
 import { worldNodes } from "@lectoemocion/resource-schema";
 import { syntheticClass, world } from "@lectoemocion/template-catalog";
+import { LOCAL_OWNER, storageKey } from "../world/progressStore";
 import { App } from "./App";
 
 type Destroyable = { destroy: () => void };
@@ -857,7 +858,7 @@ describe("profiles", () => {
     /* Stars only: a completed node would owe chests, and the ceremony for them
        would be on screen instead of the map this asserts about. */
     localStorage.setItem(
-      "lectoemocion.progress.local",
+      storageKey(LOCAL_OWNER),
       JSON.stringify({
         completedNodes: [],
         lastPlayedNode: null,
@@ -1054,11 +1055,10 @@ describe("profiles", () => {
     );
     /* Vera was the only child who had played, so her namespace was the only
        progress on the device — and deleting her must take it with her. */
-    expect(
-      Object.keys(localStorage).filter((key) =>
-        key.startsWith("lectoemocion.progress.")
-      )
-    ).toEqual([]);
+    const progressKeys = Object.keys(localStorage).filter((key) =>
+      key.startsWith(storageKey(""))
+    );
+    expect(progressKeys).toEqual([]);
   });
 
   /* Planned work, shown as planned. Neither pretends to be ready. */

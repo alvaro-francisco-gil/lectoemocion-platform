@@ -262,3 +262,63 @@ describe("a store that cannot be read", () => {
     expect(storage.getItem(PROFILES_KEY)).toBe("{ not json");
   });
 });
+
+/*
+ * The invariant the whole per-child design rests on.
+ *
+ * A profile's id *is* its progress namespace — `storageKey(id)` — so two
+ * profiles sharing an id are two children sharing one set of stars. Nothing
+ * about that failure is visible: no error, no missing data, just a sibling's
+ * world quietly becoming yours.
+ */
+describe("a profile id is a progress namespace", () => {
+  it("never gives two profiles the same id", async () => {
+    const subject = store();
+    await subject.read();
+    for (let index = 0; index < 5; index += 1) {
+      await subject.add({
+        name: `Niño ${index}`,
+        avatarId: avatarId("panda"),
+        birth: { known: false }
+      });
+    }
+
+    const book = await subject.read();
+    const ids = book.profiles.map((profile) => profile.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("refuses a saved book in which two profiles share an id", async () => {
+    storage.setItem(
+      PROFILES_KEY,
+      JSON.stringify({
+        selectedId: "twin",
+        profiles: [
+          { id: "twin", name: "Ana", avatarId: "panda", birth: { known: false } },
+          { id: "twin", name: "Bruno", avatarId: "zorro", birth: { known: false } }
+        ]
+      })
+    );
+
+    await expect(store().read()).rejects.toThrow(ProfileStoreError);
+  });
+
+  /* An id generator that repeats itself must fail loudly, not merge two worlds. */
+  it("refuses to add a profile whose generated id is already taken", async () => {
+    const colliding = new LocalProfileStore(storage, () => "always-the-same");
+    await colliding.read();
+    await colliding.add({
+      name: "Ana",
+      avatarId: avatarId("panda"),
+      birth: { known: false }
+    });
+
+    await expect(
+      colliding.add({
+        name: "Bruno",
+        avatarId: avatarId("zorro"),
+        birth: { known: false }
+      })
+    ).rejects.toThrow(ProfileStoreError);
+  });
+});

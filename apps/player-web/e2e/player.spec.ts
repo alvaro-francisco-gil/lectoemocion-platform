@@ -18,6 +18,15 @@ import {
   LETTERS_LAYOUT,
   letterColumnX
 } from "../src/game/templates/lettersLayout";
+import { LOCAL_OWNER, storageKey } from "../src/world/progressStore";
+
+/*
+ * The starter profile's progress, by the app's own key builder.
+ *
+ * Spelling the key out here would keep this suite passing after the real key
+ * changed shape, which is the one thing an end-to-end test must never do.
+ */
+const STARTER_PROGRESS_KEY = storageKey(LOCAL_OWNER);
 
 const ENTRY = "El encuentro";
 const SECOND = "Las iniciales";
@@ -39,9 +48,9 @@ async function withProgress(page: Page, completedNodes: string[]) {
   });
 
   await page.addInitScript(
-    ({ nodes, rewards: claimed }) => {
+    ({ key, nodes, rewards: claimed }) => {
       localStorage.setItem(
-        "lectoemocion.progress.local",
+        key,
         JSON.stringify({
           completedNodes: nodes,
           lastPlayedNode: nodes.at(-1),
@@ -50,7 +59,7 @@ async function withProgress(page: Page, completedNodes: string[]) {
         })
       );
     },
-    { nodes: completedNodes, rewards }
+    { key: STARTER_PROGRESS_KEY, nodes: completedNodes, rewards }
   );
 }
 
@@ -106,9 +115,7 @@ async function completed(page: Page, nodeId: string, timeout = 120_000) {
   await expect
     .poll(
       () =>
-        page.evaluate(() =>
-          localStorage.getItem("lectoemocion.progress.local")
-        ),
+        page.evaluate((key) => localStorage.getItem(key), STARTER_PROGRESS_KEY),
       { timeout }
     )
     .toContain(nodeId);

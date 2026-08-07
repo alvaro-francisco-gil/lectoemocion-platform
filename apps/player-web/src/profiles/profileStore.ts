@@ -149,6 +149,21 @@ function parseBook(raw: string): ProfileBook {
   }
 
   const parsed = profiles.map(parseProfile);
+
+  /*
+   * A profile's id is its progress namespace — `storageKey(id)` — so two
+   * profiles sharing one are two children sharing a set of stars. The failure
+   * is completely silent: no error, no missing data, just a sibling's world
+   * quietly becoming yours. It is refused here rather than deduplicated,
+   * because there is no way to tell which child the progress belonged to.
+   */
+  const ids = new Set(parsed.map((profile) => profile.id));
+  if (ids.size !== parsed.length) {
+    throw new ProfileStoreError(
+      "Two saved profiles share an identifier, so their progress cannot be told apart."
+    );
+  }
+
   const selected = playerProfileId(selectedId);
   if (!parsed.some((profile) => profile.id === selected)) {
     throw new ProfileStoreError("The saved profiles name nobody as playing.");
@@ -208,8 +223,19 @@ export class LocalProfileStore implements ProfileStore {
       );
     }
 
+    const id = playerProfileId(this.newId());
+    /*
+     * The generator is `crypto.randomUUID` in the app, so this cannot happen —
+     * which is exactly why it is checked. An id generator that ever repeats
+     * itself must fail loudly here rather than hand the new child the previous
+     * one's stars.
+     */
+    if (book.profiles.some((profile) => profile.id === id)) {
+      throw new ProfileStoreError("That identifier is already on this device.");
+    }
+
     const profile: PlayerProfile = {
-      id: playerProfileId(this.newId()),
+      id,
       name: requireName(draft.name),
       avatarId: draft.avatarId,
       birth: draft.birth

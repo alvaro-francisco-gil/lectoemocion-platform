@@ -23,6 +23,15 @@ them apart is what lets accounts replace either one without touching the other.
 `src/profiles/` must not import from `src/world/` beyond `LOCAL_OWNER` and
 `storageKey` — the two names it needs to adopt existing progress and to delete
 a child's.
+
+**A profile's id is its progress namespace.** `storageKey(id)` is the only
+thing that may build `lectoemocion.progress.<id>`, and a profile id is the only
+thing that may be passed to it. That single derivation is what keeps two
+children's stars apart on a shared family tablet, and the failure when it
+breaks is completely silent — no error, no missing data, just a sibling's world
+quietly becoming yours. `scripts/check-progress-namespace.mjs` enforces it with
+no exceptions, tests included: a test that hand-builds the key is a test that
+keeps passing after the key changes shape.
 `scripts/check-progress-boundary.mjs` stops a template or a shared package
 importing it. The shell reads progress, derives a `WorldView`, and draws the
 sections from it; it hands a template a manifest plus a completion callback.

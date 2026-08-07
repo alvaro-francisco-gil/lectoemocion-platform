@@ -9,6 +9,7 @@ const {
   isMediaFile,
   isPhaserImport,
   isProgressImport,
+  isProgressKeyLiteral,
   isReactImport,
   isStrictTypeEscape
 } = rules as {
@@ -18,6 +19,7 @@ const {
   isMediaFile: (name: string) => boolean;
   isPhaserImport: (line: string) => boolean;
   isProgressImport: (line: string) => boolean;
+  isProgressKeyLiteral: (line: string) => boolean;
   isReactImport: (line: string) => boolean;
   isStrictTypeEscape: (line: string) => boolean;
 };
@@ -131,8 +133,8 @@ describe("media rule", () => {
 describe("progress-boundary rule", () => {
   it.each([
     'import { LocalProgressStore } from "../world/progressStore";',
-    'import type { Progress } from "./mapView";',
-    'export { deriveMapView } from "../../world/mapView";',
+    'import type { Progress } from "./worldView";',
+    'export { deriveWorldView } from "../../world/worldView";',
     "import { EMPTY_PROGRESS } from '@lectoemocion/player-web/src/world/progressStore'"
   ])("flags %s", (line) => {
     expect(isProgressImport(line)).toBe(true);
@@ -149,5 +151,51 @@ describe("progress-boundary rule", () => {
     expect(isProgressImport(" * The shell records progress after a win.")).toBe(
       false
     );
+  });
+});
+
+/*
+ * A profile's id is its progress namespace: `storageKey(id)` builds
+ * `lectoemocion.progress.<id>`. That is only a guarantee while one function
+ * builds it — a second place spelling the prefix out by hand can namespace
+ * progress by something that is not a profile id, and two children quietly
+ * share a set of stars.
+ */
+describe("progress-namespace rule", () => {
+  it.each([
+    'localStorage.getItem("lectoemocion.progress." + owner);',
+    "const key = `lectoemocion.progress.${child}`;",
+    "storage.removeItem('lectoemocion.progress.' + id)"
+  ])("flags %s", (line) => {
+    expect(isProgressKeyLiteral(line)).toBe(true);
+  });
+
+  it("allows the key built through the one function that owns it", () => {
+    expect(isProgressKeyLiteral("storage.removeItem(storageKey(id));")).toBe(
+      false
+    );
+    expect(
+      isProgressKeyLiteral('return `lectoemocion.profiles`;')
+    ).toBe(false);
+  });
+
+  it("allows prose that merely names the key", () => {
+    expect(
+      isProgressKeyLiteral(" * Stored under lectoemocion.progress.<id>.")
+    ).toBe(false);
+    expect(
+      isProgressKeyLiteral("// the progress key is namespaced by profile id")
+    ).toBe(false);
+  });
+
+  /* A comment quoting the key in backticks is documentation, not a second
+     place that builds it. */
+  it("allows a doc comment formatting the key as code", () => {
+    expect(
+      isProgressKeyLiteral(" * leaving `lectoemocion.progress.<id>` behind")
+    ).toBe(false);
+    expect(
+      isProgressKeyLiteral("// writes to 'lectoemocion.progress.' + id")
+    ).toBe(false);
   });
 });
