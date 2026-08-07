@@ -173,8 +173,13 @@ function collection(container: HTMLElement): (string | null)[] {
       ? (page.querySelector(".animal-book__name")?.textContent ?? "")
       : null
   );
-  fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
+  tapOutsideTheBook();
   return pages;
+}
+
+/** Shuts the book the way a child does: a tap on the page around it. */
+function tapOutsideTheBook(): void {
+  fireEvent.click(screen.getByRole("dialog", { name: "Mis animales" }));
 }
 
 describe("the world shell", () => {
@@ -581,7 +586,7 @@ describe("the book of animals", () => {
     createGame.mockClear();
   });
 
-  it("opens from the corner and closes again", async () => {
+  it("opens from the corner and closes on a tap outside it", async () => {
     await renderApp();
     expect(screen.queryByRole("dialog", { name: "Mis animales" })).toBeNull();
 
@@ -590,8 +595,25 @@ describe("the book of animals", () => {
       screen.getByRole("dialog", { name: "Mis animales" })
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
+    tapOutsideTheBook();
     expect(screen.queryByRole("dialog", { name: "Mis animales" })).toBeNull();
+  });
+
+  /*
+   * Tapping the book itself must not shut it. A child looking at what they have
+   * collected will put a finger on the animals, and losing the book to that is
+   * losing it for no reason they can see.
+   */
+  it("stays open when the page itself is touched", async () => {
+    const { container } = await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+
+    fireEvent.click(container.querySelector(".animal-book__pages")!);
+    fireEvent.click(container.querySelector(".animal-book__page")!);
+
+    expect(
+      screen.getByRole("dialog", { name: "Mis animales" })
+    ).toBeInTheDocument();
   });
 
   /* A screen with no way out is a trap on a device with no back button. */
@@ -625,18 +647,22 @@ describe("the book of animals", () => {
     paw.focus();
     fireEvent.click(paw);
 
-    expect(screen.getByRole("button", { name: "Cerrar" })).toHaveFocus();
+    expect(screen.getByRole("dialog", { name: "Mis animales" })).toHaveFocus();
 
-    fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
+    tapOutsideTheBook();
     expect(paw).toHaveFocus();
   });
 
-  /* Pages are a record, not a route. */
-  it("keeps every page unpressable", async () => {
+  /*
+   * Nothing in the book is a control at all — not a page, and no longer a way
+   * out. It is a record a child looks at, and the way out is the world they can
+   * already see around it.
+   */
+  it("holds no buttons at all", async () => {
     const { container } = await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
 
-    expect(container.querySelectorAll(".animal-book__pages button")).toHaveLength(0);
+    expect(container.querySelectorAll(".animal-book button")).toHaveLength(0);
   });
 
   /*

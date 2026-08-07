@@ -170,8 +170,8 @@ test("finishing a chapter hands out an animal for the collection", async ({
   const book = page.getByRole("dialog", { name: "Mis animales" });
   const openBook = () =>
     page.getByRole("button", { name: "Mis animales" }).click();
-  const closeBook = () =>
-    page.getByRole("button", { name: "Cerrar", exact: true }).click();
+  /* Shut by tapping the world around it, which is the only way out it has. */
+  const closeBook = () => book.click({ position: { x: 4, y: 4 } });
   const owed = page.locator('.animal-book__page[data-earned="false"]');
   const earned = page.locator('.animal-book__page[data-earned="true"]');
 

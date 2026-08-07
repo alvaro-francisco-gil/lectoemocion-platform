@@ -1057,32 +1057,28 @@ main { height: 100dvh; }
 }
 
 /*
- * One place, pressed into the paper.
+ * One place, and no frame around it at all.
  *
- * The well is the only frame there is. A card would make the page read as a row
- * of buttons, and nothing here is pressable.
+ * The stickers sit straight on the paper. A ring around each one drew a grid of
+ * slots over a page that is meant to read as a book, and it fought the shadows:
+ * a silhouette is already the shape of what is missing, so a circle around it
+ * says the same thing again in a language the animal does not speak.
+ *
+ * Still square and centred, so what is in it keeps its place whether it is a
+ * shadow or a sticker.
  */
 .animal-book__page {
   position: relative;
   display: grid;
   place-items: center;
   aspect-ratio: 1;
-  border-radius: 50%;
-  background: radial-gradient(
-    closest-side,
-    rgb(160 130 80 / 0.1),
-    rgb(160 130 80 / 0) 72%
-  );
-  box-shadow:
-    inset 0 2px 5px rgb(90 70 40 / 0.18),
-    0 1px 0 rgb(255 255 255 / 0.7);
 }
 
 .animal-book__well {
   display: grid;
   place-items: center;
-  width: 78%;
-  height: 78%;
+  width: 88%;
+  height: 88%;
 }
 
 .animal-book__well > img {

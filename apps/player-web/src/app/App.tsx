@@ -662,7 +662,7 @@ function AnimalBook({
   stamping: string | null;
   onClose: () => void;
 }) {
-  const close = useRef<HTMLButtonElement>(null);
+  const dialog = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -679,31 +679,43 @@ function AnimalBook({
    * behind to tab into. An overlay leaves the whole world underneath, so a
    * keyboard or a screen reader would otherwise wander into a map nobody can
    * see.
+   *
+   * It lands on the book itself rather than on a control, because there is no
+   * control: the book holds nothing to press.
    */
   useEffect(() => {
     const restore = document.activeElement;
-    close.current?.focus();
+    dialog.current?.focus();
     return () => {
       if (restore instanceof HTMLElement) restore.focus();
     };
   }, []);
 
   return (
+    /*
+     * The way out is the world around it, not a cross in the corner.
+     *
+     * A child who wants to stop looking at their animals points at the thing
+     * they want instead, which is what tapping outside already is. The cross
+     * was a second thing to learn, drawn small in a corner and reading as chrome
+     * on a page that is meant to be a book.
+     *
+     * Only a tap on the scrim itself closes it — `currentTarget` rather than
+     * anything inside — so putting a finger on the animals leaves the book open.
+     * Escape does the same for a keyboard, which is what a dialog with nothing
+     * focusable in it needs.
+     */
     <div
+      ref={dialog}
+      tabIndex={-1}
       className="animal-book"
       role="dialog"
       aria-modal="true"
       aria-label="Mis animales"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
-      <button
-        ref={close}
-        type="button"
-        className="menu__close"
-        aria-label="Cerrar"
-        onClick={onClose}
-      >
-        <CloseIcon />
-      </button>
       <ul className="animal-book__pages">
         {slots.map((slot) => (
           <li
@@ -1016,20 +1028,6 @@ function PawIcon() {
       <path
         d="M12 11c3.2 0 5.6 2.4 5.6 4.9 0 2-1.6 3.1-3.4 3.1-1 0-1.6-.4-2.2-.4s-1.2.4-2.2.4c-1.8 0-3.4-1.1-3.4-3.1C6.4 13.4 8.8 11 12 11Z"
         fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
-      <path
-        d="M6 6l12 12M18 6L6 18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
       />
     </svg>
   );
