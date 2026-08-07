@@ -2,7 +2,31 @@ import { describe, expect, it } from "vitest";
 // @ts-expect-error rules.mjs is untyped tooling, deliberately outside the workspace packages
 import * as rules from "./rules.mjs";
 
+interface ChromeSoundMeasurement {
+  codec: number;
+  channels: number;
+  rate: number;
+  bitsPerSample: number;
+  seconds: number;
+  lufs: number;
+  truePeakDb: number;
+  leadInMs: number;
+}
+
+interface ChromeSoundSpec {
+  format: Pick<
+    ChromeSoundMeasurement,
+    "codec" | "channels" | "rate" | "bitsPerSample"
+  >;
+  maxSeconds: number;
+  targetLufs: number;
+  tolerance: number;
+  truePeakCeilingDb: number;
+  maxLeadInMs: number;
+}
+
 const {
+  chromeSoundProblems,
   isChildNamespaceLiteral,
   isConsoleCall,
   isDeepAdultAreaImport,
@@ -12,8 +36,13 @@ const {
   isPhaserImport,
   isProgressImport,
   isReactImport,
-  isStrictTypeEscape
+  isStrictTypeEscape,
+  parseSoundIds
 } = rules as {
+  chromeSoundProblems: (
+    measured: ChromeSoundMeasurement,
+    spec: ChromeSoundSpec
+  ) => string[];
   isChildNamespaceLiteral: (line: string) => boolean;
   isConsoleCall: (line: string) => boolean;
   isDeepAdultAreaImport: (line: string) => boolean;
@@ -24,6 +53,7 @@ const {
   isProgressImport: (line: string) => boolean;
   isReactImport: (line: string) => boolean;
   isStrictTypeEscape: (line: string) => boolean;
+  parseSoundIds: (source: string) => string[] | null;
 };
 
 describe("engine-neutrality rule", () => {
@@ -265,5 +295,82 @@ describe("child-namespace rule", () => {
     expect(
       isChildNamespaceLiteral("// writes to 'lectoemocion.progress.' + id")
     ).toBe(false);
+  });
+});
+
+describe("chrome sound rule", () => {
+  /* What `scripts/generate-chrome-sounds.mjs` actually produces. */
+  const SPEC: ChromeSoundSpec = {
+    format: { codec: 1, channels: 1, rate: 44100, bitsPerSample: 16 },
+    maxSeconds: 1,
+    targetLufs: -16,
+    tolerance: 1,
+    truePeakCeilingDb: -1,
+    maxLeadInMs: 20
+  };
+  const GOOD: ChromeSoundMeasurement = {
+    codec: 1,
+    channels: 1,
+    rate: 44100,
+    bitsPerSample: 16,
+    seconds: 0.36,
+    lufs: -16,
+    truePeakDb: -4.6,
+    leadInMs: 0
+  };
+
+  it("accepts a sound the generator wrote", () => {
+    expect(chromeSoundProblems(GOOD, SPEC)).toEqual([]);
+  });
+
+  it.each([
+    ["a codec that is not PCM", { codec: 0xff }, /codec/],
+    ["stereo", { channels: 2 }, /channels/],
+    ["the wrong sample rate", { rate: 48000 }, /48000 Hz/],
+    ["8-bit samples", { bitsPerSample: 8 }, /8-bit/],
+    ["a sound over the duration budget", { seconds: 1.4 }, /longer than/],
+    ["a sound mastered too loud", { lufs: -11 }, /LUFS/],
+    ["a sound mastered too quiet", { lufs: -21 }, /LUFS/],
+    ["a true peak above the ceiling", { truePeakDb: -0.2 }, /dBTP/],
+    ["silence in front of the sound", { leadInMs: 55 }, /silence/]
+  ])("flags %s", (_case, defect, expected) => {
+    const problems = chromeSoundProblems({ ...GOOD, ...defect }, SPEC);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(expected);
+  });
+
+  /*
+   * The soft onset a ceremony sound is allowed. This is the boundary the
+   * threshold was actually set at, so it is worth pinning: `chest-open` begins
+   * with a creak fading in, and its first few milliseconds are below the noise
+   * floor without being latency.
+   */
+  it("allows a soft onset under the lead-in limit", () => {
+    expect(chromeSoundProblems({ ...GOOD, leadInMs: 6 }, SPEC)).toEqual([]);
+  });
+
+  it("reports every fault at once rather than the first", () => {
+    expect(
+      chromeSoundProblems({ ...GOOD, channels: 2, rate: 22050 }, SPEC)
+    ).toHaveLength(2);
+  });
+
+  it("honours a lower target for the deliberately quiet sound", () => {
+    const quiet = { ...SPEC, targetLufs: -19 };
+    expect(chromeSoundProblems({ ...GOOD, lufs: -19 }, quiet)).toEqual([]);
+    expect(chromeSoundProblems(GOOD, quiet)).toHaveLength(1);
+  });
+});
+
+describe("sound registry rule", () => {
+  it("reads the ids the player declares", () => {
+    expect(
+      parseSoundIds('export const SOUND_IDS = [\n  "tap",\n  "star"\n] as const;')
+    ).toEqual(["tap", "star"]);
+  });
+
+  it("reports a registry it cannot find rather than an empty one", () => {
+    expect(parseSoundIds("export const OTHER = [];")).toBeNull();
+    expect(parseSoundIds("export const SOUND_IDS = [] as const;")).toEqual([]);
   });
 });

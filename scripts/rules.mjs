@@ -122,3 +122,76 @@ export const MEDIA_EXTENSIONS = [
 
 export const isMediaFile = (name) =>
   MEDIA_EXTENSIONS.some((extension) => name.toLowerCase().endsWith(extension));
+
+/**
+ * Everything wrong with one chrome sound, as human-readable lines.
+ *
+ * Audio format drift is invisible until one device in one classroom fails to
+ * decode, or until a teacher rides the volume all lesson because one sound was
+ * mastered louder than the rest. That is precisely the class of defect that
+ * needs a machine rather than a reviewer.
+ *
+ * Pure, so `rules.test.ts` can prove each clause fires; the measuring is
+ * `check-audio-assets.mjs`'s job.
+ */
+export function chromeSoundProblems(measured, spec) {
+  const problems = [];
+  const { format } = spec;
+
+  if (measured.codec !== format.codec) {
+    problems.push(`codec ${measured.codec}, expected PCM (${format.codec})`);
+  }
+  if (measured.channels !== format.channels) {
+    problems.push(`${measured.channels} channels, expected ${format.channels}`);
+  }
+  if (measured.rate !== format.rate) {
+    problems.push(`${measured.rate} Hz, expected ${format.rate} Hz`);
+  }
+  if (measured.bitsPerSample !== format.bitsPerSample) {
+    problems.push(
+      `${measured.bitsPerSample}-bit, expected ${format.bitsPerSample}-bit`
+    );
+  }
+  if (measured.seconds > spec.maxSeconds) {
+    problems.push(
+      `${measured.seconds.toFixed(2)} s, longer than the ${spec.maxSeconds} s limit`
+    );
+  }
+  if (Math.abs(measured.lufs - spec.targetLufs) > spec.tolerance) {
+    problems.push(
+      `${measured.lufs.toFixed(1)} LUFS, not within ` +
+        `${spec.tolerance} LU of ${spec.targetLufs}`
+    );
+  }
+  if (measured.truePeakDb > spec.truePeakCeilingDb) {
+    problems.push(
+      `${measured.truePeakDb.toFixed(1)} dBTP, above the ` +
+        `${spec.truePeakCeilingDb} dBTP ceiling`
+    );
+  }
+  /*
+   * The one that justifies the uncompressed format. Leading silence hand-built
+   * into a file would give back exactly the latency that dropping AAC removed,
+   * and it passes every test that only checks the sound plays.
+   */
+  if (measured.leadInMs > spec.maxLeadInMs) {
+    problems.push(
+      `starts with ${measured.leadInMs.toFixed(0)} ms of silence, over the ` +
+        `${spec.maxLeadInMs} ms limit`
+    );
+  }
+  return problems;
+}
+
+/**
+ * The sound ids the player's registry declares.
+ *
+ * Read out of the source rather than imported because the guardrails run on
+ * Node built-ins alone, before and independently of any build step. `null`
+ * means the array could not be found at all, which is itself the failure.
+ */
+export function parseSoundIds(source) {
+  const declaration = /export const SOUND_IDS = \[([^\]]*)\]/.exec(source);
+  if (!declaration) return null;
+  return [...declaration[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+}

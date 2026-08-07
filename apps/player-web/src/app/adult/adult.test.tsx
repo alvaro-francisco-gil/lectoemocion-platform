@@ -21,6 +21,8 @@ function open(overrides: Partial<Parameters<typeof AdultArea>[0]> = {}) {
   const props = {
     view: derivePrizeView(EMPTY_PRIZES, 0),
     today: TODAY,
+    muted: false,
+    onToggleMuted: vi.fn(),
     onSetGoal: vi.fn(),
     onConfigure: vi.fn(),
     onPickImage: vi.fn(

@@ -5,6 +5,7 @@ import {
   chooseWordPicture,
   createWordPictureRound
 } from "@lectoemocion/template-sdk";
+import { chromeSounds } from "../../audio/ChromeSounds";
 import { addLabel, addPicture, CARD, VocabularyCard } from "./vocabularyCard";
 
 const CHOICE_ROW_Y = 500;
@@ -45,6 +46,7 @@ export function renderWordPictureGame(
 
       switch (outcome.kind) {
         case "correct":
+          chromeSounds.play("correct");
           card.paint(CARD.matched);
           banner.setText("¡Muy bien!");
           for (const other of cards.values()) other.disable();
@@ -52,6 +54,7 @@ export function renderWordPictureGame(
           return;
         /* The card goes back to white and every picture stays choosable. */
         case "incorrect":
+          chromeSounds.play("wrong");
           card.paint(CARD.wrong);
           card.shake([picture]);
           scene.time.delayedCall(500, () => card.paint(CARD.fill));

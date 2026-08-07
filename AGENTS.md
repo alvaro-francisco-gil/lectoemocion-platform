@@ -123,6 +123,7 @@ above has an executable guardrail; `pnpm guardrails` runs them all, and
 | 5 — immutable published versions | `packages/template-catalog/src/publishedVersions.test.ts` |
 | Privacy — media and logging | `scripts/check-privacy.mjs` |
 | Strict typing | `scripts/check-strict-types.mjs` |
+| Chrome sounds match their committed format | `scripts/check-audio-assets.mjs` |
 
 **When you add an invariant, add its check in the same change.** The rules
 themselves live in `scripts/rules.mjs` and are unit-tested by

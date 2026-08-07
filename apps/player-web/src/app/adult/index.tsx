@@ -31,6 +31,8 @@ import { PrizeSettings } from "./PrizeSettings";
 export function AdultArea({
   view,
   today,
+  muted,
+  onToggleMuted,
   onSetGoal,
   onConfigure,
   onPickImage,
@@ -39,6 +41,8 @@ export function AdultArea({
 }: {
   view: PrizeView;
   today: Date;
+  muted: boolean;
+  onToggleMuted: () => void;
   onSetGoal: (goal: number) => void;
   onConfigure: (id: PrizeId, content: PrizeContent) => void;
   onPickImage: (file: File) => Promise<PrizePick>;
@@ -81,6 +85,19 @@ export function AdultArea({
       >
         <CloseIcon />
       </button>
+      {/*
+        One switch for all of it. A teacher with a class in front of them needs
+        the room quiet, not a mixer; `docs/plans/ideas/audio.md` settles that
+        there is no per-sound volume surface.
+
+        It sits here rather than inside `PrizeSettings` because it is not about
+        prizes, and here rather than on the world because a switch a child can
+        reach is a world silenced by accident.
+      */}
+      <label className="adult__setting">
+        <input type="checkbox" checked={!muted} onChange={onToggleMuted} />
+        <span>Sonido</span>
+      </label>
       <PrizeSettings
         view={view}
         onSetGoal={onSetGoal}

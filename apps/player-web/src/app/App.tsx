@@ -22,8 +22,10 @@ import {
   type CollectibleAnimal
 } from "@lectoemocion/resource-schema";
 import { createResourceForNode, world } from "@lectoemocion/template-catalog";
+import { chromeSounds } from "../audio/ChromeSounds";
 import { createGame } from "../game/createGame";
 import { rosterForBuild } from "../world/devRoster";
+import { CEREMONY, ceremonyTiming, playOnArrival } from "./ceremony";
 import {
   deriveWorldView,
   EMPTY_PROGRESS,
@@ -206,6 +208,8 @@ export function App({
    * whichever tab a child happened to leave open last week.
    */
   const [tab, setTab] = useState<TabId>("juegos");
+  /* Mirrored into state only so the switch redraws; the audio layer owns it. */
+  const [muted, setMuted] = useState(chromeSounds.muted);
   const host = useRef<HTMLDivElement>(null);
   /* Where the stars are flying to. Measured, never derived from the stylesheet. */
   const pill = useRef<HTMLParagraphElement>(null);
@@ -258,6 +262,38 @@ export function App({
         : new LocalProgressStore(browserStorage, selectedId),
     [selectedId]
   );
+
+  /**
+   * Fetch the sounds now; build the audio context on the first gesture.
+   *
+   * Every browser blocks audio until a gesture, and the aged panel WebViews
+   * this has to survive can be stricter than the specification. One unlock
+   * point for the whole app, rather than each screen discovering the problem
+   * for itself — which is how the first sound ends up silent and reads as a
+   * content bug (`apps/player-web/AGENTS.md`, "Audio unlocks on first gesture").
+   */
+  useEffect(() => {
+    void chromeSounds.load();
+    const unlock = () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      void chromeSounds.unlock();
+    };
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
+
+  const toggleMuted = useCallback(() => {
+    const next = !chromeSounds.muted;
+    chromeSounds.setMuted(next);
+    setMuted(next);
+    /* Unmuting is itself a gesture, and it should be audible that it worked. */
+    if (!next) chromeSounds.play("select");
+  }, []);
 
   /*
    * The prizes are two things owned by two people, behind one store.
@@ -448,6 +484,12 @@ export function App({
       const target = view.nodes.find((node) => node.id === nodeId);
       /* Dimming a locked node is presentation; refusing to open it is the rule. */
       if (!target?.playable) return;
+      /*
+       * A locked node stays silent rather than getting the wrong-answer sound.
+       * It is not a mistake — the child has not got there yet — and marking it
+       * as one is how a world stops being somewhere you want to press things.
+       */
+      chromeSounds.play("select");
       setActiveNodeId(nodeId);
     },
     [view, menuOpen]
@@ -475,6 +517,7 @@ export function App({
   const openChest = useCallback(
     (reward: PendingRewardView) => {
       if (progressStore === null) return;
+      chromeSounds.play("chest-open");
       /*
        * Recorded before it is shown. A child who is handed an animal and then
        * loses it to a closing tab has been given nothing, and the reveal is the
@@ -752,7 +795,10 @@ export function App({
           type="button"
           className="back"
           aria-label="Volver al mapa"
-          onClick={() => setActiveNodeId(null)}
+          onClick={() => {
+            chromeSounds.play("back");
+            setActiveNodeId(null);
+          }}
         >
           <BackArrow />
         </button>
@@ -805,6 +851,8 @@ export function App({
       <AdultArea
         view={prizeView}
         today={new Date()}
+        muted={muted}
+        onToggleMuted={toggleMuted}
         onSetGoal={setPrizeGoal}
         onConfigure={configure}
         onPickImage={pickImage}
@@ -1089,8 +1137,23 @@ function StarAward({
   amount: number;
   onContinue: () => void;
 }) {
+  /*
+   * The fanfare says the resource is finished; the chimes are the stars
+   * arriving inside it. Both are in the same key, so the three pings read as
+   * detail on the fanfare rather than as a second thing happening.
+   */
+  useEffect(() => {
+    chromeSounds.play("fanfare");
+    return playOnArrival(
+      "star",
+      amount,
+      CEREMONY.starFirstMs,
+      CEREMONY.starStepMs
+    );
+  }, [amount]);
+
   return (
-    <main className="award">
+    <main className="award" style={ceremonyTiming}>
       <div className="award__prize" role="status">
         {/* Decoration: the line below is what says how many. */}
         <ul className="award__stars" aria-hidden="true">
@@ -1254,8 +1317,22 @@ function Chests({
   reward: PendingRewardView;
   onOpen: (reward: PendingRewardView) => void;
 }) {
+  /*
+   * The duende steps in first and the chests follow him, so the offer opening
+   * is one sound and each chest being set down is another.
+   */
+  useEffect(() => {
+    chromeSounds.play("unlock");
+    return playOnArrival(
+      "chest-appear",
+      CHEST_COUNT,
+      CEREMONY.chestFirstMs,
+      CEREMONY.chestStepMs
+    );
+  }, []);
+
   return (
-    <main className="reward">
+    <main className="reward" style={ceremonyTiming}>
       <p className="reward__prompt">¡Muy bien! Elige un cofre</p>
       {/*
         The duende is where the chests came from. He stands beside them rather
@@ -1297,6 +1374,10 @@ function Reveal({
   animal: CollectibleAnimal;
   onContinue: () => void;
 }) {
+  /* Rises under the animal springing out and is still shimmering when its
+     name lands, which is the pair of beats this screen is made of. */
+  useEffect(() => chromeSounds.play("reveal"), []);
+
   return (
     <main className="reveal">
       {/*

@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChildRecord } from "@lectoemocion/domain";
 import { worldNodes } from "@lectoemocion/resource-schema";
 import { syntheticClass, world } from "@lectoemocion/template-catalog";
+import { MUTE_STORAGE_KEY } from "../audio/ChromeSounds";
 import { LOCAL_OWNER, storageKey } from "../world/progressStore";
 import { giftsKey, LOCAL_GROUP, prizeGoalKey } from "../world/prizeStore";
 import { App } from "./App";
@@ -335,6 +336,41 @@ describe("the world shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Cerrar el menú" }));
     expect(screen.queryByRole("dialog", { name: "Quién juega" })).toBeNull();
+  });
+
+  /*
+   * The mute switch is behind the adult gate and nowhere else. On the world a
+   * child would find it and silence the room by accident, and an adult
+   * reaching for it mid-lesson is the whole reason it exists.
+   */
+  it("turns the sound off from the adult area, and writes the choice down", async () => {
+    await renderApp();
+    await openAdultArea();
+    passAdultGate();
+
+    const sound = screen.getByRole("checkbox", { name: "Sonido" });
+    expect(sound).toBeChecked();
+
+    fireEvent.click(sound);
+
+    expect(sound).not.toBeChecked();
+    /*
+     * That the *stored* value comes back as a muted next session is
+     * `ChromeSounds.test.ts`'s job — it can build a second instance, which this
+     * cannot: the shell holds one audio layer for the whole app, so re-rendering
+     * here would only re-read the copy already in memory and prove nothing.
+     */
+    expect(localStorage.getItem(MUTE_STORAGE_KEY)).toBe("true");
+
+    /* Left as found: the audio layer outlives this render. */
+    fireEvent.click(sound);
+    expect(localStorage.getItem(MUTE_STORAGE_KEY)).toBe("false");
+  });
+
+  it("keeps the mute switch off the world", async () => {
+    await renderApp();
+
+    expect(screen.queryByRole("checkbox", { name: "Sonido" })).toBeNull();
   });
 
   /* A panel with no way out is a trap on a device with no back button. */

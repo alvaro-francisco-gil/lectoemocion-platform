@@ -49,7 +49,8 @@ const SECTIONS = [
       ["node scripts/check-firebase-boundary.mjs", "invariant 3: Firebase confined to its boundary"],
       ["node scripts/check-adult-gate.mjs", "invariant 4: the adult area stays behind its gate"],
       ["node scripts/check-strict-types.mjs", "no escapes from strict typing"],
-      ["node scripts/check-privacy.mjs", "media provenance and no ad-hoc logging"]
+      ["node scripts/check-privacy.mjs", "media provenance and no ad-hoc logging"],
+      ["node scripts/check-audio-assets.mjs", "chrome sounds match their committed format"]
     ]
   },
   {
@@ -57,6 +58,12 @@ const SECTIONS = [
     commands: [
       ["node scripts/import-vocabulary-images.mjs", "re-import vocabulary pictures and their provenance"],
       ["node scripts/generate-synthetic-cast.mjs", "regenerate the synthetic class's avatars and silent audio"]
+    ]
+  },
+  {
+    title: "Content (one-off, offline)",
+    commands: [
+      ["node scripts/generate-chrome-sounds.mjs", "re-render the player's chrome sounds"]
     ]
   }
 ];

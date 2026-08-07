@@ -7,6 +7,7 @@ import {
   type InitialLetterCard,
   type InitialLetterRound
 } from "@lectoemocion/template-sdk";
+import { chromeSounds } from "../../audio/ChromeSounds";
 import {
   INITIAL_LETTER_LAYOUT as LAYOUT,
   initialLetterColumnX
@@ -95,15 +96,21 @@ export function renderInitialLetterGame(
     switch (outcome.kind) {
       case "selected":
       case "cleared":
+        chromeSounds.play("tap");
+        paint();
+        return;
+      /* A tap on an already-matched card. Nothing happened, so nothing sounds. */
       case "ignored":
         paint();
         return;
       case "matched":
+        chromeSounds.play("correct");
         paint();
         finish(round);
         return;
       /* The connection does not stick; nothing else about the board changes. */
       case "mismatched":
+        chromeSounds.play("wrong");
         paint();
         shake(outcome.cardIds);
         return;

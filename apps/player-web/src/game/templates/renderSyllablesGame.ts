@@ -6,6 +6,7 @@ import {
   placeSyllable,
   type SyllableCard
 } from "@lectoemocion/template-sdk";
+import { chromeSounds } from "../../audio/ChromeSounds";
 import { SYLLABLES_LAYOUT, syllableColumnX } from "./syllablesLayout";
 import {
   addLabel,
@@ -110,6 +111,8 @@ export function renderSyllablesGame(
       const cardId = cardOf.get(object);
       if (cardId === undefined) return;
       placedByDrag = false;
+      /* Picking a card up is the gesture that used to be a tap. */
+      chromeSounds.play("tap");
       tray.get(cardId)?.lift(DRAG_DEPTH);
     }
   );
@@ -162,6 +165,7 @@ export function renderSyllablesGame(
 
     switch (outcome.kind) {
       case "placed":
+        chromeSounds.play("correct");
         /* The syllable is in the slot now; the card that carried it is spent. */
         held?.hide();
         paint();
@@ -171,6 +175,7 @@ export function renderSyllablesGame(
         }
         return "placed";
       case "rejected": {
+        chromeSounds.play("wrong");
         const slot = slots[slotIndex];
         slot?.paint(CARD.wrong);
         slot?.shake([]);

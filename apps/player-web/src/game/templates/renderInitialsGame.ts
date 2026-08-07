@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 import { resolveSlot, type ManifestFor } from "@lectoemocion/resource-schema";
+import { chromeSounds } from "../../audio/ChromeSounds";
 
 export function renderInitialsGame(
   scene: Phaser.Scene,
@@ -36,6 +37,7 @@ export function renderInitialsGame(
     card.on("pointerdown", () => {
       if (!card.input?.enabled) return;
       if (child.verifiedInitial === targetInitial) {
+        chromeSounds.play("correct");
         card.disableInteractive().setFillStyle(0x95d5b2);
         remaining -= 1;
         if (remaining === 0) {
@@ -49,6 +51,7 @@ export function renderInitialsGame(
           });
         }
       } else {
+        chromeSounds.play("wrong");
         scene.tweens.add({
           targets: card,
           x: { from: x - 10, to: x + 10 },

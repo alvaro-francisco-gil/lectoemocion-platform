@@ -9,6 +9,7 @@ import {
   choiceColumnX,
   INITIAL_SYLLABLE_LAYOUT
 } from "./initialSyllableLayout";
+import { chromeSounds } from "../../audio/ChromeSounds";
 import {
   addEmphasisedWord,
   addPicture,
@@ -107,6 +108,8 @@ export function renderInitialSyllableGame(
       const itemId = itemOf.get(object);
       if (itemId === undefined) return;
       answeredByDrag = false;
+      /* Picking a picture up is the gesture that used to be a tap. */
+      chromeSounds.play("tap");
       choices.get(itemId)?.card.lift(DRAG_DEPTH);
     }
   );
@@ -158,6 +161,7 @@ export function renderInitialSyllableGame(
 
     switch (outcome.kind) {
       case "correct":
+        chromeSounds.play("correct");
         view?.card.returnHome();
         view?.card.paint(CARD.matched);
         banner.setText("¡Muy bien!");
@@ -168,6 +172,7 @@ export function renderInitialSyllableGame(
         return "correct";
       /* The picture goes back to the row and every choice stays draggable. */
       case "incorrect":
+        chromeSounds.play("wrong");
         view?.card.returnHome();
         view?.card.paint(CARD.wrong);
         view?.card.shake([]);

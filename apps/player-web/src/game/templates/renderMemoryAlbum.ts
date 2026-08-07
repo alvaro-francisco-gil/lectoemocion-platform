@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 import { resolveSlot, type ManifestFor } from "@lectoemocion/resource-schema";
+import { chromeSounds } from "../../audio/ChromeSounds";
 
 const PAGE_MS = 1800;
 
@@ -43,6 +44,16 @@ export function renderMemoryAlbum(
   });
 
   pages.forEach(({ index, parts }) => {
+    /*
+     * Every page but the first, matching the book: the album appearing is
+     * arrival, and the pages after it are turns. Nothing here is interactive,
+     * so this is the only thing that marks time passing at all.
+     */
+    if (index > 0) {
+      scene.time.delayedCall(index * PAGE_MS, () =>
+        chromeSounds.play("page-turn")
+      );
+    }
     scene.tweens.add({
       targets: parts,
       alpha: 1,

@@ -7,6 +7,7 @@ import {
   type LetterAttempt,
   type LetterCard
 } from "@lectoemocion/template-sdk";
+import { chromeSounds } from "../../audio/ChromeSounds";
 import { LETTERS_LAYOUT, letterColumnX } from "./lettersLayout";
 import {
   addLabel,
@@ -113,6 +114,8 @@ export function renderLettersGame(
       const cardId = cardOf.get(object);
       if (cardId === undefined) return;
       placedByDrag = false;
+      /* Picking a card up is the gesture that used to be a tap. */
+      chromeSounds.play("tap");
       tray.get(cardId)?.lift(DRAG_DEPTH);
     }
   );
@@ -165,6 +168,7 @@ export function renderLettersGame(
 
     switch (outcome.kind) {
       case "placed":
+        chromeSounds.play("correct");
         /* The letter is in the slot now; the card that carried it is spent. */
         held?.hide();
         paint();
@@ -174,6 +178,7 @@ export function renderLettersGame(
         }
         return "placed";
       case "rejected": {
+        chromeSounds.play("wrong");
         const slot = slots[slotIndex];
         slot?.paint(CARD.wrong);
         slot?.shake([]);

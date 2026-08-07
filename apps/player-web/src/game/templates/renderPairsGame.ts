@@ -7,6 +7,7 @@ import {
   type PairsCard,
   type PairsRound
 } from "@lectoemocion/template-sdk";
+import { chromeSounds } from "../../audio/ChromeSounds";
 import { addLabel, addPicture, CARD, VocabularyCard } from "./vocabularyCard";
 
 const PICTURE_ROW_Y = 360;
@@ -90,15 +91,21 @@ export function renderPairsGame(
     switch (outcome.kind) {
       case "selected":
       case "cleared":
+        chromeSounds.play("tap");
+        paint();
+        return;
+      /* A tap on an already-matched card. Nothing happened, so nothing sounds. */
       case "ignored":
         paint();
         return;
       case "matched":
+        chromeSounds.play("correct");
         paint();
         finish(round);
         return;
       /* The pair does not stick; nothing else about the board changes. */
       case "mismatched":
+        chromeSounds.play("wrong");
         paint();
         shake(outcome.cardIds);
         return;

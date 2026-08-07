@@ -5,6 +5,7 @@ import {
   type ManifestFor,
   type StoryPage
 } from "@lectoemocion/resource-schema";
+import { chromeSounds } from "../../audio/ChromeSounds";
 import { createPicker, createPill, createProgressBar } from "./bookChrome";
 import {
   layOutPage,
@@ -190,6 +191,13 @@ export function renderIllustratedStory(
 
   function goTo(index: number, autoplay: boolean): void {
     if (index < 0 || index >= pages.length) return;
+    /*
+     * `autoplay` is false exactly once, for the opening render at the bottom of
+     * this file. Every other arrival here is a page actually turning — by the
+     * arrows, by the picker, or by the narration running out — and arriving at
+     * a book is not the same event as turning a page in one.
+     */
+    if (autoplay) chromeSounds.play("page-turn");
     target = index;
     void turnTo(index, autoplay);
   }
