@@ -205,6 +205,47 @@ test("finishing a chapter hands out an animal for the collection", async ({
   await expect(earned).toHaveCount(1);
 });
 
+/*
+ * The whole book on one page is the point, so it has to actually fit one.
+ *
+ * The stickers were laid out in a fixed number of columns with square cells, so
+ * the rows were sized from the column width and knew nothing about the height
+ * they had: an eleventh chapter added a third row and pushed the bottom of it
+ * off the paper. This measures what a child sees rather than the rule that
+ * produced it, so any future way of overflowing fails here too.
+ */
+test("every sticker sits on the page, at every size", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Mis animales" }).click();
+
+  const sheet = (await page.locator(".animal-book__pages").boundingBox())!;
+  const viewport = page.viewportSize()!;
+
+  /* The paper itself is on screen. */
+  expect(sheet.x).toBeGreaterThanOrEqual(0);
+  expect(sheet.y).toBeGreaterThanOrEqual(0);
+  expect(sheet.x + sheet.width).toBeLessThanOrEqual(viewport.width + 1);
+  expect(sheet.y + sheet.height).toBeLessThanOrEqual(viewport.height + 1);
+
+  const pages = page.locator(".animal-book__page");
+  const count = await pages.count();
+  expect(count).toBe(worldNodes(world).length);
+
+  for (let index = 0; index < count; index += 1) {
+    const box = (await pages.nth(index).boundingBox())!;
+    expect(box.x, `sticker ${index} left`).toBeGreaterThanOrEqual(sheet.x - 1);
+    expect(box.y, `sticker ${index} top`).toBeGreaterThanOrEqual(sheet.y - 1);
+    expect(
+      box.x + box.width,
+      `sticker ${index} right`
+    ).toBeLessThanOrEqual(sheet.x + sheet.width + 1);
+    expect(
+      box.y + box.height,
+      `sticker ${index} bottom`
+    ).toBeLessThanOrEqual(sheet.y + sheet.height + 1);
+  }
+});
+
 test("the bar sits below the cards without covering them", async ({ page }) => {
   await withProgress(page, ["encuentro"]);
   await page.goto("/");

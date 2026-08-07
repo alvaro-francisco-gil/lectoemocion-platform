@@ -1031,6 +1031,11 @@ main { height: 100dvh; }
   place-items: center;
   padding: clamp(0.75rem, 3vh, 2.5rem);
   background: rgb(20 6 40 / 0.72);
+  /*
+   * A size container, so the page below can measure the room it actually has
+   * in both directions rather than only across.
+   */
+  container-type: size;
 }
 
 /*
@@ -1040,20 +1045,70 @@ main { height: 100dvh; }
  * are still owed — so the badges shrink to fit rather than spilling into a
  * scroll container a three-year-old has to discover.
  */
+/*
+ * The page: the whole collection on one sheet, no scrolling and no page turns.
+ *
+ * The stickers are square, so a cell has to satisfy the width and the height at
+ * once. Sizing them from the width alone is what let an eleventh chapter add a
+ * row that hung off the bottom of the paper: the rows knew how wide they were
+ * and nothing about how tall they were allowed to be. `--cell` is therefore the
+ * smaller of what each dimension can afford, which makes overflow arithmetically
+ * impossible rather than merely unlikely.
+ *
+ * `--book-columns` and `--book-rows` come from `bookShape` in `App.tsx`, which
+ * is the only thing that counts the chapters. Nothing here assumes a number.
+ */
 .animal-book__pages {
+  --book-columns: var(--book-columns-wide);
+  --book-rows: var(--book-rows-wide);
+  --gap: clamp(0.35rem, 2vmin, 1.6rem);
+  --pad-y: clamp(1rem, 4vmin, 3rem);
+  --pad-x: clamp(1rem, 4vmin, 3.5rem);
+  /*
+   * A sticker is as big as the paper can afford in whichever direction is
+   * tighter, and never bigger than a hand.
+   *
+   * The ceiling is on the sticker rather than on the sheet: capping the sheet's
+   * width made every sticker small on a classroom panel to stop the paper being
+   * absurdly wide, which solved the wrong half of it. The sheet shrink-wraps its
+   * columns, so bounding the sticker bounds the page too.
+   */
+  --cell: min(
+    (100cqw - 2 * var(--pad-x) - (var(--book-columns) - 1) * var(--gap)) /
+      var(--book-columns),
+    (100cqh - 2 * var(--pad-y) - (var(--book-rows) - 1) * var(--gap)) /
+      var(--book-rows),
+    12rem
+  );
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: clamp(0.35rem, 2vmin, 1.6rem);
-  width: min(100%, 62rem);
-  max-height: 100%;
+  grid-template-columns: repeat(var(--book-columns), var(--cell));
+  grid-auto-rows: var(--cell);
+  justify-content: center;
+  gap: var(--gap);
   margin: 0;
-  padding: clamp(1rem, 4vmin, 3rem) clamp(1rem, 4vmin, 3.5rem);
+  padding: var(--pad-y) var(--pad-x);
   list-style: none;
   border-radius: clamp(8px, 1.5vmin, 18px);
   background: radial-gradient(120% 90% at 50% 0%, #fffaf0 0%, #f6ecd8 60%);
   box-shadow:
     0 18px 44px rgb(0 0 0 / 0.45),
     inset 0 0 0 1px rgb(0 0 0 / 0.06);
+}
+
+/*
+ * Upright — a phone in a hand, the native shell's usual case — the page stands
+ * up: fewer columns and more rows. The wide shape across a narrow screen is a
+ * thin band of small stickers with the screen empty above and below it.
+ *
+ * The question is the shape of the room, which only the stylesheet can ask, so
+ * it picks between two shapes `bookShape` worked out rather than counting
+ * anything itself.
+ */
+@container (max-aspect-ratio: 1 / 1) {
+  .animal-book__pages {
+    --book-columns: var(--book-columns-tall);
+    --book-rows: var(--book-rows-tall);
+  }
 }
 
 /*
@@ -1071,7 +1126,6 @@ main { height: 100dvh; }
   position: relative;
   display: grid;
   place-items: center;
-  aspect-ratio: 1;
 }
 
 .animal-book__well {

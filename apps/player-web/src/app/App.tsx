@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode
 } from "react";
 import { assertNever, type ChildRecord } from "@lectoemocion/domain";
@@ -26,6 +27,7 @@ import {
 } from "../world/worldView";
 import { LocalProgressStore } from "../world/progressStore";
 import { unlockAllEnabled } from "../world/unlockAll";
+import { bookShape } from "./bookShape";
 import { useDragScroll } from "./useDragScroll";
 import { avatarImageUrl } from "../profiles/avatarCatalogue";
 import {
@@ -663,6 +665,15 @@ function AnimalBook({
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDivElement>(null);
+  /*
+   * The stylesheet cannot count the chapters, and it must not guess: a fixed
+   * number of columns is what let an eleventh chapter add a row the paper had
+   * no room for. So both shapes are decided here and handed over, and the
+   * stylesheet picks between them on the shape of the room it has — which is
+   * the one thing it knows and this does not.
+   */
+  const wide = bookShape(slots.length);
+  const tall = bookShape(slots.length, true);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -716,7 +727,17 @@ function AnimalBook({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <ul className="animal-book__pages">
+      <ul
+        className="animal-book__pages"
+        style={
+          {
+            "--book-columns-wide": wide.columns,
+            "--book-rows-wide": wide.rows,
+            "--book-columns-tall": tall.columns,
+            "--book-rows-tall": tall.rows
+          } as CSSProperties
+        }
+      >
         {slots.map((slot) => (
           <li
             key={slot.nodeId}
