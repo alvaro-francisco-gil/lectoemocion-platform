@@ -1,0 +1,171 @@
+import {
+  DEFAULT_PRIZE_GOAL,
+  type Prize,
+  type PrizeContent,
+  type PrizeId
+} from "@lectoemocion/domain";
+
+/**
+ * What the adults set and what the child has been given.
+ *
+ * Separate from `Progress` on purpose. Progress is what a child did; this is
+ * what the adults around them decided a star is worth, and the two change for
+ * entirely different reasons.
+ */
+export interface Prizes {
+  readonly goal: number;
+  readonly prizes: readonly Prize[];
+}
+
+export const EMPTY_PRIZES: Prizes = {
+  goal: DEFAULT_PRIZE_GOAL,
+  prizes: []
+};
+
+/** The identity and the moment a prize is about to be awarded. */
+export interface PrizeMint {
+  readonly id: PrizeId;
+  /** ISO 8601, in UTC. */
+  readonly at: string;
+}
+
+/** Every letriestrella already spent on a prize, at the price it cost then. */
+export function starsClaimed(prizes: Prizes): number {
+  return prizes.prizes.reduce((total, prize) => total + prize.costStars, 0);
+}
+
+/**
+ * How many prizes the child has earned and not yet been given.
+ *
+ * Derived rather than remembered, the same way `pendingReward` is: closing the
+ * tab between the last frame of a game and the ceremony must not cost a prize.
+ * Because `costStars` is recorded per prize, lowering the goal owes one at
+ * once and raising it simply moves the line the current fill is measured
+ * against.
+ */
+export function prizesDue(prizes: Prizes, starsEarned: number): number {
+  const unclaimed = starsEarned - starsClaimed(prizes);
+  if (unclaimed < prizes.goal) return 0;
+  return Math.floor(unclaimed / prizes.goal);
+}
+
+/**
+ * Awards every prize owed, in one step.
+ *
+ * Takes one mint per prize so identities and timestamps come from the caller
+ * and a test can name them. A mint short of what is owed awards what it can:
+ * the rest stays owed and is awarded on the next read, which is the honest
+ * outcome of running out of names rather than a silently skipped reward.
+ */
+export function awardDue(
+  prizes: Prizes,
+  starsEarned: number,
+  mints: readonly PrizeMint[]
+): Prizes {
+  const due = Math.min(prizesDue(prizes, starsEarned), mints.length);
+  if (due === 0) return prizes;
+
+  const awarded: Prize[] = [];
+  for (let index = 0; index < due; index += 1) {
+    const mint = mints[index];
+    if (mint === undefined) break;
+    awarded.push({
+      id: mint.id,
+      state: "unconfigured",
+      awardedAt: mint.at,
+      costStars: prizes.goal
+    });
+  }
+  return { ...prizes, prizes: [...prizes.prizes, ...awarded] };
+}
+
+/**
+ * Says what is inside a gift.
+ *
+ * An id the list no longer holds changes nothing, and an already-opened prize
+ * is left alone: what a child has already been shown is a fact about that
+ * moment and must not change because an adult edited something afterwards.
+ */
+export function configurePrize(
+  prizes: Prizes,
+  id: PrizeId,
+  content: PrizeContent
+): Prizes {
+  const target = prizes.prizes.find((prize) => prize.id === id);
+  if (target === undefined || target.state === "opened") return prizes;
+
+  return {
+    ...prizes,
+    prizes: prizes.prizes.map((prize) =>
+      prize.id === id
+        ? {
+            id: prize.id,
+            state: "ready",
+            awardedAt: prize.awardedAt,
+            costStars: prize.costStars,
+            content
+          }
+        : prize
+    )
+  };
+}
+
+/**
+ * Opens a gift that is ready.
+ *
+ * An unconfigured gift cannot be opened — there is nothing inside to show — and
+ * an opened one stays opened, so a double tap cannot restamp the moment.
+ */
+export function openPrize(
+  prizes: Prizes,
+  id: PrizeId,
+  at: string
+): Prizes {
+  const target = prizes.prizes.find((prize) => prize.id === id);
+  if (target === undefined || target.state !== "ready") return prizes;
+
+  return {
+    ...prizes,
+    prizes: prizes.prizes.map((prize) =>
+      prize.id === id && prize.state === "ready"
+        ? { ...prize, state: "opened", openedAt: at }
+        : prize
+    )
+  };
+}
+
+/** Moves the line the meter is measured against. Awarded prizes keep their cost. */
+export function setGoal(prizes: Prizes, goal: number): Prizes {
+  return { ...prizes, goal };
+}
+
+export interface PrizeView {
+  readonly goal: number;
+  /** Never more than the goal: a meter fuller than full says nothing. */
+  readonly filled: number;
+  readonly due: number;
+  /** Awarded and not yet opened, oldest first — the longest wait is owed first. */
+  readonly pending: readonly Prize[];
+  /** Opened, newest first: what a child asks about is what they just opened. */
+  readonly history: readonly Prize[];
+}
+
+/**
+ * Projects the prize list onto what a child has earned.
+ *
+ * Pure, and the only place that decides whether a gift is owed — the same
+ * division `deriveMapView` draws, so no screen grows its own opinion.
+ */
+export function derivePrizeView(
+  prizes: Prizes,
+  starsEarned: number
+): PrizeView {
+  const unclaimed = Math.max(0, starsEarned - starsClaimed(prizes));
+  return {
+    goal: prizes.goal,
+    filled: Math.min(unclaimed, prizes.goal),
+    due: prizesDue(prizes, starsEarned),
+    pending: prizes.prizes.filter((prize) => prize.state !== "opened"),
+    history: prizes.prizes.filter((prize) => prize.state === "opened").reverse()
+  };
+}
