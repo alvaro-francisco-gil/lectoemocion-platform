@@ -7,12 +7,14 @@ import {
   useState,
   type ReactNode
 } from "react";
+import { assertNever, type ChildRecord } from "@lectoemocion/domain";
 import {
   worldNodes,
   type CollectibleAnimal
 } from "@lectoemocion/resource-schema";
 import { createResourceForNode, world } from "@lectoemocion/template-catalog";
 import { createGame } from "../game/createGame";
+import { rosterForBuild } from "../world/devRoster";
 import {
   deriveWorldView,
   EMPTY_PROGRESS,
@@ -70,7 +72,19 @@ const CARD_TINTS = 6;
  * menu, the collection, or a section. They are exclusive rather than layered so
  * that nothing a child can touch is ever hidden behind something else.
  */
-export function App() {
+/**
+ * The roster is a prop with a build-derived default, not a value read inside.
+ *
+ * `App` is the composition root, so where the children come from is decided
+ * here and nowhere below. It also means a test can render the shell with no
+ * roster and see what a school sees, which is the state that actually ships
+ * until capture lands.
+ */
+export function App({
+  roster = rosterForBuild(import.meta.env.DEV)
+}: {
+  readonly roster?: readonly ChildRecord[];
+} = {}) {
   const [progress, setProgress] = useState<Progress>(EMPTY_PROGRESS);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   /*
@@ -109,8 +123,12 @@ export function App() {
   }, []);
 
   const view = useMemo(
-    () => deriveWorldView(world, progress, { unlockAll: unlockAllEnabled() }),
-    [progress]
+    () =>
+      deriveWorldView(world, progress, {
+        unlockAll: unlockAllEnabled(),
+        hasRoster: roster.length > 0
+      }),
+    [progress, roster]
   );
 
   const activeNode = useMemo(
@@ -157,11 +175,11 @@ export function App() {
     const parent = host.current;
     if (!activeNode || !parent) return;
 
-    const game = createGame(parent, createResourceForNode(activeNode), () =>
+    const game = createGame(parent, createResourceForNode(activeNode, roster), () =>
       complete(activeNode.id)
     );
     return () => game.destroy(true);
-  }, [activeNode, complete]);
+  }, [activeNode, complete, roster]);
 
   if (activeNode) {
     return (
@@ -630,7 +648,7 @@ function WorldNode({
           reader announcing the picture as well would say the chapter twice.
         */}
         <img className="world-node__icon" src={node.icon} alt="" />
-        {node.state === "locked" ? <LockIcon /> : null}
+        {node.playable ? null : <LockIcon />}
       </span>
       <span className="world-node__title" id={titleId}>
         {node.title}
@@ -638,15 +656,37 @@ function WorldNode({
       <span className="world-node__state" id={stateId}>
         {stateLabel(node)}
       </span>
+      {/*
+        The one thing on this screen addressed to an adult rather than a child.
+        It is written on the card instead of waiting behind a tap, because the
+        card cannot be tapped: what is missing is not something a child can go
+        and get, so nothing here should invite them to try.
+      */}
+      {node.state === "needs-roster" ? (
+        <span className="world-node__note">{NEEDS_ROSTER_NOTE}</span>
+      ) : null}
     </button>
   );
 }
 
+const NEEDS_ROSTER_NOTE =
+  "Añade los nombres y las fotos de los niños para abrir este libro";
+
 /** Spoken by a screen reader and read by an adult; never carried by colour alone. */
 function stateLabel(node: WorldNodeView): string {
-  if (node.state === "locked") return "Bloqueado";
-  if (node.state === "completed") return "Completado";
-  return node.kind === "cinematic" ? "Historia" : "Jugar";
+  switch (node.state) {
+    case "locked":
+      return "Bloqueado";
+    /* Not "Bloqueado": nothing here is waiting on the child. */
+    case "needs-roster":
+      return "Faltan los nombres";
+    case "completed":
+      return "Completado";
+    case "unlocked":
+      return node.kind === "cinematic" ? "Historia" : "Jugar";
+    default:
+      return assertNever(node.state, "world node state");
+  }
 }
 
 /**

@@ -4,7 +4,11 @@ import {
   type World,
   type WorldNode
 } from "@lectoemocion/resource-schema";
-import { templateKind, type ResourceKind } from "@lectoemocion/template-sdk";
+import {
+  templateKind,
+  templateNeedsRoster,
+  type ResourceKind
+} from "@lectoemocion/template-sdk";
 
 /** Which animal a child chose out of a node's three chests. */
 export interface ClaimedReward {
@@ -47,7 +51,15 @@ export const EMPTY_PROGRESS: Progress = {
   stars: 0
 };
 
-export type NodeState = "locked" | "unlocked" | "completed";
+/**
+ * `needs-roster` is deliberately not a second flavour of `locked`.
+ *
+ * The two say different things to the adult standing next to the child:
+ * `locked` is *not yet, keep playing*, and `needs-roster` is *this one needs
+ * you*. It is the only state in the world an adult can act on, so a shell that
+ * could not tell them apart would bury the one message worth reading.
+ */
+export type NodeState = "locked" | "needs-roster" | "unlocked" | "completed";
 
 export interface WorldNodeView {
   readonly id: string;
@@ -111,6 +123,16 @@ export interface WorldView {
 export interface WorldViewOptions {
   /** Development bypass only. Never reachable in a production build. */
   readonly unlockAll?: boolean;
+  /**
+   * Whether any children have been recorded for this group.
+   *
+   * A boolean rather than the roster itself: this function decides what a child
+   * may reach, and handing it names would put child data through a projection
+   * that has no use for them. Defaults to `false`, so a caller that has not
+   * thought about it gets the chapter held back rather than opened onto
+   * nothing.
+   */
+  readonly hasRoster?: boolean;
 }
 
 /**
@@ -153,14 +175,25 @@ export function deriveWorldView(
   );
 
   const project = (node: WorldNode): WorldNodeView => {
+    /*
+     * Asked before progression, and unaffected by the development bypass. The
+     * bypass answers "has the child played enough", and this is a different
+     * question with no answer available: a book of the group's own names has
+     * nothing to be made of until there are some.
+     */
+    const missingRoster =
+      templateNeedsRoster(node.resource.template) && options.hasRoster !== true;
+
     const unlocked =
       options.unlockAll === true ||
       node.unlockedBy.every((required) => completed.has(required));
-    const state: NodeState = completed.has(node.id)
-      ? "completed"
-      : unlocked
-        ? "unlocked"
-        : "locked";
+    const state: NodeState = missingRoster
+      ? "needs-roster"
+      : completed.has(node.id)
+        ? "completed"
+        : unlocked
+          ? "unlocked"
+          : "locked";
 
     return {
       id: node.id,
@@ -169,7 +202,7 @@ export function deriveWorldView(
       surface: node.surface,
       kind: templateKind(node.resource.template),
       state,
-      playable: state !== "locked"
+      playable: state === "unlocked" || state === "completed"
     };
   };
 

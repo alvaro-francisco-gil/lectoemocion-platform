@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { worldNodes } from "@lectoemocion/resource-schema";
-import { world } from "@lectoemocion/template-catalog";
+import { syntheticClass, world } from "@lectoemocion/template-catalog";
 import { App } from "./App";
 
 type Destroyable = { destroy: () => void };
@@ -310,6 +310,66 @@ describe("the world shell", () => {
 });
 
 /**
+ * The one chapter an adult has to act on.
+ *
+ * *El libro de los nombres* is the class's own names, so with nobody recorded
+ * there is nothing to open. It stands on the shelf saying what it needs rather
+ * than hiding, because an adult who cannot see the feature will never add the
+ * names it is asking for.
+ */
+describe("the book of names before there are any names", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    createGame.mockClear();
+  });
+
+  const book = () => screen.getByRole("button", { name: "El libro de los nombres" });
+
+  it("says what it needs instead of saying it is blocked", () => {
+    render(<App roster={[]} />);
+    openTab("Recursos");
+
+    expect(book().querySelector(".world-node__state")?.textContent).toBe(
+      "Faltan los nombres"
+    );
+    expect(book().querySelector(".world-node__note")?.textContent).toBe(
+      "Añade los nombres y las fotos de los niños para abrir este libro"
+    );
+  });
+
+  it("cannot be opened", () => {
+    render(<App roster={[]} />);
+    openTab("Recursos");
+
+    fireEvent.click(book());
+    expect(createGame).not.toHaveBeenCalled();
+  });
+
+  it("leaves the story beside it open", () => {
+    render(<App roster={[]} />);
+    openTab("Recursos");
+
+    fireEvent.click(screen.getByRole("button", { name: "El gallo Rayo" }));
+    expect(createGame).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens once there are names, and builds a book of them", () => {
+    render(<App roster={syntheticClass} />);
+    openTab("Recursos");
+
+    expect(book().querySelector(".world-node__note")).toBeNull();
+    fireEvent.click(book());
+
+    const resource = createGame.mock.calls.at(-1)?.[1] as {
+      template: { id: string };
+      pages: readonly { grapheme: string }[];
+    };
+    expect(resource.template.id).toBe("name-book");
+    expect(resource.pages[0]?.grapheme).toBe("A");
+  });
+});
+
+/**
  * The three sections along the bottom.
  *
  * Juegos is the progression and Recursos is the shelf; Multijugador is a door
@@ -340,7 +400,7 @@ describe("the three sections", () => {
   it("shows the shelf under Recursos, and only the shelf", () => {
     render(<App />);
     openTab("Recursos");
-    expect(pathTitles()).toEqual(["El gallo Rayo"]);
+    expect(pathTitles()).toEqual(["El gallo Rayo", "El libro de los nombres"]);
   });
 
   /* A book a child has to unlock is a book most of them never open. */
@@ -375,7 +435,9 @@ describe("the three sections", () => {
     fireEvent.click(screen.getByRole("button", { name: "El gallo Rayo" }));
     returnToMap();
 
-    await waitFor(() => expect(pathTitles()).toEqual(["El gallo Rayo"]));
+    await waitFor(() =>
+      expect(pathTitles()).toEqual(["El gallo Rayo", "El libro de los nombres"])
+    );
   });
 
   it("marks the section a child is standing in", () => {
