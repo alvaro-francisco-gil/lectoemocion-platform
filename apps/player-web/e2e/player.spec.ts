@@ -4,7 +4,8 @@ import { createResourceForNode, world } from "@lectoemocion/template-catalog";
 import {
   createInitialLetterRound,
   createInitialSyllableRound,
-  createLettersRound
+  createLettersRound,
+  createSyllablesRound
 } from "@lectoemocion/template-sdk";
 import {
   INITIAL_LETTER_LAYOUT,
@@ -18,6 +19,10 @@ import {
   LETTERS_LAYOUT,
   letterColumnX
 } from "../src/game/templates/lettersLayout";
+import {
+  SYLLABLES_LAYOUT,
+  syllableColumnX
+} from "../src/game/templates/syllablesLayout";
 import { LOCAL_OWNER, storageKey } from "../src/world/progressStore";
 
 /*
@@ -27,6 +32,12 @@ import { LOCAL_OWNER, storageKey } from "../src/world/progressStore";
  * changed shape, which is the one thing an end-to-end test must never do.
  */
 const STARTER_PROGRESS_KEY = storageKey(LOCAL_OWNER);
+
+/** A point on the page, in screen pixels. */
+interface Point {
+  readonly x: number;
+  readonly y: number;
+}
 
 const ENTRY = "El encuentro";
 const SECOND = "Las iniciales";
@@ -552,33 +563,140 @@ test("a locked node cannot be opened from the map", async ({ page }) => {
 });
 
 /**
+ * Waits for the page to actually paint `count` frames.
+ *
+ * Paced against the browser's own frame clock rather than the wall clock. A
+ * fixed millisecond wait is a bet on how long a frame takes, and that bet is
+ * lost exactly when three viewport projects — one of them 4K — are rendering
+ * at once, which is when this suite runs.
+ *
+ * Six is not a tuned number: it is "comfortably more than the one frame Phaser
+ * strictly needs", bought in the only currency that stays honest under load.
+ * On an idle machine it costs about a tenth of a second per stage; on a loaded
+ * one it costs longer, which is the entire point.
+ */
+async function nextFrames(page: Page, count = 6) {
+  await page.evaluate(
+    (frames: number) =>
+      new Promise<void>((resolve) => {
+        let left = frames;
+        const tick = () => {
+          if (left <= 0) {
+            resolve();
+            return;
+          }
+          left -= 1;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }),
+    count
+  );
+}
+
+/**
  * One drag, paced so the game sees it as a drag.
  *
  * Phaser reads its pointer queue once per frame. A press, a move, and a
- * release delivered inside a single frame collapse into something that is not
- * a drag at all, so the letter lands nowhere — and three of those lose the
- * round, after which the chapter can never be finished and the test can only
- * time out. Delivered fast enough, that is exactly what happens: this passed
- * run alone and timed out under a loaded three-project run.
+ * release delivered inside a single frame collapse into a click, which these
+ * games deliberately do nothing with, so the card lands nowhere and the
+ * chapter is never finished — the test can only time out.
  *
- * The waits buy a frame at each stage on a machine that is rendering two other
- * viewports at the same time. They are not a guess at how long the app takes:
- * every assertion after this still polls.
+ * That is not hypothetical: it is what made this suite flaky under load, on
+ * three separate tests, before the pacing below stopped being measured in
+ * milliseconds. Every stage now waits for real frames, so a loaded machine
+ * takes longer rather than dropping the gesture. Every assertion after this
+ * still polls.
  */
 async function dragAcrossCanvas(
   page: Page,
   from: { x: number; y: number },
   to: { x: number; y: number }
 ) {
-  const frames = 100;
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
-  await page.waitForTimeout(frames);
+  await nextFrames(page);
   /* Stepped, because a single jump can be read as a click rather than a drag. */
   await page.mouse.move(to.x, to.y, { steps: 12 });
-  await page.waitForTimeout(frames);
+  await nextFrames(page);
   await page.mouse.up();
-  await page.waitForTimeout(frames);
+  await nextFrames(page);
+}
+
+/**
+ * Plays an ordering game to its end by dragging, and tolerates a dropped
+ * gesture without tolerating a broken one.
+ *
+ * Winning one of these chapters takes every card placed, so the chance of the
+ * harness losing *some* synthetic drag compounds with the length of the word.
+ * A trace of one such failure shows three letters seated and the fourth still
+ * in the row: nothing wrong with the game, one gesture that never arrived.
+ *
+ * So the pass is repeated. Re-dragging a card already in its slot is a no-op —
+ * its card is hidden and its pointer target disabled — so a repeat only ever
+ * retries what did not land. This cannot paper over a drag that does not work:
+ * if the wiring were broken, every pass would place nothing and the poll below
+ * would still fail. It absorbs dropped input, which is the harness's problem,
+ * and nothing else.
+ */
+async function winBySequenceOfDrags(
+  page: Page,
+  nodeId: string,
+  drags: readonly { from: Point; to: Point }[],
+  passes = 3
+) {
+  for (let pass = 1; pass <= passes; pass += 1) {
+    for (const { from, to } of drags) await dragAcrossCanvas(page, from, to);
+
+    const progress = await page.evaluate(
+      (key) => localStorage.getItem(key),
+      STARTER_PROGRESS_KEY
+    );
+    if (progress?.includes(nodeId)) return;
+  }
+
+  /* Every pass placed nothing, or not everything: report it as the failure. */
+  await completed(page, nodeId, 5_000);
+}
+
+/**
+ * Plays a chapter to its end, reopening it from the map if a gesture is lost.
+ *
+ * The counterpart of `winBySequenceOfDrags` for a game answered by taps, where
+ * replaying in place is not safe: a lost second tap leaves a card selected, and
+ * a fresh pass starting against that selection pairs the wrong two cards and
+ * thrashes. Going back to the map and opening the chapter again deals a new
+ * round with nothing selected, so each attempt starts from a state the caller
+ * can reason about.
+ *
+ * As with the drags, this absorbs input the harness dropped and nothing else:
+ * a game that could not be won by tapping fails every attempt, and the poll at
+ * the end still fails the test.
+ */
+async function winByReplayingChapter(
+  page: Page,
+  nodeId: string,
+  chapterName: string,
+  play: () => Promise<void>,
+  attempts = 3
+) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    await play();
+
+    const progress = await page.evaluate(
+      (key) => localStorage.getItem(key),
+      STARTER_PROGRESS_KEY
+    );
+    if (progress?.includes(nodeId)) return;
+    if (attempt === attempts) break;
+
+    await page.getByRole("button", { name: "Volver al mapa" }).click();
+    await expect(page.getByRole("navigation", { name: "Mundo" })).toBeVisible();
+    await page.getByRole("button", { name: chapterName }).click();
+    await canvasBox(page);
+  }
+
+  await completed(page, nodeId, 5_000);
 }
 
 /**
@@ -622,20 +740,75 @@ test("the letters game is won by dragging each letter into its slot", async ({
     y: box.y + box.height / 2 + (y - LETTERS_LAYOUT.canvasHeight / 2) * scale
   });
 
-  for (const [trayIndex, card] of round.tray.entries()) {
-    const from = at(
-      letterColumnX(trayIndex, round.tray.length),
-      LETTERS_LAYOUT.trayRowY
-    );
-    const to = at(
-      letterColumnX(card.slotIndex, round.slots.length),
-      LETTERS_LAYOUT.slotRowY
-    );
+  await winBySequenceOfDrags(
+    page,
+    "letras",
+    round.tray.map((card, trayIndex) => ({
+      from: at(
+        letterColumnX(trayIndex, round.tray.length),
+        LETTERS_LAYOUT.trayRowY
+      ),
+      to: at(
+        letterColumnX(card.slotIndex, round.slots.length),
+        LETTERS_LAYOUT.slotRowY
+      )
+    }))
+  );
+  expect(failures).toEqual([]);
+});
 
-    await dragAcrossCanvas(page, from, to);
+/**
+ * The syllables game, won by dragging.
+ *
+ * The same reason the letters drag is played for real, and the same shape: two
+ * games that share `sequenceRound` still have their own wiring between the
+ * pointer and the rules, and a chapter nobody can finish is invisible to every
+ * rules test. This one earns its place twice over, because the syllables game
+ * is where tap-then-tap was removed — if that removal took the drag with it,
+ * only a test through the canvas would say so.
+ */
+test("the syllables game is won by dragging each syllable into its slot", async ({
+  page
+}) => {
+  const failures: string[] = [];
+  page.on("pageerror", (error) => failures.push(error.message));
+
+  await withProgress(page, ["encuentro", "iniciales", "parejas"]);
+  await page.goto("/");
+  await page.getByRole("button", { name: "El puente de sílabas" }).click();
+
+  const box = await canvasBox(page);
+  const node = worldNodes(world).find((candidate) => candidate.id === "silabas")!;
+  const resource = createResourceForNode(node);
+  if (resource.template.id !== "syllables-game") {
+    throw new Error("The syllables chapter no longer plays the syllables game");
   }
+  const round = createSyllablesRound(resource);
 
-  await completed(page, "letras");
+  /* Logical canvas units to screen pixels: the canvas letterboxes to fit. */
+  const scale = Math.min(
+    box.width / SYLLABLES_LAYOUT.canvasWidth,
+    box.height / SYLLABLES_LAYOUT.canvasHeight
+  );
+  const at = (x: number, y: number) => ({
+    x: box.x + box.width / 2 + (x - SYLLABLES_LAYOUT.canvasWidth / 2) * scale,
+    y: box.y + box.height / 2 + (y - SYLLABLES_LAYOUT.canvasHeight / 2) * scale
+  });
+
+  await winBySequenceOfDrags(
+    page,
+    "silabas",
+    round.tray.map((card, trayIndex) => ({
+      from: at(
+        syllableColumnX(trayIndex, round.tray.length),
+        SYLLABLES_LAYOUT.trayRowY
+      ),
+      to: at(
+        syllableColumnX(card.slotIndex, round.slots.length),
+        SYLLABLES_LAYOUT.slotRowY
+      )
+    }))
+  );
   expect(failures).toEqual([]);
 });
 
@@ -691,24 +864,31 @@ test("the initial-letter game is won by tapping each picture and its letter", as
   const pictures = row("picture");
   const letters = row("letter");
 
-  for (const [index, picture] of pictures.entries()) {
-    const letterIndex = letters.findIndex(
-      (card) => card.initial === picture.initial
-    );
-    const from = at(
-      initialLetterColumnX(index, pictures.length),
-      INITIAL_LETTER_LAYOUT.pictureRowY
-    );
-    const to = at(
-      initialLetterColumnX(letterIndex, letters.length),
-      INITIAL_LETTER_LAYOUT.letterRowY
-    );
+  const connectEveryPair = async () => {
+    for (const [index, picture] of pictures.entries()) {
+      const letterIndex = letters.findIndex(
+        (card) => card.initial === picture.initial
+      );
+      const from = at(
+        initialLetterColumnX(index, pictures.length),
+        INITIAL_LETTER_LAYOUT.pictureRowY
+      );
+      const to = at(
+        initialLetterColumnX(letterIndex, letters.length),
+        INITIAL_LETTER_LAYOUT.letterRowY
+      );
 
-    await page.mouse.click(from.x, from.y);
-    await page.mouse.click(to.x, to.y);
-  }
+      await page.mouse.click(from.x, from.y);
+      await page.mouse.click(to.x, to.y);
+    }
+  };
 
-  await completed(page, "primeras-letras");
+  await winByReplayingChapter(
+    page,
+    "primeras-letras",
+    "Las primeras letras",
+    connectEveryPair
+  );
   expect(failures).toEqual([]);
 });
 
@@ -764,16 +944,19 @@ test("the initial-syllable game is won by dragging the match onto the target", a
   );
   expect(matchIndex).toBeGreaterThanOrEqual(0);
 
-  await dragAcrossCanvas(
-    page,
-    at(
-      choiceColumnX(matchIndex, round.choices.length),
-      INITIAL_SYLLABLE_LAYOUT.choiceRowY
-    ),
-    at(INITIAL_SYLLABLE_LAYOUT.canvasWidth / 2, INITIAL_SYLLABLE_LAYOUT.targetY)
+  await winByReplayingChapter(page, "empieza-igual", "Empieza igual", () =>
+    dragAcrossCanvas(
+      page,
+      at(
+        choiceColumnX(matchIndex, round.choices.length),
+        INITIAL_SYLLABLE_LAYOUT.choiceRowY
+      ),
+      at(
+        INITIAL_SYLLABLE_LAYOUT.canvasWidth / 2,
+        INITIAL_SYLLABLE_LAYOUT.targetY
+      )
+    )
   );
-
-  await completed(page, "empieza-igual");
   expect(failures).toEqual([]);
 });
 

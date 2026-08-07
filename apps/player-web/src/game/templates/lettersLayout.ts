@@ -13,7 +13,6 @@ export const LETTERS_LAYOUT = {
   canvasWidth: 1280,
   canvasHeight: 720,
   pictureY: 175,
-  livesY: 305,
   /** The letters to pick from, above the word being built. */
   trayRowY: 430,
   slotRowY: 600,

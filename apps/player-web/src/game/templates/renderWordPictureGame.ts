@@ -28,14 +28,6 @@ export function renderWordPictureGame(
   new VocabularyCard(scene, 640, 190, 520, 150);
   addLabel(scene, round.word, 640, 190, 72);
 
-  const lives = scene.add
-    .text(640, 300, "", {
-      fontFamily: "system-ui",
-      fontSize: "30px",
-      color: "#7b2cbf"
-    })
-    .setOrigin(0.5);
-
   const cards = new Map<string, VocabularyCard>();
   const total = round.choices.length;
   const spacing = Math.min(CARD.size + 60, 1200 / total);
@@ -56,18 +48,13 @@ export function renderWordPictureGame(
           card.paint(CARD.matched);
           banner.setText("¡Muy bien!");
           for (const other of cards.values()) other.disable();
-          paint();
           onComplete();
           return;
+        /* The card goes back to white and every picture stays choosable. */
         case "incorrect":
           card.paint(CARD.wrong);
           card.shake([picture]);
           scene.time.delayedCall(500, () => card.paint(CARD.fill));
-          if (round.status === "lost") {
-            banner.setText("Vamos a intentarlo otra vez");
-            for (const other of cards.values()) other.disable();
-          }
-          paint();
           return;
         case "ignored":
           return;
@@ -76,10 +63,4 @@ export function renderWordPictureGame(
       }
     });
   });
-
-  function paint(): void {
-    lives.setText(`Vidas: ${"♥".repeat(round.livesRemaining)}`);
-  }
-
-  paint();
 }

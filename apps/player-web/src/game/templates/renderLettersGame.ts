@@ -20,7 +20,6 @@ const {
   canvasWidth,
   canvasHeight,
   pictureY,
-  livesY,
   trayRowY,
   slotRowY,
   cardWidth,
@@ -33,12 +32,16 @@ const DRAG_DEPTH = 10;
 /**
  * Spell the pictured word by dragging its letters into place.
  *
- * Placement is a **drag**, with tap-the-card then tap-the-slot kept alongside
- * it. The two gestures call the same `placeLetter`, so they cannot diverge.
- * The tap path is not a legacy leftover: `docs/migration/minigame-specifications.md`
- * records that a drag does not survive an aged classroom panel's digitiser
- * equally across touch, stylus, and mouse, so a child who cannot complete a
- * drag on that hardware still has a way to play.
+ * Placement is a **drag**, and only a drag. A letter let go anywhere but its
+ * own slot goes back to the row it came from and nothing else happens: there is
+ * no budget to spend, so a child can miss as often as they like and still
+ * finish the word.
+ *
+ * A tap does nothing here on purpose. It is held for the word recordings
+ * (`docs/plans/ideas/audio.md`), where tapping a card will sound out its
+ * letter. A gesture cannot both place a card and read it aloud, so placing is
+ * the one that moved. See
+ * [ADR 0011](../../../../../docs/decisions/0011-no-lives-and-drag-only-answers.md).
  *
  * Both rows sit in the lower reach band. A three-year-old cannot touch the top
  * of an 86-inch panel, so the picture is the only thing up there.
@@ -49,10 +52,6 @@ export function renderLettersGame(
   onComplete: () => void
 ): void {
   let round = createLettersRound(resource);
-  /** The card a tap selected, waiting for a slot. */
-  let heldCardId: string | null = null;
-  /** The card a pointer is carrying, if the input plugin has reported a drag. */
-  let dragging: string | null = null;
   let placedByDrag = false;
 
   scene.add
@@ -79,14 +78,6 @@ export function renderLettersGame(
     addPicture(scene, target, canvasWidth / 2, pictureY, 200);
   }
 
-  const lives = scene.add
-    .text(canvasWidth / 2, livesY, "", {
-      fontFamily: "system-ui",
-      fontSize: "30px",
-      color: "#5a3b00"
-    })
-    .setOrigin(0.5);
-
   const slots: VocabularyCard[] = [];
   const slotLabels: Phaser.GameObjects.Text[] = [];
   /* Phaser reports drops against the game object, so each row is indexed by it. */
@@ -98,7 +89,6 @@ export function renderLettersGame(
     const label = addLabel(scene, "", x, slotRowY, 48);
     slot.carry(label);
     slot.acceptsDrop();
-    slot.onTap(() => dropInto(index));
     slots.push(slot);
     slotLabels.push(label);
     slotOf.set(slot.target, index);
@@ -115,20 +105,6 @@ export function renderLettersGame(
     card.draggable();
     tray.set(letter.cardId, card);
     cardOf.set(card.target, letter.cardId);
-
-    /*
-     * Tapping selects; dragging does not. A drag begins with a pointer down on
-     * the same card, so selection is decided on release and suppressed once the
-     * input plugin has reported a drag.
-     */
-    card.target.on("pointerdown", () => {
-      dragging = null;
-    });
-    card.target.on("pointerup", () => {
-      if (dragging !== null) return;
-      heldCardId = heldCardId === letter.cardId ? null : letter.cardId;
-      paint();
-    });
   });
 
   scene.input.on(
@@ -136,12 +112,8 @@ export function renderLettersGame(
     (_pointer: Phaser.Input.Pointer, object: Phaser.GameObjects.GameObject) => {
       const cardId = cardOf.get(object);
       if (cardId === undefined) return;
-      dragging = cardId;
       placedByDrag = false;
-      /* A drag is its own selection; a stale held card would place the wrong one. */
-      heldCardId = null;
       tray.get(cardId)?.lift(DRAG_DEPTH);
-      paint();
     }
   );
 
@@ -182,16 +154,8 @@ export function renderLettersGame(
       card?.lift(0);
       /* A letter let go anywhere but its slot goes back where it was dealt. */
       if (!placedByDrag) card?.returnHome();
-      dragging = null;
-      paint();
     }
   );
-
-  /** The tap path: a held card, released onto a slot. */
-  function dropInto(slotIndex: number): void {
-    if (!heldCardId) return;
-    place(heldCardId, slotIndex);
-  }
 
   function place(cardId: string, slotIndex: number): LetterAttempt["kind"] {
     const held = tray.get(cardId);
@@ -201,50 +165,33 @@ export function renderLettersGame(
 
     switch (outcome.kind) {
       case "placed":
-        heldCardId = null;
         /* The letter is in the slot now; the card that carried it is spent. */
         held?.hide();
+        paint();
         if (round.status === "won") {
           banner.setText("¡Muy bien!");
           onComplete();
         }
-        paint();
         return "placed";
       case "rejected": {
-        heldCardId = null;
         const slot = slots[slotIndex];
         slot?.paint(CARD.wrong);
         slot?.shake([]);
-        if (round.status === "lost") {
-          banner.setText("Vamos a intentarlo otra vez");
-        }
         scene.time.delayedCall(500, paint);
-        paint();
         return "rejected";
       }
-      case "ignored":
-        return "ignored";
       default:
         return assertNever(outcome, "letter attempt");
     }
   }
 
   function paint(): void {
-    lives.setText(`Vidas: ${"♥".repeat(round.livesRemaining)}`);
     round.slots.forEach((filled, index) => {
       slotLabels[index]?.setText(
         filled ? filled.letter.toLocaleUpperCase("es-ES") : ""
       );
       slots[index]?.paint(filled ? CARD.matched : CARD.fill);
     });
-    for (const [cardId, card] of tray) {
-      if (!round.tray.some((each) => each.cardId === cardId)) continue;
-      card.paint(
-        cardId === heldCardId ? CARD.selected : CARD.fill,
-        CARD.border,
-        cardId === heldCardId ? CARD.borderWidth + 4 : CARD.borderWidth
-      );
-    }
   }
 
   paint();

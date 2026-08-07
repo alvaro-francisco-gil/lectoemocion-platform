@@ -24,7 +24,6 @@ const {
   targetY,
   targetSize,
   targetWordY,
-  livesY,
   choiceRowY,
   choiceSize,
   choiceWordY
@@ -36,17 +35,13 @@ const DRAG_DEPTH = 10;
 /**
  * Find the picture whose word opens with the same syllable as the one above.
  *
- * Answering is a **drag** — carry the picture up to the target — with
- * tap-the-choice then tap-the-target kept alongside it, both calling the same
- * `chooseInitialSyllable`, so the two gestures cannot disagree about the
- * answer. That is the letters game's arrangement, and
- * `docs/migration/minigame-specifications.md` records why the tap path is not a
- * leftover: a drag does not survive an aged classroom panel's digitiser equally
- * across touch, stylus, and mouse.
+ * Answering is a **drag**, and only a drag: carry the picture up to the target.
  *
- * Keeping a plain tap *out* of the answer is also what leaves it free: when
- * word recordings exist (`docs/plans/ideas/audio.md`), tapping a card plays its
- * word and the way a child answers does not change.
+ * A tap does nothing here on purpose. It is held for the word recordings
+ * (`docs/plans/ideas/audio.md`), where tapping a card will play its word —
+ * the thing this game is teaching a child to hear. A gesture cannot both
+ * answer and read aloud, so answering is the one that moved. See
+ * [ADR 0011](../../../../../docs/decisions/0011-no-lives-and-drag-only-answers.md).
  *
  * The reveal is the lesson. Winning shows both words with the syllable they
  * share picked out in colour; the choice was only the occasion for seeing it.
@@ -57,19 +52,7 @@ export function renderInitialSyllableGame(
   onComplete: () => void
 ): void {
   let round = createInitialSyllableRound(resource);
-  /** The card a tap selected, waiting for the target. */
-  let heldItemId: string | null = null;
-  /** The card a pointer is carrying, if the input plugin has reported a drag. */
-  let dragging: string | null = null;
   let answeredByDrag = false;
-  /**
-   * Cards showing the red of a wrong answer.
-   *
-   * `paint` repaints every choice from held-or-not, which would wipe that red
-   * off in the same frame it appeared. A card is excused from repainting for as
-   * long as it is flashing.
-   */
-  const flashing = new Set<string>();
 
   scene.add
     .rectangle(
@@ -99,15 +82,6 @@ export function renderInitialSyllableGame(
   );
   addPicture(scene, round.target, canvasWidth / 2, targetY, targetSize);
   targetCard.acceptsDrop();
-  targetCard.onTap(() => answerWithHeldCard());
-
-  const lives = scene.add
-    .text(canvasWidth / 2, livesY, "", {
-      fontFamily: "system-ui",
-      fontSize: "30px",
-      color: "#123a5c"
-    })
-    .setOrigin(0.5);
 
   interface ChoiceView {
     readonly card: VocabularyCard;
@@ -125,21 +99,6 @@ export function renderInitialSyllableGame(
     card.draggable();
     choices.set(choice.vocabularyItemId, { card, picture, x });
     itemOf.set(card.target, choice.vocabularyItemId);
-
-    /*
-     * Tapping selects; dragging does not. A drag begins with a pointer down on
-     * the same card, so selection is decided on release and suppressed once the
-     * input plugin has reported a drag.
-     */
-    card.target.on("pointerdown", () => {
-      dragging = null;
-    });
-    card.target.on("pointerup", () => {
-      if (dragging !== null) return;
-      heldItemId =
-        heldItemId === choice.vocabularyItemId ? null : choice.vocabularyItemId;
-      paint();
-    });
   });
 
   scene.input.on(
@@ -147,12 +106,8 @@ export function renderInitialSyllableGame(
     (_pointer: Phaser.Input.Pointer, object: Phaser.GameObjects.GameObject) => {
       const itemId = itemOf.get(object);
       if (itemId === undefined) return;
-      dragging = itemId;
       answeredByDrag = false;
-      /* A drag is its own selection; a stale held card would answer with it. */
-      heldItemId = null;
       choices.get(itemId)?.card.lift(DRAG_DEPTH);
-      paint();
     }
   );
 
@@ -192,16 +147,8 @@ export function renderInitialSyllableGame(
       view?.card.lift(0);
       /* A picture let go anywhere but the target goes back to its place. */
       if (!answeredByDrag) view?.card.returnHome();
-      dragging = null;
-      paint();
     }
   );
-
-  /** The tap path: a held card, released onto the target. */
-  function answerWithHeldCard(): void {
-    if (!heldItemId) return;
-    answer(heldItemId);
-  }
 
   function answer(vocabularyItemId: string): "correct" | "incorrect" | "ignored" {
     const view = choices.get(vocabularyItemId);
@@ -211,33 +158,22 @@ export function renderInitialSyllableGame(
 
     switch (outcome.kind) {
       case "correct":
-        heldItemId = null;
         view?.card.returnHome();
         view?.card.paint(CARD.matched);
         banner.setText("¡Muy bien!");
         for (const each of choices.values()) each.card.disable();
         targetCard.disable();
         reveal(vocabularyItemId);
-        paint();
         onComplete();
         return "correct";
+      /* The picture goes back to the row and every choice stays draggable. */
       case "incorrect":
-        heldItemId = null;
-        /* A picture dropped on the target is back in the row before it shakes. */
         view?.card.returnHome();
         view?.card.paint(CARD.wrong);
         view?.card.shake([]);
-        flashing.add(vocabularyItemId);
         scene.time.delayedCall(500, () => {
-          flashing.delete(vocabularyItemId);
           if (round.status === "playing") view?.card.paint(CARD.fill);
         });
-        if (round.status === "lost") {
-          banner.setText("Vamos a intentarlo otra vez");
-          for (const each of choices.values()) each.card.disable();
-          targetCard.disable();
-        }
-        paint();
         return "incorrect";
       case "ignored":
         return "ignored";
@@ -256,7 +192,6 @@ export function renderInitialSyllableGame(
     for (const [itemId, view] of choices) {
       if (itemId !== chosenItemId) view.card.hide();
     }
-    lives.setVisible(false);
 
     addEmphasisedWord(
       scene,
@@ -274,18 +209,4 @@ export function renderInitialSyllableGame(
       addEmphasisedWord(scene, chosen.syllables, view.x, choiceWordY, 44);
     }
   }
-
-  function paint(): void {
-    lives.setText(`Vidas: ${"♥".repeat(round.livesRemaining)}`);
-    for (const [itemId, view] of choices) {
-      if (round.status !== "playing" || flashing.has(itemId)) continue;
-      view.card.paint(
-        itemId === heldItemId ? CARD.selected : CARD.fill,
-        CARD.border,
-        itemId === heldItemId ? CARD.borderWidth + 4 : CARD.borderWidth
-      );
-    }
-  }
-
-  paint();
 }

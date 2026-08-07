@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { ManifestFor } from "@lectoemocion/resource-schema";
-import { ROUND_LIVES } from "./lives";
 import { createPairsRound, selectPairsCard } from "./pairsGame";
 
 const manifest: ManifestFor<"pairs-game"> = {
@@ -23,7 +22,6 @@ describe("createPairsRound", () => {
     const round = createPairsRound(manifest);
     expect(round.cards.filter((card) => card.group === "picture")).toHaveLength(3);
     expect(round.cards.filter((card) => card.group === "word")).toHaveLength(3);
-    expect(round.livesRemaining).toBe(ROUND_LIVES);
     expect(round.status).toBe("playing");
   });
 
@@ -44,22 +42,20 @@ describe("createPairsRound", () => {
 });
 
 describe("selectPairsCard", () => {
-  it("records a first selection without spending a life", () => {
+  it("records a first selection", () => {
     const { round, attempt } = selectPairsCard(
       createPairsRound(manifest),
       pictureCard("casa")
     );
     expect(attempt).toEqual({ kind: "selected" });
     expect(round.selectedCardId).toBe(pictureCard("casa"));
-    expect(round.livesRemaining).toBe(ROUND_LIVES);
   });
 
-  it("clears the selection when both cards share a group, at no cost", () => {
+  it("clears the selection when both cards share a group", () => {
     const first = selectPairsCard(createPairsRound(manifest), pictureCard("casa"));
     const { round, attempt } = selectPairsCard(first.round, pictureCard("sol"));
     expect(attempt).toEqual({ kind: "cleared" });
     expect(round.selectedCardId).toBeNull();
-    expect(round.livesRemaining).toBe(ROUND_LIVES);
     expect(round.matched).toEqual([]);
   });
 
@@ -69,19 +65,18 @@ describe("selectPairsCard", () => {
     expect(attempt).toEqual({ kind: "matched", vocabularyItemId: "casa" });
     expect(round.matched).toEqual(["casa"]);
     expect(round.selectedCardId).toBeNull();
-    expect(round.livesRemaining).toBe(ROUND_LIVES);
   });
 
-  it("spends a life on a picture paired with the wrong word", () => {
-    const first = selectPairsCard(createPairsRound(manifest), pictureCard("casa"));
+  it("clears the selection on a picture paired with the wrong word", () => {
+    const opening = createPairsRound(manifest);
+    const first = selectPairsCard(opening, pictureCard("casa"));
     const { round, attempt } = selectPairsCard(first.round, wordCard("sol"));
     expect(attempt).toEqual({
       kind: "mismatched",
       cardIds: [pictureCard("casa"), wordCard("sol")]
     });
-    expect(round.livesRemaining).toBe(ROUND_LIVES - 1);
-    expect(round.matched).toEqual([]);
-    expect(round.selectedCardId).toBeNull();
+    /* The board is back to the one they started from: nothing was spent. */
+    expect(round).toEqual(opening);
   });
 
   it("ignores a card that is already matched", () => {
@@ -102,21 +97,24 @@ describe("selectPairsCard", () => {
     expect(round.matched).toEqual(["casa", "sol", "luna"]);
   });
 
-  it("loses once lives run out", () => {
+  it("stays playable however many wrong pairs are tried", () => {
     let round = createPairsRound(manifest);
-    for (let attempt = 0; attempt < ROUND_LIVES; attempt += 1) {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
       round = selectPairsCard(round, pictureCard("casa")).round;
       round = selectPairsCard(round, wordCard("sol")).round;
     }
-    expect(round.livesRemaining).toBe(0);
-    expect(round.status).toBe("lost");
+    expect(round.status).toBe("playing");
+    /* And the pair they got wrong a dozen times is still there to be made. */
+    round = selectPairsCard(round, pictureCard("casa")).round;
+    round = selectPairsCard(round, wordCard("casa")).round;
+    expect(round.matched).toEqual(["casa"]);
   });
 
-  it("ignores selections once the round has ended", () => {
+  it("ignores selections once the round is won", () => {
     let round = createPairsRound(manifest);
-    for (let attempt = 0; attempt < ROUND_LIVES; attempt += 1) {
-      round = selectPairsCard(round, pictureCard("casa")).round;
-      round = selectPairsCard(round, wordCard("sol")).round;
+    for (const itemId of ["casa", "sol", "luna"]) {
+      round = selectPairsCard(round, pictureCard(itemId)).round;
+      round = selectPairsCard(round, wordCard(itemId)).round;
     }
     const { round: after, attempt } = selectPairsCard(round, pictureCard("luna"));
     expect(attempt).toEqual({ kind: "ignored" });

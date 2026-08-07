@@ -1,7 +1,6 @@
 export { selectParticipants } from "./participantSelection";
 export { seededDerangement, seededShuffle } from "./seededRandom";
-export { ROUND_LIVES } from "./rules/lives";
-export type { RoundStatus } from "./rules/lives";
+export type { RoundStatus } from "./rules/roundStatus";
 export { createPairsRound, selectPairsCard } from "./rules/pairsGame";
 export type {
   PairsAttempt,

@@ -18,7 +18,6 @@ export const INITIAL_SYLLABLE_LAYOUT = {
   targetSize: 220,
   /** Where the target's word appears once the answer is revealed. */
   targetWordY: 335,
-  livesY: 390,
   choiceRowY: 540,
   choiceSize: 190,
   /** Where the chosen word appears beneath it, on the reveal. */

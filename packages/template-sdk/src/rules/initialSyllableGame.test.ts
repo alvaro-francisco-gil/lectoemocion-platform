@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { ManifestFor, VocabularyItem } from "@lectoemocion/resource-schema";
-import { ROUND_LIVES } from "./lives";
 import {
   chooseInitialSyllable,
   createInitialSyllableRound,
@@ -74,7 +73,6 @@ describe("createInitialSyllableRound", () => {
       "luna",
       "sol"
     ]);
-    expect(round.livesRemaining).toBe(ROUND_LIVES);
     expect(round.status).toBe("playing");
   });
 
@@ -139,29 +137,25 @@ describe("chooseInitialSyllable", () => {
     );
     expect(attempt).toEqual({ kind: "correct" });
     expect(round.status).toBe("won");
-    expect(round.livesRemaining).toBe(ROUND_LIVES);
   });
 
-  it("spends a life on a distractor and keeps playing", () => {
-    const { round, attempt } = chooseInitialSyllable(
-      createInitialSyllableRound(manifest),
-      "luna"
-    );
+  it("keeps playing after a distractor, changing nothing", () => {
+    const opening = createInitialSyllableRound(manifest);
+    const { round, attempt } = chooseInitialSyllable(opening, "luna");
     expect(attempt).toEqual({ kind: "incorrect" });
-    expect(round.status).toBe("playing");
-    expect(round.livesRemaining).toBe(ROUND_LIVES - 1);
+    expect(round).toEqual(opening);
   });
 
-  it("loses once lives run out", () => {
+  it("still offers the match after a dozen distractors", () => {
     let round = createInitialSyllableRound(manifest);
-    for (let attempt = 0; attempt < ROUND_LIVES; attempt += 1) {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
       round = chooseInitialSyllable(round, "luna").round;
     }
-    expect(round.livesRemaining).toBe(0);
-    expect(round.status).toBe("lost");
+    expect(round.status).toBe("playing");
+    expect(chooseInitialSyllable(round, "caballo").round.status).toBe("won");
   });
 
-  it("ignores choices once the round has ended", () => {
+  it("ignores choices once the round is won", () => {
     const won = chooseInitialSyllable(
       createInitialSyllableRound(manifest),
       "caballo"

@@ -43,11 +43,11 @@ associations visible at once.
    presented in a seeded order independent of the picture cards.
 3. The child selects one card, then another.
 4. Selecting two cards from the same group is not an answer. The first selection
-   is cleared and no life is spent.
+   is cleared.
 5. Selecting one card from each group is an attempt:
    - same vocabulary item → both cards are matched and stay matched;
-   - different items → one life is spent.
-6. The round is won when every pair is matched, and lost when lives reach zero.
+   - different items → the selection clears and the board is unchanged.
+6. The round is won when every pair is matched. It cannot be lost.
 
 **Roster fit.** No roster. Vocabulary only.
 
@@ -65,9 +65,9 @@ against distractors.
 3. The target's picture and every distractor picture are presented together in a
    seeded order.
 4. Selecting the target's picture wins the round.
-5. Selecting a distractor spends one life. The round continues; the picture
-   stays selectable.
-6. The round is lost when lives reach zero.
+5. Selecting a distractor changes nothing. The round continues and every
+   picture, including that one, stays selectable.
+6. The round cannot be lost.
 
 **Roster fit.** No roster. Vocabulary only.
 
@@ -90,14 +90,14 @@ disagree with the answer.
    the slot it belongs to**.
 4. Placing a card into a slot is an attempt:
    - correct slot → the card stays and the slot is filled;
-   - wrong slot, or an occupied slot → the card returns and one life is spent.
-5. The round is won when every slot is filled, and lost when lives reach zero.
+   - wrong slot, or an occupied slot → the card returns to the row it came
+     from and the round is otherwise unchanged.
+5. The round is won when every slot is filled. It cannot be lost.
 
 **Roster fit.** No roster. Vocabulary only.
 
-**Deviation from the prototype.** Placement is tap-the-card then tap-the-slot,
-not a drag. Touch, stylus, and mouse then map to one semantic action; a drag
-gesture does not survive an aged panel digitiser equally across all three.
+**Placement is a drag, and only a drag** — see the letters game below, which
+arranges it identically and states why.
 
 **Deviation from the prototype.** The prototype produced rule 3 by reshuffling
 until no syllable *value* sat in its home position. For a word whose syllables
@@ -126,8 +126,9 @@ ordering task at a finer grain, which is why the two share their rules
    uses, for the same reason.
 5. Placing a card into a slot is an attempt:
    - correct slot → the card stays and the slot is filled;
-   - wrong slot, or an occupied slot → the card returns and one life is spent.
-6. The round is won when every slot is filled, and lost when lives reach zero.
+   - wrong slot, or an occupied slot → the card returns to the row it came
+     from and the round is otherwise unchanged.
+6. The round is won when every slot is filled. It cannot be lost.
 7. A word of fewer than two or more than eight letters is refused. One letter is
    already the whole word; nine cards on a panel is a search task rather than a
    spelling one, and the cards stop being big enough to hit.
@@ -140,13 +141,17 @@ not store. The catalogue calls the same function while a world is authored, so
 an unplayable word fails when it is written rather than when a child opens the
 chapter.
 
-**Placement is a drag, with tap kept alongside it.** The child drags a letter
-from the row of cards onto a slot. Tap-the-card then tap-the-slot also works
-and calls the same `placeLetter`, so the two cannot disagree about the answer.
-The tap path is not a leftover: the reason the syllables game has no drag at
-all is that a drag gesture does not survive an aged panel digitiser equally
-across touch, stylus, and mouse, and on that hardware the tap path is the only
-one a child can finish.
+**Placement is a drag, and only a drag.** The child drags a letter from the row
+of cards onto a slot. A tap does nothing, and that is the point: a tap is
+reserved for the word recordings — see [audio](../plans/ideas/audio.md) —
+where tapping a card will sound out what is written on it. A gesture cannot
+both place a card and read it aloud.
+
+This replaced an earlier arrangement in which tap-the-card then tap-the-slot
+worked alongside the drag, on the grounds that a drag does not survive an aged
+panel digitiser equally across touch, stylus, and mouse. That fallback was
+given up deliberately; see
+[ADR 0011](../decisions/0011-no-lives-and-drag-only-answers.md).
 
 **Layout.** The picture is at the top, where a child cannot reach; the letter
 cards and the slots below them are both inside the lower reach band.
@@ -170,8 +175,8 @@ here with no prototype ancestor.
 3. The target's picture is shown above; the three choices are shown below.
 4. Choosing is an attempt:
    - the named match → won;
-   - any other choice → the card returns and one life is spent.
-5. The round is won on the match and lost when lives reach zero.
+   - any other choice → the card returns to the row and nothing else changes.
+5. The round is won on the match. It cannot be lost.
 6. Winning **reveals both words** with the syllable they share picked out in
    colour. That reveal is the lesson; the win is only its occasion.
 
@@ -197,14 +202,12 @@ printed twice.
 Whether they are the same sound is a phonetic claim this repository has no basis
 to make, and it is a difference a Spanish reader sees.
 
-**Placement is a drag, with tap kept alongside it**, exactly as the letters game
-arranges it and for the same digitiser reason: the child carries a picture up to
-the target, or taps the picture and then the target, and both call the same
-`chooseInitialSyllable`.
-
-Keeping a plain tap *out* of the answer is also what leaves it free. When word
-recordings exist — see [audio](../plans/ideas/audio.md) — tapping a card will
-play its word, and the way a child answers will not change.
+**Answering is a drag, and only a drag**, exactly as the letters game arranges
+it and for the same reason: the child carries a picture up to the target, and a
+tap is left free for the word recordings — see
+[audio](../plans/ideas/audio.md) — where tapping a card will play its word.
+That is the very thing this game teaches a child to hear, so it is the gesture
+worth reserving.
 
 **Layout.** The target is above the child reach band, because it is shown and
 never touched; the row of three choices is inside it.
@@ -241,8 +244,17 @@ cards at fixed pixel offsets, which is one of the practices
 [godot-prototype.md](godot-prototype.md) rejects. Rows here are centred and
 spaced from the logical canvas size.
 
-## Lives
+## No lives
 
-All five spend from the same three-life budget the prototype used. Lives are
-round state owned by the rules, not progress state: templates never read or
-write progress (invariant 2).
+None of these games can be lost. A wrong answer does not stick and costs
+nothing else: the card goes back where it came from, the board is exactly what
+it was, and the child tries again. The prototype's three-life budget is gone,
+and `RoundStatus` has two members — `playing` and `won` — so a losing round is
+not a state this codebase can express.
+
+What a wrong answer still does is *say so*: the card flashes red and shakes.
+That is feedback, not a penalty.
+
+Round state is owned by the rules, not progress state: templates never read or
+write progress (invariant 2). See
+[ADR 0011](../decisions/0011-no-lives-and-drag-only-answers.md).

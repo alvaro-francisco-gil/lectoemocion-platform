@@ -6,6 +6,7 @@ import {
   placeSyllable,
   type SyllableCard
 } from "@lectoemocion/template-sdk";
+import { SYLLABLES_LAYOUT, syllableColumnX } from "./syllablesLayout";
 import {
   addLabel,
   addPicture,
@@ -14,17 +15,32 @@ import {
   VocabularyCard
 } from "./vocabularyCard";
 
-const SLOT_ROW_Y = 430;
-const TRAY_ROW_Y = 610;
-const SLOT_WIDTH = 150;
-const SLOT_HEIGHT = 110;
+const {
+  canvasWidth,
+  canvasHeight,
+  pictureY,
+  slotRowY,
+  trayRowY,
+  cardWidth,
+  cardHeight
+} = SYLLABLES_LAYOUT;
+
+/** Above the rows, for the length of a gesture only. */
+const DRAG_DEPTH = 10;
 
 /**
- * Placement is tap-card-then-tap-slot rather than a drag.
+ * Rebuild the pictured word by dragging its syllables into place.
  *
- * Touch, stylus, and mouse then map to one semantic action, which a drag
- * gesture does not on an aged panel digitiser. See
- * `docs/migration/minigame-specifications.md`.
+ * Placement is a **drag**, and only a drag. A syllable let go anywhere but its
+ * own slot goes back to the row it came from and nothing else happens: there is
+ * no budget to spend, so a child can miss as often as they like and still
+ * finish the word.
+ *
+ * A tap does nothing here on purpose. It is held for the word recordings
+ * (`docs/plans/ideas/audio.md`), where tapping a card will sound out its
+ * syllable — the thing this game is teaching. A gesture cannot both place a
+ * card and read it aloud, so placing is the one that moved. See
+ * [ADR 0011](../../../../../docs/decisions/0011-no-lives-and-drag-only-answers.md).
  */
 export function renderSyllablesGame(
   scene: Phaser.Scene,
@@ -32,15 +48,21 @@ export function renderSyllablesGame(
   onComplete: () => void
 ): void {
   let round = createSyllablesRound(resource);
-  let heldCardId: string | null = null;
+  let placedByDrag = false;
 
   /* The prototype's turquoise field. */
   scene.add
-    .rectangle(640, 360, 1280, 720, SYLLABLE_BACKGROUND)
+    .rectangle(
+      canvasWidth / 2,
+      canvasHeight / 2,
+      canvasWidth,
+      canvasHeight,
+      SYLLABLE_BACKGROUND
+    )
     .setDepth(-1);
 
   const banner = scene.add
-    .text(640, 45, "Ordena las sílabas", {
+    .text(canvasWidth / 2, 45, "Ordena las sílabas", {
       fontFamily: "system-ui",
       fontSize: "40px",
       color: "#0f4f47"
@@ -49,53 +71,90 @@ export function renderSyllablesGame(
 
   const target = resource.vocabulary[0];
   if (target) {
-    new VocabularyCard(scene, 640, 210, 240, 240);
-    addPicture(scene, target, 640, 210, 240);
+    new VocabularyCard(scene, canvasWidth / 2, pictureY, 240, 240);
+    addPicture(scene, target, canvasWidth / 2, pictureY, 240);
   }
 
-  const lives = scene.add
-    .text(640, 350, "", {
-      fontFamily: "system-ui",
-      fontSize: "30px",
-      color: "#0f4f47"
-    })
-    .setOrigin(0.5);
-
-  const columnX = (index: number, total: number) =>
-    640 + (index - (total - 1) / 2) * Math.min(190, 1180 / total);
-
-  const slotCount = round.slots.length;
   const slots: VocabularyCard[] = [];
   const slotLabels: Phaser.GameObjects.Text[] = [];
+  /* Phaser reports drops against the game object, so each row is indexed by it. */
+  const slotOf = new Map<Phaser.GameObjects.GameObject, number>();
 
-  for (let index = 0; index < slotCount; index += 1) {
-    const x = columnX(index, slotCount);
-    const slot = new VocabularyCard(scene, x, SLOT_ROW_Y, SLOT_WIDTH, SLOT_HEIGHT);
-    slot.onTap(() => dropInto(index));
+  round.slots.forEach((_empty, index) => {
+    const x = syllableColumnX(index, round.slots.length);
+    const slot = new VocabularyCard(scene, x, slotRowY, cardWidth, cardHeight);
+    const label = addLabel(scene, "", x, slotRowY, 40);
+    slot.carry(label);
+    slot.acceptsDrop();
     slots.push(slot);
-    slotLabels.push(addLabel(scene, "", x, SLOT_ROW_Y, 40));
-  }
-
-  interface TrayView {
-    readonly card: VocabularyCard;
-    readonly label: Phaser.GameObjects.Text;
-  }
-  const tray = new Map<string, TrayView>();
-
-  round.tray.forEach((syllable: SyllableCard, index) => {
-    const x = columnX(index, round.tray.length);
-    const card = new VocabularyCard(scene, x, TRAY_ROW_Y, SLOT_WIDTH, SLOT_HEIGHT);
-    const label = addLabel(scene, syllable.syllable, x, TRAY_ROW_Y, 40);
-    card.onTap(() => {
-      heldCardId = heldCardId === syllable.cardId ? null : syllable.cardId;
-      paint();
-    });
-    tray.set(syllable.cardId, { card, label });
+    slotLabels.push(label);
+    slotOf.set(slot.target, index);
   });
 
-  function dropInto(slotIndex: number): void {
-    if (!heldCardId) return;
-    const cardId = heldCardId;
+  /* The card carries its own syllable, so the card alone is the whole view. */
+  const tray = new Map<string, VocabularyCard>();
+  const cardOf = new Map<Phaser.GameObjects.GameObject, string>();
+
+  round.tray.forEach((syllable: SyllableCard, index) => {
+    const x = syllableColumnX(index, round.tray.length);
+    const card = new VocabularyCard(scene, x, trayRowY, cardWidth, cardHeight);
+    card.carry(addLabel(scene, syllable.syllable, x, trayRowY, 40));
+    card.draggable();
+    tray.set(syllable.cardId, card);
+    cardOf.set(card.target, syllable.cardId);
+  });
+
+  scene.input.on(
+    Phaser.Input.Events.DRAG_START,
+    (_pointer: Phaser.Input.Pointer, object: Phaser.GameObjects.GameObject) => {
+      const cardId = cardOf.get(object);
+      if (cardId === undefined) return;
+      placedByDrag = false;
+      tray.get(cardId)?.lift(DRAG_DEPTH);
+    }
+  );
+
+  scene.input.on(
+    Phaser.Input.Events.DRAG,
+    (
+      _pointer: Phaser.Input.Pointer,
+      object: Phaser.GameObjects.GameObject,
+      dragX: number,
+      dragY: number
+    ) => {
+      const cardId = cardOf.get(object);
+      if (cardId === undefined) return;
+      tray.get(cardId)?.moveTo(dragX, dragY);
+    }
+  );
+
+  scene.input.on(
+    Phaser.Input.Events.DROP,
+    (
+      _pointer: Phaser.Input.Pointer,
+      object: Phaser.GameObjects.GameObject,
+      dropped: Phaser.GameObjects.GameObject
+    ) => {
+      const cardId = cardOf.get(object);
+      const slotIndex = slotOf.get(dropped);
+      if (cardId === undefined || slotIndex === undefined) return;
+      placedByDrag = place(cardId, slotIndex) === "placed";
+    }
+  );
+
+  scene.input.on(
+    Phaser.Input.Events.DRAG_END,
+    (_pointer: Phaser.Input.Pointer, object: Phaser.GameObjects.GameObject) => {
+      const cardId = cardOf.get(object);
+      if (cardId === undefined) return;
+      const card = tray.get(cardId);
+      card?.lift(0);
+      /* A syllable let go anywhere but its slot goes back where it was dealt. */
+      if (!placedByDrag) card?.returnHome();
+    }
+  );
+
+  function place(cardId: string, slotIndex: number): "placed" | "rejected" {
     const held = tray.get(cardId);
     const result = placeSyllable(round, cardId, slotIndex);
     round = result.round;
@@ -103,51 +162,33 @@ export function renderSyllablesGame(
 
     switch (outcome.kind) {
       case "placed":
-        heldCardId = null;
-        held?.card.disable();
-        held?.card.paint(CARD.fill, SYLLABLE_BACKGROUND, 0);
-        held?.label.setVisible(false);
+        /* The syllable is in the slot now; the card that carried it is spent. */
+        held?.hide();
+        paint();
         if (round.status === "won") {
           banner.setText("¡Muy bien!");
           onComplete();
         }
-        paint();
-        return;
+        return "placed";
       case "rejected": {
-        heldCardId = null;
         const slot = slots[slotIndex];
         slot?.paint(CARD.wrong);
         slot?.shake([]);
-        if (round.status === "lost") {
-          banner.setText("Vamos a intentarlo otra vez");
-        }
         scene.time.delayedCall(500, paint);
-        paint();
-        return;
+        return "rejected";
       }
-      case "ignored":
-        return;
       default:
-        assertNever(outcome, "syllable attempt");
+        return assertNever(outcome, "syllable attempt");
     }
   }
 
   function paint(): void {
-    lives.setText(`Vidas: ${"♥".repeat(round.livesRemaining)}`);
     round.slots.forEach((filled, index) => {
       slotLabels[index]?.setText(
         filled ? filled.syllable.toLocaleUpperCase("es-ES") : ""
       );
       slots[index]?.paint(filled ? CARD.matched : CARD.fill);
     });
-    for (const [cardId, view] of tray) {
-      if (!round.tray.some((each) => each.cardId === cardId)) continue;
-      view.card.paint(
-        cardId === heldCardId ? CARD.selected : CARD.fill,
-        CARD.border,
-        cardId === heldCardId ? CARD.borderWidth + 4 : CARD.borderWidth
-      );
-    }
   }
 
   paint();

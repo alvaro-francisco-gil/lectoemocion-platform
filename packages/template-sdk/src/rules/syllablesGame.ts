@@ -1,6 +1,6 @@
 import type { ManifestFor } from "@lectoemocion/resource-schema";
 import { vocabularyWord } from "@lectoemocion/resource-schema";
-import { type RoundStatus } from "./lives";
+import { type RoundStatus } from "./roundStatus";
 import {
   dealSequence,
   placeSequenceCard,
@@ -19,7 +19,6 @@ export interface SyllablesRound {
   readonly imageUrl: string;
   readonly slots: readonly (SyllableCard | null)[];
   readonly tray: readonly SyllableCard[];
-  readonly livesRemaining: number;
   readonly status: RoundStatus;
 }
 
