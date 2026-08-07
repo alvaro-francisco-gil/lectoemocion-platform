@@ -1,5 +1,15 @@
 export { assertNever } from "./assertNever";
 export type { ChildRecord } from "./childRecord";
+export {
+  checkCustomPrize,
+  checkPrizeGoal,
+  DEFAULT_PRIZE_GOAL,
+  MAX_PRIZE_GOAL,
+  MAX_PRIZE_TEXT_LENGTH,
+  MIN_PRIZE_GOAL,
+  PRIZE_PRESET_KEYS,
+  isPrizePresetKey
+} from "./prize";
 export { deriveInitial } from "./initial";
 export {
   accountId,
@@ -24,3 +34,12 @@ export type {
   TemplateId,
   VocabularyItemId
 } from "./ids";
+export type {
+  CustomPrizeCheck,
+  CustomPrizeProblem,
+  Prize,
+  PrizeContent,
+  PrizeGoalCheck,
+  PrizeGoalProblem,
+  PrizePresetKey
+} from "./prize";
