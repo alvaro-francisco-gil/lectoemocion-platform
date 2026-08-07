@@ -27,7 +27,12 @@ main { height: 100dvh; }
  * host, so a host free to grow with its content would size the canvas from a
  * height the canvas itself decided, and the picture walks down the screen.
  */
-.playing { height: 100dvh; display: grid; }
+/*
+ * The chapter's own colour, so the card a child pressed and the game it opens
+ * are the same place. It fills the shell rather than only the canvas: the
+ * canvas is a fixed 16:9 and every other shape of screen letterboxes it.
+ */
+.playing { height: 100dvh; display: grid; background: var(--game-wash); }
 .playing .game-host { grid-area: 1 / 1; }
 
 .back {
@@ -238,15 +243,14 @@ main { height: 100dvh; }
  * cut-out illustration sits on, and every one of them is dark enough to hold
  * white text and light enough to separate from the background.
  *
+ * The palette itself is in `app/cardTints.ts`, because the same colour has to
+ * reach the canvas when the chapter opens and Phaser cannot read a stylesheet.
+ * Here it arrives as a custom property on the card.
+ *
  * Decoration only. Nothing here is the sole carrier of any state: locked says
  * so with a padlock, and every card's state is spoken.
  */
-.world-node[data-tint="0"] .world-node__marker { background: #e05299; }
-.world-node[data-tint="1"] .world-node__marker { background: #2a9d8f; }
-.world-node[data-tint="2"] .world-node__marker { background: #e07a3f; }
-.world-node[data-tint="3"] .world-node__marker { background: #4361c9; }
-.world-node[data-tint="4"] .world-node__marker { background: #7a4fc7; }
-.world-node[data-tint="5"] .world-node__marker { background: #d64550; }
+.world-node__marker { background: var(--card-tint); }
 
 /*
  * `contain`, not `cover`.

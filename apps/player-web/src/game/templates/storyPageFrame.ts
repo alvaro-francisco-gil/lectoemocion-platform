@@ -4,16 +4,20 @@ import type { StoryPage } from "@lectoemocion/resource-schema";
 /**
  * The reading surface, reproduced from the application the book shipped with.
  *
- * These values are that application's, converted from its stylesheet: a pale
- * blue field (`#E9F3FA`), a white page with a soft grey edge, and a green play
- * control in the bottom corner. Matching it is the point — this is the screen
- * the author and her readers already know.
+ * These values are that application's, converted from its stylesheet: a white
+ * page with a soft grey edge, and a green play control in the bottom corner.
+ * Matching it is the point — this is the screen the author and her readers
+ * already know.
+ *
+ * Its pale blue field is the one value not reproduced. A book is a chapter like
+ * any other, and every chapter now stands on the colour of the card that opened
+ * it, so the field comes from the shell (`app/cardTints.ts`) and the page sits
+ * on whatever colour this book is.
  *
  * This is to a story what `CARD` is to a vocabulary game: the look lives in one
  * place so a second title cannot quietly acquire a different one.
  */
 export const PAGE = {
-  backdrop: 0xe9f3fa,
   sheet: 0xffffff,
   sheetEdge: 0xd8e3ee,
   ink: "#2b3a4a",

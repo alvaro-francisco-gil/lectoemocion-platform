@@ -72,7 +72,6 @@ export function renderNameBook(
   onComplete: () => void
 ): void {
   const pages = resource.pages;
-  scene.cameras.main.setBackgroundColor(PAGE.backdrop);
 
   const progress = createProgressBar(scene);
   let current = -1;

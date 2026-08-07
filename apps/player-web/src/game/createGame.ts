@@ -8,7 +8,6 @@ import { ResourceScene } from "./scenes/ResourceScene";
  */
 const PRESENTATION = {
   type: Phaser.AUTO,
-  backgroundColor: "#f7f2ff",
   scale: {
     mode: Phaser.Scale.FIT,
     /*
@@ -25,13 +24,22 @@ const PRESENTATION = {
   input: { activePointers: 4 }
 } as const;
 
+/**
+ * @param background The chapter's own colour, from `cardTint`. It is the field
+ *   every template draws on: the shell hands it in rather than a template
+ *   choosing one, so a chapter looks the same from the moment its card is
+ *   pressed. Presentation only — it never reaches the manifest, so templates
+ *   stay engine-neutral (invariant 2).
+ */
 export function createGame(
   parent: HTMLElement,
   resource: ResourceManifest,
+  background: string,
   onComplete: () => void
 ): Phaser.Game {
   return new Phaser.Game({
     ...PRESENTATION,
+    backgroundColor: background,
     parent,
     scene: [new ResourceScene(resource, onComplete)]
   });

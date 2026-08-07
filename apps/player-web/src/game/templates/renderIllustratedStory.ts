@@ -38,7 +38,6 @@ export function renderIllustratedStory(
   onComplete: () => void
 ): void {
   const pages = resource.pages;
-  scene.cameras.main.setBackgroundColor(PAGE.backdrop);
 
   const sheet = scene.add.graphics();
   const progress = createProgressBar(scene);
@@ -270,8 +269,13 @@ export function renderIllustratedStory(
    * a voice, or stopped on a page that will not speak.
    */
   const curtain = (() => {
+    /*
+     * The chapter's own colour, taken from the camera rather than named here:
+     * the field behind a book is the shell's to choose, and a curtain drawn in
+     * a colour of its own would announce itself as a second surface.
+     */
     const cover = scene.add
-      .rectangle(640, 360, 1280, 720, PAGE.backdrop, 0.9)
+      .rectangle(640, 360, 1280, 720, scene.cameras.main.backgroundColor.color, 0.9)
       .setDepth(OVERLAY_DEPTH - 1);
     const message = scene.add
       .text(640, 360, "", {
