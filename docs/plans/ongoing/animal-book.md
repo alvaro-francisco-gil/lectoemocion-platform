@@ -1,5 +1,15 @@
 # The book of animals
 
+## Status
+
+- **Updated:** 2026-08-07
+- **Stage:** starting — the schema is first
+- **Branch:** `feat/animal-book`, worktree `.worktrees/animal-book`
+- **Done:** the design below, agreed with mockups of the page and of the stamp.
+- **Next:** one animal per chapter in `worldSchema.ts`, distinct across the
+  world, then the catalog, the view, and the book itself.
+- **Blockers:** none.
+
 ## Goal
 
 The collection stops being a grid of tiles and becomes a book: one sheet of
