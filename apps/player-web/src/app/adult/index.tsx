@@ -1,5 +1,5 @@
 import type { PrizeContent, PrizeId, PrizeImageId } from "@lectoemocion/domain";
-import type { ReactElement } from "react";
+import { useEffect, type ReactElement } from "react";
 import type { PrizeView } from "../../world/prizes";
 import { CloseIcon } from "../icons";
 import { AdultGate } from "./AdultGate";
@@ -12,6 +12,10 @@ import { PrizeSettings } from "./PrizeSettings";
  * The gate wraps the whole area rather than each control inside it, so every
  * adult-facing thing added here inherits it instead of growing its own.
  * `scripts/check-adult-gate.mjs` is what keeps that true.
+ *
+ * Closes on Escape as well as the button: a panel with no way out is a trap
+ * on a device with no back button, and the classroom panel this ships to is
+ * exactly that device.
  */
 export function AdultArea({
   view,
@@ -28,6 +32,14 @@ export function AdultArea({
   onPickImage: (file: File) => Promise<PrizeImageId | null>;
   onClose: () => void;
 }): ReactElement {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   return (
     <main className="adult" role="dialog" aria-modal="true" aria-label="Ajustes">
       <button

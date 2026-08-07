@@ -65,6 +65,22 @@ describe("the adult gate", () => {
   });
 });
 
+/* A panel with no way out is a trap on a device with no back button. */
+describe("closing the area", () => {
+  it("closes on Escape, gate answered or not", () => {
+    const props = open();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes on Escape once the gate has been passed", () => {
+    const props = open();
+    passGate();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("the goal", () => {
   it("saves a goal an adult typed", () => {
     const props = open();

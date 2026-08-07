@@ -193,20 +193,49 @@ export function App() {
   const waiting = prizeView.pending[0] ?? null;
 
   /*
+   * Which prize the ceremony is showing, tracked by id rather than read from
+   * `pending`: opening a gift moves it to `"opened"`, which drops it out of
+   * `pending` on the very next render. Deriving the ceremony's prize from
+   * `pending` would lose it at exactly the moment a child taps `¡Ábrelo!` —
+   * the screen would fall through to the map, or to whatever prize is next in
+   * `pending`. Reading the full list by id is what lets the reveal's render
+   * see the same prize's `"opened"` state instead.
+   */
+  const [ceremonyPrizeId, setCeremonyPrizeId] = useState<PrizeId | null>(null);
+  const ceremonyPrize = useMemo(
+    () => prizes.prizes.find((prize) => prize.id === ceremonyPrizeId) ?? null,
+    [prizes, ceremonyPrizeId]
+  );
+
+  /*
    * The gift takes the screen the first time it exists, because a wrapped box
    * appearing quietly in the corner of a busy map is a thing a child does not
-   * find. Once dismissed it waits on the map instead — `shown` is what keeps the
-   * ceremony from re-entering every render.
+   * find. Once dismissed it waits on the map instead — `shown` is what keeps
+   * the ceremony from re-entering every render for a prize already shown.
+   *
+   * Guarded on `ceremonyPrizeId === null` as well: opening the prize on
+   * screen drops it out of `pending`, which changes `waiting` to whatever is
+   * next — without this guard that would swap the ceremony to the next prize
+   * mid-reveal, a second gift jumping the queue in front of the one the child
+   * is still looking at.
    */
   const shown = useRef<PrizeId | null>(null);
   useEffect(() => {
-    if (!waiting || shown.current === waiting.id) return;
+    if (!waiting || ceremonyPrizeId !== null || shown.current === waiting.id) {
+      return;
+    }
     shown.current = waiting.id;
+    setCeremonyPrizeId(waiting.id);
     setDetour("gift");
-  }, [waiting]);
+  }, [waiting, ceremonyPrizeId]);
 
   const openGift = useCallback((id: PrizeId) => {
     void prizeStore.open(id).then(setPrizes);
+  }, []);
+
+  const continueFromGift = useCallback(() => {
+    setDetour("none");
+    setCeremonyPrizeId(null);
   }, []);
 
   const setPrizeGoal = useCallback((goal: number) => {
@@ -235,13 +264,18 @@ export function App() {
   }, []);
 
   /*
-   * `giftImage` is the custom picture, read from the image store when the
-   * waiting gift has one. Unconfigured prizes have no content to read, so they
-   * read as no picture rather than reaching into a field they do not have.
+   * `giftImage` is the custom picture, read from the image store for whatever
+   * prize the ceremony is showing right now. Sourced from `ceremonyPrize`
+   * rather than `waiting`, for the same reason the ceremony's content is: the
+   * picture for the prize on screen must still resolve after it is opened,
+   * once it has dropped out of `pending`. Unconfigured prizes have no content
+   * to read, so they read as no picture rather than reaching into a field
+   * they do not have.
    */
   const [giftImage, setGiftImage] = useState<string | null>(null);
   useEffect(() => {
-    const content = waiting?.state === "unconfigured" ? null : waiting?.content;
+    const content =
+      ceremonyPrize?.state === "unconfigured" ? null : ceremonyPrize?.content;
     if (content?.kind !== "custom" || content.imageId === null) {
       setGiftImage(null);
       return;
@@ -253,7 +287,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [waiting]);
+  }, [ceremonyPrize]);
 
   useEffect(() => {
     const parent = host.current;
@@ -293,14 +327,14 @@ export function App() {
     return <Chests reward={view.pendingReward} onOpen={openChest} />;
   }
 
-  if (detour === "gift" && waiting) {
+  if (detour === "gift" && ceremonyPrize) {
     return (
       <Gift
-        prize={waiting}
+        prize={ceremonyPrize}
         imageUrl={giftImage}
         onOpen={openGift}
         onPrepare={() => setDetour("adult")}
-        onContinue={() => setDetour("none")}
+        onContinue={continueFromGift}
       />
     );
   }
@@ -345,7 +379,10 @@ export function App() {
           type="button"
           className="map__gift"
           aria-label="Tu regalo"
-          onClick={() => setDetour("gift")}
+          onClick={() => {
+            setCeremonyPrizeId(waiting.id);
+            setDetour("gift");
+          }}
         >
           <GiftIcon />
         </button>

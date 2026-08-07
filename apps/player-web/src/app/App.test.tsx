@@ -101,6 +101,14 @@ async function openFirstChest(): Promise<string> {
   return openChest(1);
 }
 
+/** Answers the adult area's birth-year gate the way an adult does. */
+function passAdultGate(year = 1988): void {
+  fireEvent.change(screen.getByLabelText("¿En qué año naciste?"), {
+    target: { value: String(year) }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+}
+
 /** The animals on the map, in world order — `null` for a slot still to fill. */
 function collection(container: HTMLElement): (string | null)[] {
   return [...container.querySelectorAll(".collection__slot")].map((slot) =>
@@ -227,6 +235,17 @@ describe("the world shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Cerrar los ajustes" }));
     expect(screen.queryByRole("dialog", { name: "Ajustes" })).toBeNull();
+  });
+
+  /* A panel with no way out is a trap on a device with no back button. */
+  it("closes the adult area on Escape", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: "Ajustes" })).toBeNull();
+    expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
   });
 
   /* One screen at a time: the map is not left underneath to be tapped through. */
@@ -657,5 +676,106 @@ describe("reaching the goal", () => {
       name: "Letriestrellas hacia el próximo regalo"
     });
     expect(meter).toHaveAttribute("aria-valuenow", "0");
+  });
+
+  /**
+   * Takes an unconfigured gift through the adult area, back to the map, and
+   * into the reveal — the same door a real classroom panel walks through.
+   */
+  async function configureAndOpenTheGift(
+    fill: () => void,
+    { formIndex = 0 }: { formIndex?: number } = {}
+  ): Promise<void> {
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Preparar el regalo" })[0]!
+    );
+    passAdultGate();
+    fill();
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Guardar el regalo" })[formIndex]!
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar los ajustes" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Tu regalo" }));
+    fireEvent.click(await screen.findByRole("button", { name: "¡Ábrelo!" }));
+  }
+
+  it("reveals what a preset gift holds, once opened", async () => {
+    nearlyThere();
+    render(<App />);
+    await playFirstChapter();
+    await collectStars();
+    await openFirstChest();
+    await screen.findByText("Un regalo te está esperando");
+
+    await configureAndOpenTheGift(() => {
+      fireEvent.click(
+        screen.getAllByRole("radio", {
+          name: "Encuentra tu regalo en el patio"
+        })[0]!
+      );
+    });
+
+    expect(
+      await screen.findByText("Encuentra tu regalo en el patio")
+    ).toBeVisible();
+  });
+
+  it("reveals what a custom gift holds, once opened", async () => {
+    nearlyThere();
+    render(<App />);
+    await playFirstChapter();
+    await collectStars();
+    await openFirstChest();
+    await screen.findByText("Un regalo te está esperando");
+
+    await configureAndOpenTheGift(() => {
+      fireEvent.click(
+        screen.getAllByRole("radio", { name: "Escribirlo yo" })[0]!
+      );
+      fireEvent.change(
+        screen.getAllByLabelText("¿Qué hay dentro?")[0]!,
+        { target: { value: "un helado" } }
+      );
+    });
+
+    expect(await screen.findByText("un helado")).toBeVisible();
+  });
+
+  /*
+   * A second prize can be due at the same moment as the one on screen — a
+   * goal low enough that one sitting reaches it twice over. Opening the first
+   * must not fall through to the second's still-unconfigured screen: that is
+   * exactly the bug where the ceremony was rendering `pending[0]`, which
+   * drops the prize just opened and picks up whatever is next.
+   */
+  it("keeps showing the gift just opened, not the next one waiting", async () => {
+    localStorage.setItem(
+      "lectoemocion.prizes.local",
+      JSON.stringify({ goal: 5, prizes: [] })
+    );
+    localStorage.setItem(
+      "lectoemocion.progress.local",
+      JSON.stringify({
+        completedNodes: [],
+        lastPlayedNode: null,
+        rewards: [],
+        stars: 10
+      })
+    );
+    render(<App />);
+    await screen.findByText("Un regalo te está esperando");
+
+    await configureAndOpenTheGift(() => {
+      fireEvent.click(
+        screen.getAllByRole("radio", {
+          name: "Encuentra tu regalo en el patio"
+        })[0]!
+      );
+    });
+
+    expect(
+      await screen.findByText("Encuentra tu regalo en el patio")
+    ).toBeVisible();
+    expect(screen.queryByText("Un regalo te está esperando")).toBeNull();
   });
 });
