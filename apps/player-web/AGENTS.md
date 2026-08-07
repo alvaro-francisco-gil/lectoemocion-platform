@@ -10,10 +10,19 @@ inside the mobile shell. See
 ```text
 src/app/      React shell — routing, adult-facing UI
 src/world/    progression — progress storage and the world view derived from it
+src/profiles/ who is playing — the profile record's store and the avatar catalogue
 src/game/     the rendering adapter — the only place Phaser may appear
 ```
 
 Progression lives in `src/world/` and nowhere else.
+
+`src/profiles/` is deliberately separate from it. A profile is *who* is
+playing; progress is *what they have done*, and the only thing joining them is
+that a profile's id is the owner a `ProgressStore` is namespaced by. Keeping
+them apart is what lets accounts replace either one without touching the other.
+`src/profiles/` must not import from `src/world/` beyond `LOCAL_OWNER` and
+`storageKey` — the two names it needs to adopt existing progress and to delete
+a child's.
 `scripts/check-progress-boundary.mjs` stops a template or a shared package
 importing it. The shell reads progress, derives a `WorldView`, and draws the
 sections from it; it hands a template a manifest plus a completion callback.

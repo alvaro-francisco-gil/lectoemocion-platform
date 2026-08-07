@@ -229,8 +229,18 @@ begins, so a lesson can be planned around what the class can actually reach.
   and validated parameters.
 - `Progress`: unlock and completion state.
 
-Progress belongs to the account. Per-child profiles within a single account are
-a possible future addition and must not be designed out, but are not required.
+Progress belongs to a **player profile**, not to the account as a whole. A
+device holds one profile per child — a name, a chosen avatar, and optionally a
+birth month and year — and each profile has its own progress namespace, so
+siblings sharing a tablet keep separate worlds.
+
+Profiles are local to the device today; there are no accounts yet. When
+accounts arrive a profile is read from a child record under a group, and the
+store behind the existing interface is replaced without the player changing.
+See `docs/plans/ongoing/child-profiles.md`.
+
+A profile is never a prerequisite for playing. Every device creates one
+automatically on first launch, inheriting whatever progress is already there.
 
 Deleting a child record must remove that child from every resource that
 references them, falling back to default content rather than failing.
@@ -442,7 +452,6 @@ model are defined.
 
 - Whether phone-driven control of the display is added as a later enhancement.
   The display remains self-sufficient regardless. See 5.3.
-- Whether per-child profiles within one account are added.
 - Whether offline playback becomes mandatory.
 - Pricing, licensing, and WooCommerce integration.
 - Photo background removal in a later privacy-reviewed release.

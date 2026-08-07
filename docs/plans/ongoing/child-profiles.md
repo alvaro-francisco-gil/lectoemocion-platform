@@ -1,8 +1,22 @@
 # Child profiles
 
+## Status
+
+- **Updated:** 2026-08-07
+- **Stage:** Built and verified; awaiting review and merge
+- **Branch:** `feat/child-profiles`
+- **Done:** `PlayerProfile`, `Birth` and `ageInYears` in `packages/domain`;
+  `LocalProfileStore` with the starter profile that adopts existing progress;
+  the adult challenge; the drawer, the corner swap and the avatar button;
+  twelve avatars imported with per-file provenance;
+  `platform-design.md` and the player's `AGENTS.md` brought in line; idea
+  documents for the two placeholder rows. `pnpm check` green (1046 tests).
+- **Next:** merge, then distil the durable decisions — per-child profiles, and
+  the drawer-over-world reversal — into `docs/decisions/` and delete this plan
+
 ## Goal
 
-The map's hamburger becomes a child's avatar, moves to the top-left corner, and
+The world's hamburger becomes a child's avatar, moves to the top-left corner, and
 opens a drawer naming who is playing. From there an adult can add another child,
 edit one, or delete one; a child can switch between them unaided. The star
 counter moves to the right corner to make room.
@@ -130,7 +144,7 @@ not merged. Both comments are rewritten to say which corner now holds what and
 why the avatar earns the more prominent one: the child's own face is the most
 legible way for a pre-reader to know the app is theirs.
 
-The menu becomes a **drawer over a dimmed map** rather than a screen that
+The menu becomes a **drawer over the dimmed world** rather than a screen that
 replaces it. This reverses the decision recorded in `App.tsx`, which chose a
 full screen because "a panel a child can tap through is a way to leave the world
 by accident". That objection is about mis-taps, and a full-surface scrim answers
@@ -149,7 +163,7 @@ are planned work rather than debt parked in the interface.
 
 ### File layout
 
-`App.tsx` is 690 lines and already carries the map, the menu, the award screen,
+`App.tsx` already carries the world, the sections, the award screen,
 the chests, the collection and every icon. This change extracts
 `src/profiles/` (record glue, store, avatar catalogue), `ProfileMenu.tsx` and
 `AdultGate.tsx`, leaving `App.tsx` as a composition root. The extraction is
@@ -189,7 +203,7 @@ Unit:
 
 Component, in `App.test.tsx`:
 
-- the avatar opens the drawer, and the map stays mounted behind the scrim;
+- the avatar opens the drawer, and the world stays mounted behind the scrim;
 - switching profile changes the star count;
 - `Añadir niño` is refused until the gate is passed;
 - Escape and scrim tap close the drawer.
