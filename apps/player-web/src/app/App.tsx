@@ -75,6 +75,26 @@ type TabId = "juegos" | "recursos";
 const CARD_TINTS = 6;
 
 /**
+ * How many chests the duende offers.
+ *
+ * A question about the ceremony rather than about the world, which is why it
+ * lives here and not in the schema: every chest holds the chapter's one animal,
+ * so this is how wide the choice looks, not how many outcomes there are. Three
+ * is what a child aged 3–5 can hold in mind at once.
+ */
+const CHEST_COUNT = 3;
+
+/**
+ * How long the book stays up while it stamps an animal in.
+ *
+ * The stamp itself runs for most of it; the rest is the beat afterwards where
+ * the animal is simply sitting in the page among the others, which is the part
+ * a child is actually being shown. It agrees with the `book-stamp` animation in
+ * `styles.css`, and this is the only number that has to.
+ */
+const STAMP_VISIBLE_MS = 1850;
+
+/**
  * The world shell.
  *
  * It owns progression: it reads progress, derives the world, routes into a
@@ -87,15 +107,17 @@ const CARD_TINTS = 6;
  * around the progression.
  *
  * Exactly one screen is on at a time: a playing resource, the letriestrellas
- * just won, the animal just revealed, the chests owed for a first finish, the
- * collection, or a section. They are exclusive rather than layered so that
- * nothing a child can touch is ever hidden behind something else.
+ * just won, the animal just revealed, the chests owed for a first finish, or a
+ * section. They are exclusive rather than layered so that nothing a child can
+ * touch is ever hidden behind something else.
  *
- * The profile drawer is the one exception, and is a layer over the world
- * rather than a screen of its own. A child needs to see the world is still
- * there while an adult changes who is playing; what the exclusivity rule was
- * protecting — a tap landing on something hidden — is handled instead by the
- * scrim and by `select` refusing while the drawer is up.
+ * Two things are layers over the world instead. The profile drawer is one: a
+ * child needs to see the world is still there while an adult changes who is
+ * playing, and what the exclusivity rule was protecting — a tap landing on
+ * something hidden — is handled by the scrim and by `select` refusing while the
+ * drawer is up. The animal book is the other: it is a record of what a child has
+ * done, not a place to go, so looking at it must not cost them their place in
+ * the world.
  *
  * The roster is a prop with a build-derived default rather than a value read
  * inside. This is the composition root, so where the children come from is
@@ -121,14 +143,22 @@ export function App({
    * be derived: the moment it is claimed it stops being pending, and without
    * this the reveal would vanish in the same frame the chest opened.
    */
-  const [revealed, setRevealed] = useState<CollectibleAnimal | null>(null);
+  const [revealed, setRevealed] = useState<PendingRewardView | null>(null);
   /*
    * The drawer is a layer rather than a screen, so it is not part of which
    * screen is on: the world stays mounted underneath it.
    */
   const [menuOpen, setMenuOpen] = useState(false);
-  /* The collection is a screen too, for the same reason and in the same shape. */
-  const [collectionOpen, setCollectionOpen] = useState(false);
+  /* Whether the child asked to see the book. */
+  const [animalBookOpen, setAnimalBookOpen] = useState(false);
+  /*
+   * The chapter whose animal is being stamped into the book right now.
+   *
+   * It opens the book on its own and closes it again, so this is not the same
+   * question as `animalBookOpen`: one is the child asking to look, the other is the
+   * book showing them what just arrived.
+   */
+  const [stamping, setStamping] = useState<string | null>(null);
   /*
    * Everyone who plays on this device. `null` until the first read lands —
    * which is a frame, and the corner simply has no face in it until then.
@@ -246,15 +276,17 @@ export function App({
   );
 
   const openChest = useCallback(
-    (nodeId: string, animal: CollectibleAnimal) => {
+    (reward: PendingRewardView) => {
       if (progressStore === null) return;
       /*
        * Recorded before it is shown. A child who is handed an animal and then
        * loses it to a closing tab has been given nothing, and the reveal is the
        * one part of this that can safely be replayed.
        */
-      setRevealed(animal);
-      void progressStore.claimReward(nodeId, animal.animalId).then(setProgress);
+      setRevealed(reward);
+      void progressStore
+        .claimReward(reward.nodeId, reward.animal.animalId)
+        .then(setProgress);
     },
     [progressStore]
   );
@@ -271,6 +303,28 @@ export function App({
     },
     []
   );
+
+  /*
+   * The reveal hands over to the book: the animal a child has just been shown
+   * travels into the page and is stamped where its shadow was.
+   */
+  const acknowledgeReveal = useCallback((nodeId: string) => {
+    setRevealed(null);
+    setStamping(nodeId);
+  }, []);
+
+  /*
+   * The book closes itself once the stamp has landed and been looked at.
+   *
+   * Nothing is tapped in any of it. A child at the end of a chapter has already
+   * made every choice this ceremony asks for, and a modal they must dismiss to
+   * get back to the world is one more thing between them and playing again.
+   */
+  useEffect(() => {
+    if (stamping === null) return;
+    const timer = setTimeout(() => setStamping(null), STAMP_VISIBLE_MS);
+    return () => clearTimeout(timer);
+  }, [stamping]);
 
   useEffect(() => {
     const parent = host.current;
@@ -335,20 +389,16 @@ export function App({
   }
 
   if (revealed) {
-    return <Reveal animal={revealed} onContinue={() => setRevealed(null)} />;
+    return (
+      <Reveal
+        animal={revealed.animal}
+        onContinue={() => acknowledgeReveal(revealed.nodeId)}
+      />
+    );
   }
 
   if (view.pendingReward) {
     return <Chests reward={view.pendingReward} onOpen={openChest} />;
-  }
-
-  if (collectionOpen) {
-    return (
-      <CollectionScreen
-        slots={view.collection}
-        onClose={() => setCollectionOpen(false)}
-      />
-    );
   }
 
   const standing = tab === "juegos" ? view.games : view.resources;
@@ -400,7 +450,7 @@ export function App({
         type="button"
         className="collection-button"
         aria-label="Mis animales"
-        onClick={() => setCollectionOpen(true)}
+        onClick={() => setAnimalBookOpen(true)}
       >
         <PawIcon />
       </button>
@@ -419,6 +469,21 @@ export function App({
           onRemove={(id) => applyProfileChange(profiles.remove(id))}
         />
       ) : null}
+      {/*
+        Above the world rather than instead of it. The book is a record, so
+        opening it must not move a child anywhere, and closing it must not cost
+        them the section and the scroll position they were standing in.
+      */}
+      {(animalBookOpen || stamping !== null) && (
+        <AnimalBook
+          slots={view.collection}
+          stamping={stamping}
+          onClose={() => {
+            setAnimalBookOpen(false);
+            setStamping(null);
+          }}
+        />
+      )}
     </main>
   );
 }
@@ -576,23 +641,29 @@ function StarAward({
 }
 
 /**
- * The animals won so far, one slot per chapter, in world order.
+ * The book of animals: one page per chapter, in world order.
  *
- * A screen rather than a row along the bottom edge: that band belongs to the
- * sections now, and a record a child looks at has no business competing with
- * the app's own navigation for the place their hands land.
+ * A modal over the world rather than a screen of its own. It is a record of
+ * what a child has done, not a place to go, so looking at it does not move
+ * them and closing it does not cost them where they were standing.
  *
- * Display only: it is what a child has done, not another way to navigate. Its
- * slots exist from the first screen, so the row reads as a thing to fill rather
- * than a thing that grows.
+ * Every page carries its chapter's animal from the very first screen. Until it
+ * is won it is drawn as that animal's shadow, so the book shows a child which
+ * animal is still owed rather than merely that something is. Display only:
+ * nothing on the page is a button.
  */
-function CollectionScreen({
+function AnimalBook({
   slots,
+  stamping,
   onClose
 }: {
   slots: readonly CollectionSlotView[];
+  /** The chapter whose animal is landing right now, if one is. */
+  stamping: string | null;
   onClose: () => void;
 }) {
+  const close = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -601,14 +672,31 @@ function CollectionScreen({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
+  /*
+   * Focus moves in and comes back out again.
+   *
+   * A screen replacing another took this for granted — there was nothing left
+   * behind to tab into. An overlay leaves the whole world underneath, so a
+   * keyboard or a screen reader would otherwise wander into a map nobody can
+   * see.
+   */
+  useEffect(() => {
+    const restore = document.activeElement;
+    close.current?.focus();
+    return () => {
+      if (restore instanceof HTMLElement) restore.focus();
+    };
+  }, []);
+
   return (
-    <main
-      className="collection-screen"
+    <div
+      className="animal-book"
       role="dialog"
       aria-modal="true"
       aria-label="Mis animales"
     >
       <button
+        ref={close}
         type="button"
         className="menu__close"
         aria-label="Cerrar"
@@ -616,50 +704,39 @@ function CollectionScreen({
       >
         <CloseIcon />
       </button>
-      <section className="collection" ref={useDragScroll()}>
-        <ul className="collection__slots">
-          {slots.map((slot) => (
-            <li
-              key={slot.nodeId}
-              className="collection__slot"
-              data-filled={slot.animal !== null}
-            >
-              {slot.animal ? (
-                <>
-                  {/*
-                    Empty `alt`: the name is the accessible text, and a screen
-                    reader announcing the picture as well would say it twice.
+      <ul className="animal-book__pages">
+        {slots.map((slot) => (
+          <li
+            key={slot.nodeId}
+            className="animal-book__page"
+            data-earned={slot.earned}
+            data-stamping={slot.nodeId === stamping}
+          >
+            {/*
+              The same picture in both states, in the same place and at the
+              same size: winning one changes its colour and nothing else, so a
+              child finds the animal they just won exactly where its shadow
+              was.
 
-                    Spoken but not drawn, like the empty slot below it. A child of
-                    three does not read the label, the picture is the animal they
-                    remember winning, and a word under every square turns a row of
-                    animals into a row of text.
-                  */}
-                  <img src={slot.animal.imageUrl} alt="" />
-                  <span className="collection__name visually-hidden">
-                    {slot.animal.label}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="collection__empty" aria-hidden="true">
-                    ?
-                  </span>
-                  {/*
-                    Spoken but not drawn. An empty slot must say what it is to a
-                    screen reader without putting "todavía no" six times across a
-                    screen a child is looking at.
-                  */}
-                  <span className="visually-hidden">
-                    {slot.title}: todavía no
-                  </span>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
-    </main>
+              Empty `alt` throughout — the text beside it is the accessible
+              name, and a screen reader announcing the picture as well would
+              say it twice.
+            */}
+            <span className="animal-book__well">
+              <img src={slot.animal.imageUrl} alt="" />
+            </span>
+            {/*
+              Spoken but not drawn. A child of three does not read the label,
+              the picture is the animal they remember winning, and a word under
+              every page would turn the book into a page of text.
+            */}
+            <span className="animal-book__name visually-hidden">
+              {slot.earned ? slot.animal.label : `${slot.title}: todavía no`}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -675,7 +752,7 @@ function Chests({
   onOpen
 }: {
   reward: PendingRewardView;
-  onOpen: (nodeId: string, animal: CollectibleAnimal) => void;
+  onOpen: (reward: PendingRewardView) => void;
 }) {
   return (
     <main className="reward">
@@ -687,14 +764,20 @@ function Chests({
       */}
       <div className="reward__offer">
         <img className="duende" src="/world/duende.webp" alt="" />
+        {/*
+          Three chests, one animal. Which one a child opens changes nothing,
+          and that is the point: choosing is the ceremony, and a chapter that
+          could hand over any of three animals could not show the shadow of
+          what it owes in the book.
+        */}
         <ul className="chests">
-          {reward.choices.map((animal, index) => (
-            <li key={animal.animalId}>
+          {Array.from({ length: CHEST_COUNT }, (_unused, index) => (
+            <li key={index}>
               <button
                 type="button"
                 className="chest"
                 aria-label={`Abrir el cofre ${index + 1}`}
-                onClick={() => onOpen(reward.nodeId, animal)}
+                onClick={() => onOpen(reward)}
               >
                 <ChestIcon />
               </button>

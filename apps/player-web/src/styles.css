@@ -972,79 +972,156 @@ main { height: 100dvh; }
 .profile-failure h1 { margin: 0; font-size: clamp(1.3rem, 4vw, 2rem); }
 .profile-failure p { margin: 0; max-width: 42ch; line-height: 1.5; }
 
-/* ------------------------------------------------------------ collection */
+/* ------------------------------------------------------------ the book */
 
 /*
- * A screen, not a row along the bottom edge: that band belongs to the sections
- * now. The world is gone while this is up, so there is nothing underneath to
- * tap through.
- */
-.collection-screen {
-  position: relative;
-  display: grid;
-  align-content: center;
-  background: #2c1250;
-}
-
-/*
- * The animals, one slot per chapter. Display only — nothing here is a button.
+ * A sheet of paper laid over the world.
  *
- * No band behind them. Contrast is carried by the slots themselves: every
- * square is its own opaque tile, so the screen behind them never has to be the
- * background of anything.
+ * A modal rather than a screen: the world is still there underneath, dimmed,
+ * because looking at what you have collected is not going anywhere. The scrim
+ * is what makes the page readable over it and what says the world is not
+ * listening while the book is up.
  */
-.collection {
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: clamp(1rem, 4vh, 3rem) clamp(0.5rem, 3vw, 2rem);
-}
-
-/* Wrapping, now that it has a screen rather than a strip: a collection that
-   grew past the width would otherwise scroll out of a child's reach. */
-.collection__slots {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: start;
-  justify-content: center;
-  gap: clamp(0.4rem, 2vw, 1.5rem);
-  margin: 0 auto;
-  padding: 0;
-  list-style: none;
-}
-
-.collection__slot {
-  display: grid;
-  justify-items: center;
-  gap: 0.25rem;
-}
-
-/*
- * The empty slot and the filled one are the same square, so filling one moves
- * nothing: a child looking for the animal they just won finds it exactly where
- * the grey slot was.
- */
-.collection__slot > img,
-.collection__empty {
-  width: clamp(48px, 7vw, 92px);
-  height: clamp(48px, 7vw, 92px);
-  border-radius: 24%;
-  border: 3px dashed #c3b3d6;
-  background: #e7e1ef;
-}
-
-.collection__empty {
+.animal-book {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
   display: grid;
   place-items: center;
-  font-size: clamp(1.1rem, 2.5vw, 2rem);
-  font-weight: 800;
-  color: #a394b6;
+  padding: clamp(0.75rem, 3vh, 2.5rem);
+  background: rgb(20 6 40 / 0.72);
 }
 
-.collection__slot[data-filled="true"] > img {
-  border: 3px solid #95d5b2;
-  background: #fff;
+/*
+ * The page: ten places on one sheet, no scrolling and no page turns.
+ *
+ * The whole collection at once is the point — a child seeing every shadow they
+ * are still owed — so the badges shrink to fit rather than spilling into a
+ * scroll container a three-year-old has to discover.
+ */
+.animal-book__pages {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: clamp(0.35rem, 2vmin, 1.6rem);
+  width: min(100%, 62rem);
+  max-height: 100%;
+  margin: 0;
+  padding: clamp(1rem, 4vmin, 3rem) clamp(1rem, 4vmin, 3.5rem);
+  list-style: none;
+  border-radius: clamp(8px, 1.5vmin, 18px);
+  background: radial-gradient(120% 90% at 50% 0%, #fffaf0 0%, #f6ecd8 60%);
+  box-shadow:
+    0 18px 44px rgb(0 0 0 / 0.45),
+    inset 0 0 0 1px rgb(0 0 0 / 0.06);
+}
+
+/*
+ * One place, pressed into the paper.
+ *
+ * The well is the only frame there is. A card would make the page read as a row
+ * of buttons, and nothing here is pressable.
+ */
+.animal-book__page {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    rgb(160 130 80 / 0.1),
+    rgb(160 130 80 / 0) 72%
+  );
+  box-shadow:
+    inset 0 2px 5px rgb(90 70 40 / 0.18),
+    0 1px 0 rgb(255 255 255 / 0.7);
+}
+
+.animal-book__well {
+  display: grid;
+  place-items: center;
+  width: 78%;
+  height: 78%;
+}
+
+.animal-book__well > img {
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-  padding: 6%;
+}
+
+/*
+ * Not yet won: the animal's own artwork, flattened to ink on the paper.
+ *
+ * A shadow rather than an empty square, so the page promises a particular
+ * animal instead of merely saying that something is missing. It depends on the
+ * artwork carrying an alpha channel, which
+ * `apps/player-web/public/vocabulary/PROVENANCE.md` requires — an opaque source
+ * would draw a black rectangle here.
+ */
+.animal-book__page[data-earned="false"] .animal-book__well > img {
+  filter: brightness(0) saturate(0);
+  opacity: 0.18;
+}
+
+/* Won: the same picture in the same place, lifted off the page by its shadow. */
+.animal-book__page[data-earned="true"] .animal-book__well > img {
+  filter: drop-shadow(0 3px 3px rgb(90 60 20 / 0.35));
+}
+
+/*
+ * The stamp.
+ *
+ * The animal arrives from where the reveal left it — large, off to one side and
+ * tilted — holds a moment over its place, and comes down hard. The pause is
+ * what makes it read as being stamped rather than as landing.
+ *
+ * The total agrees with `STAMP_VISIBLE_MS` in `App.tsx`, which is what takes the
+ * book away again.
+ */
+@keyframes book-stamp {
+  0% {
+    transform: translate(-38vmin, -26vmin) scale(3) rotate(-16deg);
+    opacity: 0;
+  }
+  16% { opacity: 1; }
+  50% { transform: translate(0, -14%) scale(2) rotate(-10deg); }
+  62% { transform: translate(0, -16%) scale(2.05) rotate(-11deg); }
+  80% { transform: translate(0, 0) scale(0.85) rotate(4deg); }
+  90% { transform: translate(0, 0) scale(1.08) rotate(-2deg); }
+  100% { transform: translate(0, 0) scale(1) rotate(0); }
+}
+
+/* The paper taking the hit: a ring of gold thrown outward from the impact. */
+@keyframes book-stamp-puff {
+  0% { opacity: 0.9; transform: scale(0.55); }
+  100% { opacity: 0; transform: scale(1.9); }
+}
+
+.animal-book__page[data-stamping="true"] .animal-book__well {
+  animation: book-stamp 0.95s cubic-bezier(0.3, 0.6, 0.3, 1) both;
+}
+
+.animal-book__page[data-stamping="true"]::after {
+  content: "";
+  position: absolute;
+  inset: -6%;
+  border-radius: 50%;
+  border: 3px solid #c9a227;
+  animation: book-stamp-puff 0.5s ease-out 0.68s both;
+}
+
+/*
+ * Reduced motion: the book still opens and closes on the same timing, and the
+ * animal is simply already in its place. The ceremony is the book showing you
+ * what you won; the flight is only how it gets there.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .animal-book__page[data-stamping="true"] .animal-book__well,
+  .animal-book__page[data-stamping="true"]::after {
+    animation: none;
+  }
+  .animal-book__page[data-stamping="true"]::after { content: none; }
 }
 
 

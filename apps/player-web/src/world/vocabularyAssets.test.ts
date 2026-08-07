@@ -69,7 +69,7 @@ describe("every chapter's map icon is actually served", () => {
 });
 
 describe("every reward animal is actually served", () => {
-  const animals = worldNodes(world).flatMap((node) => node.reward.choices);
+  const animals = worldNodes(world).map((node) => node.reward.animal);
 
   it.each(animals.map((animal) => [animal.animalId, animal] as const))(
     "%s",

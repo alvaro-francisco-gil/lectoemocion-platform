@@ -86,7 +86,14 @@ function pathTitles(): (string | null | undefined)[] {
   );
 }
 
-/** Opens a chest and acknowledges the animal inside, landing back on the map. */
+/**
+ * Opens a chest and acknowledges the animal, landing back on the map.
+ *
+ * Acknowledging the reveal hands over to the book, which opens itself, stamps
+ * the animal in and closes itself again. Waiting that out is part of getting
+ * back to the world: a caller that carried on immediately would be tapping the
+ * map through an open modal.
+ */
 async function openChest(which = 1): Promise<string> {
   const chest = await screen.findByRole("button", {
     name: `Abrir el cofre ${which}`
@@ -95,6 +102,9 @@ async function openChest(which = 1): Promise<string> {
 
   const won = (await screen.findByRole("status")).textContent ?? "";
   fireEvent.click(screen.getByRole("button", { name: "Seguir" }));
+
+  await screen.findByRole("dialog", { name: "Mis animales" });
+  await closeTheBook();
   return won.replace(/[¡!]/g, "");
 }
 
@@ -139,21 +149,32 @@ function passAdultGate(): void {
 }
 
 /**
- * The animals, in world order — `null` for a slot still to fill.
+ * Waits out the beat the book stays up for after a stamp.
  *
- * The collection is a screen now, so reading it means opening it: this goes in,
- * reads the row, and closes it again, leaving the caller where it found them.
+ * It closes itself, so this is a wait rather than a click — and the timeout is
+ * generous because what it is waiting for is a real animation playing out.
+ */
+async function closeTheBook(): Promise<void> {
+  await waitFor(() => expect(bookDialog()).toBeNull(), { timeout: 4000 });
+}
+
+const bookDialog = () => screen.queryByRole("dialog", { name: "Mis animales" });
+
+/**
+ * The animals, in world order — `null` for a page still owed.
+ *
+ * The book is a modal, so reading it means opening it: this goes in, reads the
+ * page, and closes it again, leaving the caller where it found them.
  */
 function collection(container: HTMLElement): (string | null)[] {
   fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
-  const slots = [...container.querySelectorAll(".collection__slot")].map(
-    (slot) =>
-      slot.getAttribute("data-filled") === "true"
-        ? (slot.querySelector(".collection__name")?.textContent ?? "")
-        : null
+  const pages = [...container.querySelectorAll(".animal-book__page")].map((page) =>
+    page.getAttribute("data-earned") === "true"
+      ? (page.querySelector(".animal-book__name")?.textContent ?? "")
+      : null
   );
   fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
-  return slots;
+  return pages;
 }
 
 describe("the world shell", () => {
@@ -554,7 +575,7 @@ describe("the three sections", () => {
   });
 });
 
-describe("the collection screen", () => {
+describe("the book of animals", () => {
   beforeEach(() => {
     localStorage.clear();
     createGame.mockClear();
@@ -583,23 +604,57 @@ describe("the collection screen", () => {
     expect(screen.queryByRole("dialog", { name: "Mis animales" })).toBeNull();
   });
 
-  /* One screen at a time: the world is not left underneath to be tapped
-     through. */
-  it("puts the world away while it is open", async () => {
+  /*
+   * A record, not a place to go. The world stays where it was, so a child who
+   * looks at their animals has not lost the section or the scroll position they
+   * were standing in.
+   */
+  it("leaves the world where it was underneath", async () => {
     await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
 
-    expect(screen.queryByRole("navigation", { name: "Mundo" })).toBeNull();
+    expect(
+      screen.getByRole("navigation", { name: "Mundo" })
+    ).toBeInTheDocument();
   });
 
-  /* Slots are a record, not a route. */
-  it("keeps every slot unpressable", async () => {
+  /* Focus goes in and comes back, because the world is still behind it. */
+  it("takes focus in and gives it back on close", async () => {
+    await renderApp();
+    const paw = screen.getByRole("button", { name: "Mis animales" });
+    paw.focus();
+    fireEvent.click(paw);
+
+    expect(screen.getByRole("button", { name: "Cerrar" })).toHaveFocus();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
+    expect(paw).toHaveFocus();
+  });
+
+  /* Pages are a record, not a route. */
+  it("keeps every page unpressable", async () => {
     const { container } = await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
 
+    expect(container.querySelectorAll(".animal-book__pages button")).toHaveLength(0);
+  });
+
+  /*
+   * The shadow is the promise. A page shows which animal is still owed, drawn
+   * from the same picture that will fill it, so the book is never a row of
+   * anonymous holes.
+   */
+  it("draws every animal from the first screen, none of them earned", async () => {
+    const { container } = await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+
+    const pages = [...container.querySelectorAll(".animal-book__page")];
+    expect(pages).toHaveLength(worldNodes(world).length);
+    expect(pages.every((page) => page.getAttribute("data-earned") === "false"))
+      .toBe(true);
     expect(
-      container.querySelectorAll(".collection__slots button")
-    ).toHaveLength(0);
+      pages.map((page) => page.querySelector("img")?.getAttribute("src"))
+    ).toEqual(worldNodes(world).map((node) => node.reward.animal.imageUrl));
   });
 
   it("reaches the collection from the shelf as well as the games", async () => {
@@ -681,8 +736,12 @@ describe("the chest a chapter is worth", () => {
     );
   });
 
-  /* Three chests, three animals: which one the child gets is their choice. */
-  it("gives a different animal for a different chest", async () => {
+  /*
+   * Three chests, one animal. The choosing is the ceremony; what a chapter
+   * grants is a fact about the chapter, which is what lets the book draw the
+   * shadow of what it still owes.
+   */
+  it("gives the chapter's animal whichever chest is opened", async () => {
     await renderApp();
     await finishTheFirstChapter();
     const first = await openChest(1);
@@ -694,7 +753,32 @@ describe("the chest a chapter is worth", () => {
     await renderApp();
     await finishTheFirstChapter();
 
-    expect(await openChest(3)).not.toBe(first);
+    expect(await openChest(3)).toBe(first);
+  });
+
+  /*
+   * The reveal hands over to the book, which shows the animal arriving in its
+   * place and then takes itself away. Nothing is tapped: a child at the end of
+   * a chapter has already made every choice this ceremony asks for.
+   */
+  it("stamps the animal into the book and puts the book away again", async () => {
+    const { container } = await renderApp();
+    await finishTheFirstChapter();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Abrir el cofre 1" }));
+    await screen.findByRole("status");
+    fireEvent.click(screen.getByRole("button", { name: "Seguir" }));
+
+    const book = await screen.findByRole("dialog", { name: "Mis animales" });
+    const stamping = container.querySelectorAll('[data-stamping="true"]');
+    expect(stamping).toHaveLength(1);
+    expect(stamping[0]?.getAttribute("data-earned")).toBe("true");
+    expect(book).toBeInTheDocument();
+
+    await closeTheBook();
+    expect(
+      screen.getByRole("navigation", { name: "Mundo" })
+    ).toBeInTheDocument();
   });
 
   it("does not offer chests again for a chapter already rewarded", async () => {

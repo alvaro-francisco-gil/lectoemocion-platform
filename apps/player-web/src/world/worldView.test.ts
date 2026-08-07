@@ -12,13 +12,13 @@ import {
   type Progress
 } from "./worldView";
 
-/** Three animals for a node's chests, named after the node so they are traceable. */
-const chestsFor = (node: string) => ({
-  choices: ["a", "b", "c"].map((suffix) => ({
-    animalId: `${node}-${suffix}`,
-    label: `${node} ${suffix}`,
-    imageUrl: `/vocabulary/${node}-${suffix}.webp`
-  }))
+/** The one animal a chapter grants, named after it so it is traceable. */
+const grants = (node: string) => ({
+  animal: {
+    animalId: `${node}-animal`,
+    label: `${node} animal`,
+    imageUrl: `/vocabulary/${node}-animal.webp`
+  }
 });
 
 /**
@@ -37,7 +37,7 @@ const chain: World = parseWorld({
       surface: "juegos",
       unlockedBy: [],
       resource: { template: "name-story", seed: "one" },
-      reward: chestsFor("one")
+      reward: grants("one")
     },
     {
       id: "two",
@@ -46,7 +46,7 @@ const chain: World = parseWorld({
       surface: "juegos",
       unlockedBy: ["one"],
       resource: { template: "pairs-game", seed: "two", pairCount: 3 },
-      reward: chestsFor("two")
+      reward: grants("two")
     },
     {
       id: "three",
@@ -55,7 +55,7 @@ const chain: World = parseWorld({
       surface: "recursos",
       unlockedBy: [],
       resource: { template: "pairs-game", seed: "three", pairCount: 3 },
-      reward: chestsFor("three")
+      reward: grants("three")
     },
     {
       id: "four",
@@ -64,7 +64,7 @@ const chain: World = parseWorld({
       surface: "juegos",
       unlockedBy: ["two", "three"],
       resource: { template: "memory-album", seed: "four" },
-      reward: chestsFor("four")
+      reward: grants("four")
     }
   ]
 });
@@ -73,14 +73,14 @@ const chain: World = parseWorld({
  * Progress as it is after the chests have been dealt with.
  *
  * Most of these cases are about the graph, not the ceremony, so they claim
- * each completed node's first animal and move on.
+ * each completed node's animal and move on.
  */
 const progressAfter = (...completedNodes: string[]): Progress => ({
   completedNodes,
   lastPlayedNode: completedNodes.at(-1) ?? null,
   rewards: completedNodes.map((nodeId) => ({
     nodeId,
-    animalId: `${nodeId}-a`
+    animalId: `${nodeId}-animal`
   })),
   stars: completedNodes.length * STARS_PER_COMPLETION
 });
@@ -195,15 +195,19 @@ describe("the world's two surfaces", () => {
 
 describe("the collection and the chests owed for it", () => {
   const collectionOf = (view: ReturnType<typeof deriveWorldView>) =>
-    view.collection.map((slot) => [slot.nodeId, slot.animal?.animalId ?? null]);
+    view.collection.map((slot) => [slot.animal.animalId, slot.earned]);
 
-  it("gives a new player an empty slot for every chapter", () => {
+  /*
+   * The book shows the shadow of what is owed, not that something is owed, so
+   * every page carries its chapter's animal from the very first screen.
+   */
+  it("shows a new player every animal, none of them earned", () => {
     const view = deriveWorldView(chain, EMPTY_PROGRESS);
     expect(collectionOf(view)).toEqual([
-      ["one", null],
-      ["two", null],
-      ["three", null],
-      ["four", null]
+      ["one-animal", false],
+      ["two-animal", false],
+      ["three-animal", false],
+      ["four-animal", false]
     ]);
     expect(view.pendingReward).toBeNull();
   });
@@ -218,29 +222,27 @@ describe("the collection and the chests owed for it", () => {
 
     const owed = deriveWorldView(chain, finished);
     expect(owed.pendingReward?.nodeId).toBe("one");
-    expect(
-      owed.pendingReward?.choices.map((choice) => choice.animalId)
-    ).toEqual(["one-a", "one-b", "one-c"]);
+    expect(owed.pendingReward?.animal.animalId).toBe("one-animal");
 
     const claimed = deriveWorldView(chain, {
       ...finished,
-      rewards: [{ nodeId: "one", animalId: "one-b" }]
+      rewards: [{ nodeId: "one", animalId: "one-animal" }]
     });
     expect(claimed.pendingReward).toBeNull();
   });
 
-  it("fills the chapter's own slot with the animal the child chose", () => {
+  it("earns the chapter's own page and no other", () => {
     const view = deriveWorldView(chain, {
       completedNodes: ["one"],
       lastPlayedNode: "one",
-      rewards: [{ nodeId: "one", animalId: "one-c" }],
+      rewards: [{ nodeId: "one", animalId: "one-animal" }],
       stars: STARS_PER_COMPLETION
     });
     expect(collectionOf(view)).toEqual([
-      ["one", "one-c"],
-      ["two", null],
-      ["three", null],
-      ["four", null]
+      ["one-animal", true],
+      ["two-animal", false],
+      ["three-animal", false],
+      ["four-animal", false]
     ]);
   });
 
@@ -272,7 +274,7 @@ describe("the collection and the chests owed for it", () => {
       stars: STARS_PER_COMPLETION
     });
     expect(view.pendingReward?.nodeId).toBe("one");
-    expect(view.collection[0]?.animal).toBeNull();
+    expect(view.collection[0]?.earned).toBe(false);
   });
 });
 

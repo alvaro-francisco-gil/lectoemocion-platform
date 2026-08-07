@@ -10,7 +10,13 @@ import {
   type ResourceKind
 } from "@lectoemocion/template-sdk";
 
-/** Which animal a child chose out of a node's three chests. */
+/**
+ * The animal a node has already handed over.
+ *
+ * The animal is recorded rather than merely the node, so a content update that
+ * changes what a chapter grants is visible here: the stored animal stops
+ * matching, and the chapter honestly owes its chest again.
+ */
 export interface ClaimedReward {
   readonly nodeId: string;
   readonly animalId: string;
@@ -75,24 +81,29 @@ export interface WorldNodeView {
 }
 
 /**
- * One place in the collection, in world order.
+ * One page of the book, in world order.
  *
- * Every node has a slot from the very first screen, including locked ones: the
- * empty row is the promise, and a collection that grew a new slot each time
+ * Every node has a page from the very first screen, including locked ones: the
+ * empty book is the promise, and a collection that grew a new page each time
  * would show a child nothing to fill.
+ *
+ * The animal is here whether or not it has been won, because the page draws its
+ * shadow until it has: what a child is owed is a particular animal, and a page
+ * that did not know which one could only promise that *something* is missing.
  */
 export interface CollectionSlotView {
   readonly nodeId: string;
   readonly title: string;
-  /** `null` until the child has opened a chest for this node. */
-  readonly animal: CollectibleAnimal | null;
+  readonly animal: CollectibleAnimal;
+  /** False until the child has opened a chest for this node. */
+  readonly earned: boolean;
 }
 
 /** A finished node whose chests are still closed. */
 export interface PendingRewardView {
   readonly nodeId: string;
   readonly title: string;
-  readonly choices: readonly CollectibleAnimal[];
+  readonly animal: CollectibleAnimal;
 }
 
 export interface WorldView {
@@ -160,19 +171,16 @@ export function deriveWorldView(
   );
 
   /*
-   * A stored animal the node no longer offers resolves to nothing, which puts
+   * A stored animal the node no longer grants counts as unearned, which puts
    * the node back in the queue for a chest. Same reasoning as an unknown node
    * id: stored client state outlives a content update, and the honest recovery
-   * is to hand the reward out again rather than to leave a hole in the row.
+   * is to hand the reward out again rather than to leave a page a child has no
+   * way to fill.
    */
-  const earned = (node: WorldNode): CollectibleAnimal | null =>
-    node.reward.choices.find(
-      (choice) => choice.animalId === claimed.get(node.id)
-    ) ?? null;
+  const earned = (node: WorldNode): boolean =>
+    claimed.get(node.id) === node.reward.animal.animalId;
 
-  const owed = nodes.find(
-    (node) => completed.has(node.id) && earned(node) === null
-  );
+  const owed = nodes.find((node) => completed.has(node.id) && !earned(node));
 
   const project = (node: WorldNode): WorldNodeView => {
     /*
@@ -216,7 +224,8 @@ export function deriveWorldView(
     collection: nodes.map((node) => ({
       nodeId: node.id,
       title: node.title,
-      animal: earned(node)
+      animal: node.reward.animal,
+      earned: earned(node)
     })),
     pendingReward:
       owed === undefined
@@ -224,7 +233,7 @@ export function deriveWorldView(
         : {
             nodeId: owed.id,
             title: owed.title,
-            choices: owed.reward.choices
+            animal: owed.reward.animal
           }
   };
 }

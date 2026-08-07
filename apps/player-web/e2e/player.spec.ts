@@ -44,7 +44,7 @@ async function withProgress(page: Page, completedNodes: string[]) {
   const rewards = completedNodes.map((nodeId) => {
     const node = worldNodes(world).find((candidate) => candidate.id === nodeId);
     if (!node) throw new Error(`No such world node: ${nodeId}`);
-    return { nodeId, animalId: node.reward.choices[0]!.animalId };
+    return { nodeId, animalId: node.reward.animal.animalId };
   });
 
   await page.addInitScript(
@@ -167,18 +167,22 @@ test("finishing a chapter hands out an animal for the collection", async ({
 }) => {
   await page.goto("/");
 
-  const openCollection = () =>
+  const book = page.getByRole("dialog", { name: "Mis animales" });
+  const openBook = () =>
     page.getByRole("button", { name: "Mis animales" }).click();
-  const closeCollection = () =>
+  const closeBook = () =>
     page.getByRole("button", { name: "Cerrar", exact: true }).click();
-  const empty = page.locator('.collection__slot[data-filled="false"]');
-  const filled = page.locator('.collection__slot[data-filled="true"]');
+  const owed = page.locator('.animal-book__page[data-earned="false"]');
+  const earned = page.locator('.animal-book__page[data-earned="true"]');
 
-  /* One slot per chapter, counted from the world so a new one does not fail
-     this test for having been added. */
-  await openCollection();
-  await expect(empty).toHaveCount(worldNodes(world).length);
-  await closeCollection();
+  /* One page per chapter, counted from the world so a new one does not fail
+     this test for having been added. Every one of them draws its animal from
+     the first screen: the book shows which animal is owed, not merely that one
+     is. */
+  await openBook();
+  await expect(owed).toHaveCount(worldNodes(world).length);
+  await expect(owed.first().locator("img")).toBeVisible();
+  await closeBook();
 
   await page.getByRole("button", { name: ENTRY }).click();
   await completed(page, "encuentro");
@@ -190,10 +194,15 @@ test("finishing a chapter hands out an animal for the collection", async ({
   await chests.nth(1).click();
   await page.getByRole("button", { name: "Seguir" }).click();
 
-  await openCollection();
-  await expect(filled).toHaveCount(1);
-  await expect(filled.locator("img")).toBeVisible();
-  await expect(empty).toHaveCount(worldNodes(world).length - 1);
+  /* The book opens itself, stamps the animal in, and takes itself away. */
+  await expect(earned).toHaveCount(1);
+  await expect(earned.locator("img")).toBeVisible();
+  await expect(owed).toHaveCount(worldNodes(world).length - 1);
+  await expect(book).toBeHidden();
+
+  /* And it is still there when the child goes back to look. */
+  await openBook();
+  await expect(earned).toHaveCount(1);
 });
 
 test("the bar sits below the cards without covering them", async ({ page }) => {
