@@ -53,98 +53,95 @@ main { height: 100dvh; }
 .game-host { min-height: 0; display: grid; place-items: center; overflow: hidden; }
 .game-host canvas { max-width: 100%; max-height: 100%; touch-action: none; }
 
-/* ------------------------------------------------------------------- map */
+/* ----------------------------------------------------------------- world */
 
 /*
- * The world reads left to right as one path, so progress is a place you have
- * reached rather than a number.
+ * The world reads left to right as one row of cards, so progress is a place you
+ * have reached rather than a number.
  *
- * Two bands: the path, centred in the screen, and the collection over the
- * bottom edge. The path keeps the middle of the display — the reachable band on
- * a panel and the comfortable one on a tablet — while the row of animals sits
- * under it as a footer a child looks at rather than touches.
+ * Two bands: the row, holding the middle of the display — the reachable band on
+ * a panel and the comfortable one on a tablet — and the bar of sections over
+ * the bottom edge, where hands land.
  *
- * The collection is out of the flow on purpose. It grows a row taller on a
- * narrow screen and shorter on a wide one, and as a grid band it would drag the
- * path off the middle of the display every time it changed height. The path is
- * the thing a child aims at, so it is the thing that stays put.
+ * The bar and the collection button are out of the flow on purpose. They are
+ * fixed chrome, and as grid bands they would drag the row off the middle of the
+ * display whenever their height changed. The row is the thing a child aims at,
+ * so it is the thing that stays put.
  *
- * The region a child is standing in is the map's background rather than a
- * picture on it: `cover` from the centre, because each composition is a place
- * and its edges are what may be cropped, never the ground the path stands on.
- * The white wash above it is what buys the contrast — the barn's straw floor
- * and the forest's grass are both mid-tones under dark ink labels, and without
- * it the locked ones sit too close to the ground they are drawn on.
+ * Flat, not a scene. The backdrop used to be the place a child was standing in;
+ * with one world there is no place left to name, and a picture behind a row of
+ * picture cards is a second thing competing with the first. The colour is dark
+ * so that every card — each its own bright rectangle — carries the screen.
  */
-.map {
+.world {
   /*
-   * How big a chapter is, in one place.
+   * How big a card is, in one place.
    *
-   * The marker, the gap between markers and the height the connecting line is
-   * drawn at are all derived from it, so the path stays one row rather than
-   * three measurements that have to be kept in agreement by hand.
+   * The card, the gap between cards and the height the connecting line is drawn
+   * at are all derived from it, so the row stays one row rather than three
+   * measurements that have to be kept in agreement by hand.
    *
    * Bounded by the shorter side of the viewport as well as the wider one: the
-   * path is a middle band with the collection under it, and a marker sized off
-   * width alone would push that row off a laptop in landscape.
+   * row is a middle band with the bar under it, and a card sized off width
+   * alone would push that bar off a laptop in landscape.
    */
-  --node-size: clamp(112px, min(30vw, 26vh), 224px);
+  --card-width: clamp(150px, min(38vw, 34vh), 300px);
   position: relative;
   display: grid;
   grid-template-rows: 1fr;
   overflow: hidden;
-  /* `--map-scene` is set per region by the shell; the wash is the same for all. */
-  background:
-    linear-gradient(rgb(255 255 255 / 0.34), rgb(255 255 255 / 0.34)),
-    var(--map-scene) center / cover no-repeat;
+  background: #2c1250;
+  color: #f4eefc;
 }
 
 /*
- * The path itself scrolls, not the page. `.map` fills the screen exactly, so a
- * path wider than it has to take its overflow here.
+ * The row itself scrolls, not the page. `.world` fills the screen exactly, so a
+ * row wider than it has to take its overflow here.
  *
- * The band is the whole screen rather than a strip around the nodes, because
- * what a hand grabs to pan the world is the world: a child dragging the barn
- * floor or the sky above the path expects it to move, and a drag surface that
- * only starts a few pixels from a chapter is a target they cannot see. The path
- * is then centred *inside* that full-height band — `align-content` on the grid,
- * so the row keeps its own `flex-start` alignment and the connecting line stays
- * on one level across nodes with labels of different heights.
+ * The band is the whole screen rather than a strip around the cards, because
+ * what a hand grabs to pan the world is the world: a child dragging the space
+ * above or below the row expects it to move, and a drag surface that only
+ * starts a few pixels from a card is a target they cannot see. The row is then
+ * centred *inside* that full-height band — `align-content` on the grid, so the
+ * cards keep their own `flex-start` alignment and the connecting line stays on
+ * one level.
  */
-.map__world {
+.world__row {
   align-self: stretch;
   display: grid;
   align-content: center;
   overflow-x: auto;
   overflow-y: hidden;
   padding-block: clamp(0.75rem, 4vh, 3rem);
+  /* Clear of the bar, which floats over this band rather than pushing it. */
+  padding-bottom: clamp(6rem, 18vh, 11rem);
 }
 
 /*
  * Both bands are dragged, not scrolled with a bar.
  *
  * A scrollbar is a thin adult target at the edge of a band: it says nothing to
- * a child about what it does, and on an 86-inch panel the one under the path is
+ * a child about what it does, and on an 86-inch panel the one under the row is
  * not reachable at all. So it is hidden, and `useDragScroll` teaches the mouse
  * and the stylus the grab-and-pan a touchscreen already does. Keyboard reach is
- * unaffected — focusing a node still scrolls it into view.
+ * unaffected — focusing a card still scrolls it into view.
  */
-.map__world,
+.world__row,
 .collection {
   cursor: grab;
   user-select: none;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
 }
-.map__world::-webkit-scrollbar,
+.world__row::-webkit-scrollbar,
 .collection::-webkit-scrollbar { display: none; }
-.map__world[data-dragging],
+.world__row[data-dragging],
 .collection[data-dragging] { cursor: grabbing; }
 
 .world-path {
   display: flex;
   align-items: flex-start;
-  gap: clamp(0.5rem, 3vw, 2.5rem);
+  gap: clamp(0.75rem, 3vw, 2rem);
   margin: 0;
   padding: 0 clamp(1rem, 5vw, 4rem);
   list-style: none;
@@ -152,7 +149,7 @@ main { height: 100dvh; }
   justify-content: center;
 }
 
-/* The line that makes a row of buttons read as one journey. */
+/* The line that makes a row of cards read as one journey. */
 .world-path > li {
   position: relative;
   display: flex;
@@ -160,57 +157,53 @@ main { height: 100dvh; }
 .world-path > li + li::before {
   content: "";
   position: absolute;
-  /* Half a marker down, less half the line's own thickness: the middle of it. */
-  top: calc(var(--node-size) / 2 - 3px);
+  /* Half a card down — the card is 4:3, so that is 3/8 of its width — less half
+     the line's own thickness: the middle of it. */
+  top: calc(var(--card-width) * 3 / 8 - 3px);
   right: 100%;
-  width: clamp(0.5rem, 3vw, 2.5rem);
+  width: clamp(0.75rem, 3vw, 2rem);
   height: 6px;
   border-radius: 3px;
-  background: #d7c9ea;
+  background: rgb(255 255 255 / 0.28);
 }
 .world-path > li:has(.world-node[data-state="completed"]) + li::before {
-  background: #7b2cbf;
+  background: #f4c95d;
 }
 
 .world-node {
-  /* Wider than the marker, so a two-line title does not force the disc narrow. */
-  width: calc(var(--node-size) + 1.5rem);
+  width: var(--card-width);
   display: grid;
-  justify-items: center;
-  gap: 0.4rem;
   padding: 0;
   border: 0;
   background: none;
   font: inherit;
-  color: #402060;
+  color: inherit;
   cursor: pointer;
 }
-/* Dark enough to clear 4.5:1 against the straw floor behind it. A locked node
-   is told apart by its padlock and its label, never by being faint. */
-.world-node[disabled] { cursor: not-allowed; color: #3f3350; }
+.world-node[disabled] { cursor: not-allowed; }
 
 /*
- * The disc a chapter's picture sits in.
+ * The card a chapter's picture fills.
  *
- * `grid` with one cell, so the padlock stacks over the picture rather than
- * beside it. The picture is inset from the ring: an illustration drawn to the
- * edge of a circle loses its silhouette, which is the part a child recognises.
+ * 4:3 and rounded, with the picture covering it edge to edge: a rectangle is
+ * the shape that gives an illustration the most of itself, which is the part a
+ * child recognises. `grid` with one cell, so the padlock and the title chip
+ * stack over the picture rather than beside it.
  */
 .world-node__marker {
-  width: var(--node-size);
-  height: var(--node-size);
+  width: 100%;
+  aspect-ratio: 4 / 3;
   /*
-   * One definite cell, not `place-items`: the picture has to resolve its
-   * height against the disc rather than against itself, or a tall illustration
-   * sizes the cell to its own natural height and walks out of the circle and
-   * over the title beneath it.
+   * One definite cell, not `place-items`: the picture has to resolve its height
+   * against the card rather than against itself, or a tall illustration sizes
+   * the cell to its own natural height and walks out of the rectangle.
    */
   display: grid;
   grid-template: 1fr / 1fr;
-  padding: 8%;
-  border: 6px solid #7b2cbf;
-  border-radius: 50%;
-  background: #fff;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #4a2a75;
+  box-shadow: 0 8px 0 rgb(0 0 0 / 0.22);
 }
 .world-node__marker > * {
   grid-area: 1 / 1;
@@ -222,65 +215,88 @@ main { height: 100dvh; }
 .world-node__icon {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-}
-
-.world-node[data-state="completed"] .world-node__marker {
-  background: #95d5b2;
-  border-color: #4a3a63;
+  object-fit: cover;
 }
 
 /*
- * A locked chapter still shows its picture, faded, with the padlock over it:
- * what is behind the lock is the reason to come back for it. Faded, never
- * hidden — the state is also written under the node and read aloud, so the
- * dimming is never what carries it.
+ * The title on a chip over the bottom-left corner, not a line of text under the
+ * card. It is for the adult and the screen reader, and a word under every card
+ * turns a row of pictures into a row of labels; riding on the picture it reads
+ * as part of the card instead.
  */
-.world-node[data-state="locked"] .world-node__marker {
-  background: #e7e1ef;
-  border-color: #b9a7c9;
-}
-.world-node[data-state="locked"] .world-node__icon { opacity: 0.4; }
-
-.world-node__lock {
-  width: 45%;
-  height: 45%;
+.world-node__title {
+  place-self: end start;
+  z-index: 1;
+  max-width: 85%;
+  margin-bottom: 0.7rem;
+  padding: 0.3em 0.9em;
+  border-radius: 0 999px 999px 0;
+  background: #fff;
+  color: #241133;
+  font-weight: 800;
+  font-size: clamp(0.85rem, 1.6vw, 1.15rem);
+  line-height: 1.2;
+  text-align: left;
 }
 
 /*
- * The door into the region beside this one.
- *
- * Built as a chapter and then dressed as a place: the picture is a backdrop, a
- * wide rectangle, so it fills the disc rather than sitting inside it the way a
- * cut-out illustration does. Same size and same row as a chapter, because it is
- * the same gesture — the next thing along the road.
+ * Spoken, never drawn. The state is already carried by the padlock and by the
+ * star, and a second copy of it in words under every card is noise on a screen
+ * a child is looking at.
  */
-.region-door .world-node__marker { padding: 0; overflow: hidden; }
-.region-door .world-node__icon { object-fit: cover; border-radius: 50%; }
-.region-door[data-state="locked"] .world-node__icon { opacity: 0.35; }
+.world-node__state {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
-.region-door__way {
-  place-self: end center;
+/*
+ * A finished chapter wears a star in its corner rather than changing colour:
+ * the picture is the landmark a child navigates by, and repainting the card
+ * would move that landmark every time they finished something.
+ */
+.world-node[data-state="completed"] .world-node__marker::after {
+  content: "★";
+  place-self: start end;
+  z-index: 1;
+  width: 1.9em;
+  height: 1.9em;
+  margin: 0.55rem;
   display: grid;
   place-items: center;
-  width: 38%;
-  height: 38%;
-  margin-bottom: 6%;
   border-radius: 50%;
-  background: rgb(255 255 255 / 0.92);
-  color: #402060;
-}
-.region-door__way > svg { width: 70%; height: 70%; }
-/* The same arrow, turned around: one drawing, two directions. */
-.region-door[data-direction="on"] .region-door__way > svg {
-  transform: scaleX(-1);
+  background: #f4c95d;
+  color: #6b4a05;
+  font-size: clamp(0.8rem, 1.5vw, 1.1rem);
+  line-height: 1;
 }
 
-.world-node__title { font-weight: 700; font-size: 1rem; line-height: 1.2; }
-.world-node__state { font-size: 0.85rem; opacity: 0.8; }
+/*
+ * A locked chapter still shows its picture, dimmed, with the padlock over it:
+ * what is behind the lock is the reason to come back for it. Dimmed, never
+ * hidden — the state is also read aloud, so the dimming never carries it alone.
+ */
+.world-node[data-state="locked"] .world-node__marker { background: #3a2159; }
+.world-node[data-state="locked"] .world-node__icon { opacity: 0.35; }
+.world-node[data-state="locked"] .world-node__title {
+  background: #d9cfe8;
+  color: #4a3a63;
+}
 
-.world-node:focus-visible { outline: 3px solid #402060; outline-offset: 4px; }
-.world-node:not([disabled]):hover .world-node__marker { transform: scale(1.06); }
+.world-node__lock {
+  z-index: 1;
+  width: 34%;
+  height: 34%;
+}
+
+.world-node:focus-visible { outline: 4px solid #f4c95d; outline-offset: 4px; }
+.world-node:not([disabled]):hover .world-node__marker { transform: scale(1.04); }
 
 @media (prefers-reduced-motion: no-preference) {
   .world-node__marker { transition: transform 120ms ease-out; }
@@ -289,16 +305,16 @@ main { height: 100dvh; }
 /* ---------------------------------------------------------------- stars */
 
 /*
- * The running total, over the map's top-left corner.
+ * The running total, over the world's top-left corner.
  *
  * On the left because it is the child's number, and the corner opposite is
  * where the app's own controls live: what was won and what an adult can change
  * never share a corner.
  *
- * Out of the flow on purpose: the map is a two-band layout and the path owns
- * the middle of the screen, so a third band for one number would push the path
- * off centre. `pointer-events: none` because it is a readout, not a control —
- * it must never eat a tap aimed at the first node of the path.
+ * Out of the flow on purpose: the row of cards owns the middle of the screen,
+ * so a band for one number would push it off centre. `pointer-events: none`
+ * because it is a readout, not a control — it must never eat a tap aimed at the
+ * first card of the row.
  */
 .star-counter {
   position: absolute;
@@ -322,15 +338,109 @@ main { height: 100dvh; }
   height: 1.3em;
 }
 
+/* ---------------------------------------------------------- the sections */
+
+/*
+ * The three sections, as a pill floating over the bottom edge.
+ *
+ * Centred and low: this is the one piece of chrome a child uses, so it goes
+ * where their hands are, while the star counter and the menu keep the corners.
+ * Out of the flow so it cannot move the row of cards when its height changes,
+ * and `pointer-events` only on the pill itself, so the empty space beside it
+ * stays part of the surface a hand can grab to pan the world.
+ */
+.tab-bar {
+  position: absolute;
+  inset: auto 0 clamp(0.75rem, 3vh, 2rem);
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  pointer-events: none;
+}
+
+.tab-bar__tabs {
+  display: flex;
+  align-items: stretch;
+  gap: clamp(0.25rem, 2vw, 1.5rem);
+  margin: 0;
+  padding: 0.5rem clamp(0.75rem, 3vw, 2rem);
+  border-radius: 28px;
+  background: #4a2a75;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.35);
+  list-style: none;
+  pointer-events: auto;
+}
+
+.tab {
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  min-width: clamp(64px, 16vw, 130px);
+  padding: 0.4rem 0.6rem;
+  border: 0;
+  border-radius: 20px;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  font-size: clamp(0.75rem, 1.7vw, 1.05rem);
+  color: #d6c4ee;
+  cursor: pointer;
+}
+.tab__icon { display: grid; place-items: center; }
+.tab__icon > svg { width: clamp(24px, 5vw, 34px); height: auto; }
+
+/* Where you are standing, said twice: brighter, and on a plate of its own. */
+.tab[aria-current="page"] {
+  background: rgb(255 255 255 / 0.16);
+  color: #fff;
+}
+
+/* Shut. Dimmed here and said in words to a screen reader, never one alone. */
+.tab[disabled] {
+  color: #8a76a8;
+  cursor: not-allowed;
+}
+
+.tab:focus-visible { outline: 3px solid #f4c95d; outline-offset: 2px; }
+
+/*
+ * The way into the collection, beside the bar rather than in it.
+ *
+ * It is not a fourth section: the animals are a record of what a child has
+ * done, and a tab for them would put a place to look beside two places to go.
+ */
+.collection-button {
+  position: absolute;
+  right: clamp(0.5rem, 3vw, 2rem);
+  bottom: clamp(0.75rem, 3vh, 2rem);
+  z-index: 2;
+  width: clamp(56px, 11vw, 76px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #f4c95d;
+  color: #6b4a05;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.35);
+  cursor: pointer;
+}
+.collection-button > svg { width: 55%; height: auto; }
+.collection-button:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
 /* -------------------------------------------------------------- the menu */
 
 /*
- * The way into the app itself, in the map's top-right corner.
+ * The way into the app itself, in the world's top-right corner.
  *
  * High and in a corner: adult chrome may sit above the world, but never in the
- * band where a child's hands land on the path. Same disc as the way back out of
- * a game, because they are the same kind of control — the app talking, not the
- * world.
+ * band where a child's hands land — that band is the bar's. Same disc as the
+ * way back out of a game, because they are the same kind of control: the app
+ * talking, not the world.
  */
 .menu-button {
   position: absolute;
@@ -351,8 +461,8 @@ main { height: 100dvh; }
 .menu-button:hover { background: #fff; }
 .menu-button:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
 
-/* A screen, not a layer: the map is gone while this is up, so there is nothing
-   underneath to tap through. Empty until it holds something. */
+/* A screen, not a layer: the world is gone while this is up, so there is
+   nothing underneath to tap through. Empty until it holds something. */
 .menu {
   position: relative;
   background: #f6f2fb;
@@ -378,33 +488,38 @@ main { height: 100dvh; }
 /* ------------------------------------------------------------ collection */
 
 /*
- * The animals, one slot per chapter. Display only — nothing here is a button,
- * so it may sit at the very bottom edge where a stray hand rests, and it may
- * overlay the path rather than push it: out of the flow, it cannot move the one
- * thing on this screen a child aims at.
- *
- * No band behind it. The animals are kept in the barn, not in a drawer bolted
- * over it, so they stand on the floor of the room the framing story put the
- * child in. Contrast is carried by the slots themselves — every square is its
- * own opaque tile — which is what makes dropping the panel safe: nothing here
- * ever asks straw to be the background of a letter.
+ * A screen, not a row along the bottom edge: that band belongs to the sections
+ * now. The world is gone while this is up, so there is nothing underneath to
+ * tap through.
  */
-.collection {
-  position: absolute;
-  inset: auto 0 0;
-  z-index: 1;
-  padding: clamp(0.5rem, 1.5vh, 1.25rem) clamp(0.5rem, 3vw, 2rem)
-    clamp(0.75rem, 2.5vh, 2rem);
-  overflow-x: auto;
-  overflow-y: hidden;
+.collection-screen {
+  position: relative;
+  display: grid;
+  align-content: center;
+  background: #2c1250;
 }
 
+/*
+ * The animals, one slot per chapter. Display only — nothing here is a button.
+ *
+ * No band behind them. Contrast is carried by the slots themselves: every
+ * square is its own opaque tile, so the screen behind them never has to be the
+ * background of anything.
+ */
+.collection {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: clamp(1rem, 4vh, 3rem) clamp(0.5rem, 3vw, 2rem);
+}
+
+/* Wrapping, now that it has a screen rather than a strip: a collection that
+   grew past the width would otherwise scroll out of a child's reach. */
 .collection__slots {
   display: flex;
+  flex-wrap: wrap;
   align-items: start;
   justify-content: center;
   gap: clamp(0.4rem, 2vw, 1.5rem);
-  min-width: max-content;
   margin: 0 auto;
   padding: 0;
   list-style: none;
