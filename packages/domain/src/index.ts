@@ -6,6 +6,8 @@ export {
   childRecordId,
   groupId,
   mediaAssetId,
+  prizeId,
+  prizeImageId,
   resourceId,
   templateId,
   vocabularyItemId
@@ -16,6 +18,8 @@ export type {
   ChildRecordId,
   GroupId,
   MediaAssetId,
+  PrizeId,
+  PrizeImageId,
   ResourceId,
   TemplateId,
   VocabularyItemId

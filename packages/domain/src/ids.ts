@@ -10,11 +10,13 @@ export type Branded<Value, Name extends string> = Value & {
 };
 
 export type AccountId = Branded<string, "AccountId">;
-export type GroupId = Branded<string, "GroupId">;
 export type ChildRecordId = Branded<string, "ChildRecordId">;
+export type GroupId = Branded<string, "GroupId">;
 export type MediaAssetId = Branded<string, "MediaAssetId">;
-export type TemplateId = Branded<string, "TemplateId">;
+export type PrizeId = Branded<string, "PrizeId">;
+export type PrizeImageId = Branded<string, "PrizeImageId">;
 export type ResourceId = Branded<string, "ResourceId">;
+export type TemplateId = Branded<string, "TemplateId">;
 export type VocabularyItemId = Branded<string, "VocabularyItemId">;
 
 function requireNonEmpty(kind: string, value: string): string {
@@ -32,24 +34,32 @@ export function accountId(value: string): AccountId {
   return requireNonEmpty("AccountId", value) as AccountId;
 }
 
-export function groupId(value: string): GroupId {
-  return requireNonEmpty("GroupId", value) as GroupId;
-}
-
 export function childRecordId(value: string): ChildRecordId {
   return requireNonEmpty("ChildRecordId", value) as ChildRecordId;
+}
+
+export function groupId(value: string): GroupId {
+  return requireNonEmpty("GroupId", value) as GroupId;
 }
 
 export function mediaAssetId(value: string): MediaAssetId {
   return requireNonEmpty("MediaAssetId", value) as MediaAssetId;
 }
 
-export function templateId(value: string): TemplateId {
-  return requireNonEmpty("TemplateId", value) as TemplateId;
+export function prizeId(value: string): PrizeId {
+  return requireNonEmpty("PrizeId", value) as PrizeId;
+}
+
+export function prizeImageId(value: string): PrizeImageId {
+  return requireNonEmpty("PrizeImageId", value) as PrizeImageId;
 }
 
 export function resourceId(value: string): ResourceId {
   return requireNonEmpty("ResourceId", value) as ResourceId;
+}
+
+export function templateId(value: string): TemplateId {
+  return requireNonEmpty("TemplateId", value) as TemplateId;
 }
 
 export function vocabularyItemId(value: string): VocabularyItemId {
