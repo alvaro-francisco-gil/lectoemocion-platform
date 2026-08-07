@@ -8,6 +8,7 @@ export { syntheticClass } from "./fixtures/syntheticClass";
 export { createIllustratedStoryResource } from "./illustratedStory";
 export { createInitialsGameResource } from "./initialsGame";
 export { createMemoryAlbumResource } from "./memoryAlbum";
+export { createNameBookResource } from "./nameBook";
 export { createNameStoryResource } from "./nameStory";
 export {
   createInitialLetterGameResource,
