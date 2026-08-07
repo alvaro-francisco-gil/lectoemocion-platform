@@ -18,8 +18,8 @@ the record of why the concept changed.
 
 ## Decision
 
-Letriestrellas fill a meter toward a goal an adult sets — 30 by default.
-Reaching it awards a wrapped gift (`Prize` in code, "regalo" on screen — a
+Letriestrellas fill a meter toward a goal an adult sets. Reaching it awards a
+wrapped gift (`Prize` in code, "regalo" on screen — a
 second thing named "chest" would collide with the three chests a child already
 chooses an animal from). An adult, behind a birth-year gate, says what is
 inside; the child opens it and a reveal shows an illustration and a phrase, or
@@ -87,32 +87,21 @@ failure instead of a blank card in a child's hands.
 
 ## What this binds
 
-**A ceremony must resolve its subject by identity, not by re-deriving "what's
-current."** The reveal screen first read its prize from the `pending` list —
-the same list `derivePrizeView` filters to *unopened* prizes by definition.
-Opening a gift made it vanish from that list on the next render, so tapping
-"¡Ábrelo!" showed the map, or a different waiting prize, instead of the reveal
-just earned. Every unit test passed, because each one asserted the pure
-derivation in isolation; only wiring the ceremony to a real, re-rendering
-shell exposed that the screen and the state it read had opposite lifetimes.
-The fix holds the ceremony's subject as an id chosen once, not a value
-recomputed from a filtered list on every render — the same shape as any other
-screen whose subject must survive the state it was opened from changing
-underneath it.
+**A ceremony holds its subject as an id chosen once, never a value re-derived
+from a list that can filter it out mid-render.** The reveal screen originally
+read its prize from `pending`, which `derivePrizeView` defines as *unopened*
+prizes — so opening a gift removed it from the very list the screen was
+reading, and every unit test still passed because each one asserted the pure
+derivation in isolation, not the wiring. Any screen whose subject must survive
+a state change triggered by that screen's own action follows this rule.
 
-**A touch target proven correct in isolation must still be proven reachable
-in the layout it actually ships in.** The map's waiting gift rendered, sat at
-a plausible position, and passed every component test — and was untappable on
-the classroom-HD and 4K viewports, because it shared the same bottom-of-screen
-band as the animal collection strip, whose own row of tiles absorbed the tap
-first. Nothing in jsdom detects two elements occupying the same physical
-region; only a real browser at real viewport sizes did. The fix reserves the
-gift a vertical band the collection's own tallest possible height cannot
-reach, rather than a fixed offset that happened to clear today's layout.
-Both bugs are the same shape: the player's reach-band and hit-target rules
-must be checked in a real browser at the viewports it ships to, not asserted
-from a component test's DOM alone — `pnpm test:e2e` earns its place in every
-change that touches the map or a ceremony for exactly this reason.
+**A touch target is proven reachable in the real layout it ships in, not only
+in a component test's DOM.** The map's waiting gift rendered correctly and
+passed every component test while sharing a hit region with the collection
+strip below it on wider viewports, which absorbed the tap first — a class of
+overlap jsdom cannot detect. `pnpm test:e2e` in a real browser, at the
+viewports the player ships to, is required for any change touching the map or
+a ceremony for exactly this reason.
 
 ## Revisit when
 
