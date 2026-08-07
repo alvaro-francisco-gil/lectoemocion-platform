@@ -17,4 +17,5 @@ export {
   createSyllablesGameResource,
   createWordPictureGameResource
 } from "./vocabularyGames";
+export { PRIZE_PRESET_PHRASES, prizePresetPhrase } from "./prizes";
 export { createResourceForNode, world } from "./world";
