@@ -719,3 +719,39 @@ test("the initial-syllable game is won by dragging the match onto the target", a
   await completed(page, "empieza-igual");
   expect(failures).toEqual([]);
 });
+
+/*
+ * The drawer is the one thing in this app that floats over the world, so it is
+ * the one thing that can push the page out of the viewport without any other
+ * test noticing. On a phone it is most of the screen; on a 4K panel it must not
+ * stretch to the width of the room.
+ */
+test("the profile drawer fits the viewport and covers the world", async ({
+  page
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Quién juega/ }).click();
+
+  const drawer = page.getByRole("dialog", { name: "Quién juega" });
+  await expect(drawer).toBeVisible();
+
+  const viewport = await page.evaluate(() => ({
+    width: innerWidth,
+    height: innerHeight
+  }));
+  const box = (await drawer.boundingBox())!;
+  expect(box.width).toBeLessThanOrEqual(viewport.width);
+  expect(box.height).toBeLessThanOrEqual(viewport.height + 1);
+
+  const scroll = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    scrollHeight: document.documentElement.scrollHeight
+  }));
+  expect(scroll.scrollWidth).toBeLessThanOrEqual(viewport.width);
+  expect(scroll.scrollHeight).toBeLessThanOrEqual(viewport.height);
+
+  /* The scrim is what makes the world behind it untouchable. */
+  const scrim = (await page.locator(".profile-menu__scrim").boundingBox())!;
+  expect(scrim.width).toBeGreaterThanOrEqual(viewport.width - 1);
+  expect(scrim.height).toBeGreaterThanOrEqual(viewport.height - 1);
+});

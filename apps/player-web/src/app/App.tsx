@@ -22,15 +22,34 @@ import {
   type Progress,
   type WorldNodeView
 } from "../world/worldView";
-import { LOCAL_OWNER, LocalProgressStore } from "../world/progressStore";
+import { LocalProgressStore } from "../world/progressStore";
 import { unlockAllEnabled } from "../world/unlockAll";
 import { useDragScroll } from "./useDragScroll";
+import { avatarImageUrl } from "../profiles/avatarCatalogue";
+import {
+  LocalProfileStore,
+  ProfileStoreError,
+  type ProfileBook,
+  type ProfileDraft
+} from "../profiles/profileStore";
+import { ProfileMenu } from "./ProfileMenu";
 
-const store = new LocalProgressStore(
-  typeof localStorage === "undefined"
-    ? { getItem: () => null, setItem: () => undefined }
-    : localStorage,
-  LOCAL_OWNER
+/*
+ * A store that answers nothing, for a browser that has no storage at all —
+ * private mode, or a locked-down panel. The session still plays; it just does
+ * not persist.
+ */
+const memoryStorage = {
+  getItem: () => null,
+  setItem: () => undefined,
+  removeItem: () => undefined
+};
+
+const browserStorage =
+  typeof localStorage === "undefined" ? memoryStorage : localStorage;
+
+const profiles = new LocalProfileStore(browserStorage, () =>
+  crypto.randomUUID()
 );
 
 /**
@@ -67,8 +86,14 @@ const CARD_TINTS = 6;
  *
  * Exactly one screen is on at a time: a playing resource, the letriestrellas
  * just won, the animal just revealed, the chests owed for a first finish, the
- * menu, the collection, or a section. They are exclusive rather than layered so
- * that nothing a child can touch is ever hidden behind something else.
+ * collection, or a section. They are exclusive rather than layered so that
+ * nothing a child can touch is ever hidden behind something else.
+ *
+ * The profile drawer is the one exception, and is a layer over the world
+ * rather than a screen of its own. A child needs to see the world is still
+ * there while an adult changes who is playing; what the exclusivity rule was
+ * protecting — a tap landing on something hidden — is handled instead by the
+ * scrim and by `select` refusing while the drawer is up.
  */
 export function App() {
   const [progress, setProgress] = useState<Progress>(EMPTY_PROGRESS);
@@ -85,10 +110,24 @@ export function App() {
    * this the reveal would vanish in the same frame the chest opened.
    */
   const [revealed, setRevealed] = useState<CollectibleAnimal | null>(null);
-  /* The menu is a screen of its own, so whether it is on is part of which one. */
+  /*
+   * The drawer is a layer rather than a screen, so it is not part of which
+   * screen is on: the world stays mounted underneath it.
+   */
   const [menuOpen, setMenuOpen] = useState(false);
   /* The collection is a screen too, for the same reason and in the same shape. */
   const [collectionOpen, setCollectionOpen] = useState(false);
+  /*
+   * Everyone who plays on this device. `null` until the first read lands —
+   * which is a frame, and the corner simply has no face in it until then.
+   */
+  const [book, setBook] = useState<ProfileBook | null>(null);
+  /*
+   * A profile problem an adult has to see. Profiles cannot be re-derived from
+   * anything on the device, so this fails closed rather than resetting: the
+   * unreadable data is left exactly where it is, to be recovered.
+   */
+  const [profileError, setProfileError] = useState<string | null>(null);
   /*
    * Which section the child is standing in. Session state, deliberately not
    * stored: the app is for playing, so it opens on the games rather than on
@@ -100,13 +139,50 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    void store.read().then((stored) => {
+    void profiles.read().then(
+      (next) => {
+        if (!cancelled) setBook(next);
+      },
+      (error: unknown) => {
+        if (!cancelled) setProfileError(describeProfileFailure(error));
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /*
+   * One progress store per child, namespaced by their profile id. This is the
+   * seam `progressStore.ts` was written with: what used to be the constant
+   * `LOCAL_OWNER` is now whoever is playing, and the starter profile carries
+   * that same string so nothing already on the device moves.
+   */
+  const selectedId = book?.selectedId ?? null;
+  const progressStore = useMemo(
+    () =>
+      selectedId === null
+        ? null
+        : new LocalProgressStore(browserStorage, selectedId),
+    [selectedId]
+  );
+
+  useEffect(() => {
+    if (progressStore === null) return;
+    let cancelled = false;
+    /*
+     * Cleared before the read, not after it. Holding the previous child's
+     * total on screen for the frame it takes to load the next one shows a
+     * child stars that are not theirs.
+     */
+    setProgress(EMPTY_PROGRESS);
+    void progressStore.read().then((stored) => {
       if (!cancelled) setProgress(stored);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [progressStore]);
 
   const view = useMemo(
     () => deriveWorldView(world, progress, { unlockAll: unlockAllEnabled() }),
@@ -120,38 +196,65 @@ export function App() {
 
   const select = useCallback(
     (nodeId: string) => {
+      /*
+       * Nothing in the world opens while the drawer is up. The scrim already
+       * covers it, but a stylesheet is not a guarantee — one missed
+       * `pointer-events` rule would drop a child into a game they never chose.
+       */
+      if (menuOpen) return;
       const target = view.nodes.find((node) => node.id === nodeId);
       /* Dimming a locked node is presentation; refusing to open it is the rule. */
       if (!target?.playable) return;
       setActiveNodeId(nodeId);
     },
-    [view]
+    [view, menuOpen]
   );
 
-  const complete = useCallback((nodeId: string) => {
-    void store.recordCompletion(nodeId).then((next) => {
-      setProgress(next);
-      /*
-       * Every finish leaves the game, because every finish is paid: the stars
-       * come first and the chests, when a chapter is owed them, come after.
-       * Banked before they are shown, for the same reason as the animal — a
-       * child who is told they won something and then loses it to a closing
-       * tab has been given nothing.
-       */
-      setActiveNodeId(null);
-      setAwarded(STARS_PER_COMPLETION);
-    });
-  }, []);
+  const complete = useCallback(
+    (nodeId: string) => {
+      if (progressStore === null) return;
+      void progressStore.recordCompletion(nodeId).then((next) => {
+        setProgress(next);
+        /*
+         * Every finish leaves the game, because every finish is paid: the stars
+         * come first and the chests, when a chapter is owed them, come after.
+         * Banked before they are shown, for the same reason as the animal — a
+         * child who is told they won something and then loses it to a closing
+         * tab has been given nothing.
+         */
+        setActiveNodeId(null);
+        setAwarded(STARS_PER_COMPLETION);
+      });
+    },
+    [progressStore]
+  );
 
-  const openChest = useCallback((nodeId: string, animal: CollectibleAnimal) => {
-    /*
-     * Recorded before it is shown. A child who is handed an animal and then
-     * loses it to a closing tab has been given nothing, and the reveal is the
-     * one part of this that can safely be replayed.
-     */
-    setRevealed(animal);
-    void store.claimReward(nodeId, animal.animalId).then(setProgress);
-  }, []);
+  const openChest = useCallback(
+    (nodeId: string, animal: CollectibleAnimal) => {
+      if (progressStore === null) return;
+      /*
+       * Recorded before it is shown. A child who is handed an animal and then
+       * loses it to a closing tab has been given nothing, and the reveal is the
+       * one part of this that can safely be replayed.
+       */
+      setRevealed(animal);
+      void progressStore.claimReward(nodeId, animal.animalId).then(setProgress);
+    },
+    [progressStore]
+  );
+
+  /*
+   * Every profile change lands here, so the drawer never holds a book of its
+   * own to drift from this one.
+   */
+  const applyProfileChange = useCallback(
+    (change: Promise<ProfileBook>) => {
+      void change.then(setBook, (error: unknown) => {
+        setProfileError(describeProfileFailure(error));
+      });
+    },
+    []
+  );
 
   useEffect(() => {
     const parent = host.current;
@@ -162,6 +265,38 @@ export function App() {
     );
     return () => game.destroy(true);
   }, [activeNode, complete]);
+
+  /*
+   * Profiles that cannot be read stop everything, deliberately.
+   *
+   * Invariant 6: this is a broken invariant, not a missing nicety, and the
+   * alternative — carrying on with an invented profile — would write a fresh
+   * book over the one that failed to parse and destroy a family's progress
+   * with it. Nothing is written until an adult has seen this.
+   */
+  if (profileError !== null) {
+    return (
+      <main className="profile-failure" role="alert">
+        <h1>No se pueden leer los perfiles</h1>
+        <p>{profileError}</p>
+        <p>
+          No se ha borrado nada. Vuelve a abrir la aplicación; si sigue igual,
+          avisa a quien la instaló.
+        </p>
+      </main>
+    );
+  }
+
+  /*
+   * Nothing is playable until the app knows whose progress it would be writing.
+   *
+   * The window is a microtask against local storage, but it is not nothing: a
+   * chapter finished inside it would have no profile to pay, and the stars
+   * would be dropped. Waiting is the only answer that cannot lose them.
+   */
+  if (book === null) {
+    return <main className="loading" aria-busy="true" aria-label="Cargando" />;
+  }
 
   if (activeNode) {
     return (
@@ -191,10 +326,6 @@ export function App() {
     return <Chests reward={view.pendingReward} onOpen={openChest} />;
   }
 
-  if (menuOpen) {
-    return <Menu onClose={() => setMenuOpen(false)} />;
-  }
-
   if (collectionOpen) {
     return (
       <CollectionScreen
@@ -205,18 +336,22 @@ export function App() {
   }
 
   const standing = tab === "juegos" ? view.games : view.resources;
+  const playing =
+    book.profiles.find((profile) => profile.id === book.selectedId) ?? null;
 
   return (
     <main className="world">
+      {playing ? (
+        <button
+          type="button"
+          className="profile-button"
+          aria-label={`Quién juega: ${playing.name}`}
+          onClick={() => setMenuOpen(true)}
+        >
+          <img src={avatarImageUrl(playing.avatarId)} alt="" />
+        </button>
+      ) : null}
       <StarCounter stars={view.stars} />
-      <button
-        type="button"
-        className="menu-button"
-        aria-label="Menú"
-        onClick={() => setMenuOpen(true)}
-      >
-        <MenuIcon />
-      </button>
       {/*
         An ordered list because a section is a sequence: that is what a screen
         reader should hear, and it is what the connecting line draws.
@@ -253,6 +388,21 @@ export function App() {
       >
         <PawIcon />
       </button>
+      {menuOpen ? (
+        <ProfileMenu
+          book={book}
+          today={new Date()}
+          onClose={() => setMenuOpen(false)}
+          onSelect={(id) => applyProfileChange(profiles.select(id))}
+          onAdd={(draft: ProfileDraft) =>
+            applyProfileChange(profiles.add(draft))
+          }
+          onUpdate={(id, draft) =>
+            applyProfileChange(profiles.update(id, draft))
+          }
+          onRemove={(id) => applyProfileChange(profiles.remove(id))}
+        />
+      ) : null}
     </main>
   );
 }
@@ -340,13 +490,30 @@ function Tab({
 }
 
 /**
- * Every letriestrella won so far, in the map's top-left corner.
+ * What to tell an adult when a profile operation fails.
+ *
+ * `ProfileStoreError` carries a message written for them; anything else is a
+ * defect, and saying so is more use than showing its internals.
+ */
+function describeProfileFailure(error: unknown): string {
+  return error instanceof ProfileStoreError
+    ? error.message
+    : "Ha ocurrido un fallo inesperado.";
+}
+
+/**
+ * Every letriestrella won so far, in the world's top-right corner.
  *
  * A running total rather than a per-chapter mark: stars are paid for playing,
  * including replaying, and a number that only ever goes up is the part of the
  * world a child can move on their own. It is display only — nothing here is
- * pressable — and it lives on the map alone, because a total counting up
+ * pressable — and it lives on the world alone, because a total counting up
  * beside a running game is a second thing to watch.
+ *
+ * It moved here from the left when the avatar took that corner. The rule it
+ * was placed by is unchanged: what was won and what an adult can change never
+ * share a corner. They traded sides, and the child's own face earned the more
+ * prominent one because it is what a pre-reader reads first.
  */
 function StarCounter({ stars }: { stars: number }) {
   return (
@@ -354,38 +521,6 @@ function StarCounter({ stars }: { stars: number }) {
       <StarIcon />
       <span className="star-counter__count">{stars}</span>
     </section>
-  );
-}
-
-/**
- * The adult's way in, in the map's top-right corner.
- *
- * Empty for now: it is the place the app's own settings will live, kept apart
- * from the world so that nothing on the map is about the app rather than about
- * playing. It takes the screen rather than floating over the map, like every
- * other screen here — a panel a child can tap through is a way to leave the
- * world by accident.
- */
-function Menu({ onClose }: { onClose: () => void }) {
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-
-  return (
-    <main className="menu" role="dialog" aria-modal="true" aria-label="Menú">
-      <button
-        type="button"
-        className="menu__close"
-        aria-label="Cerrar el menú"
-        onClick={onClose}
-      >
-        <CloseIcon />
-      </button>
-    </main>
   );
 }
 
@@ -760,21 +895,6 @@ function PawIcon() {
       <path
         d="M12 11c3.2 0 5.6 2.4 5.6 4.9 0 2-1.6 3.1-3.4 3.1-1 0-1.6-.4-2.2-.4s-1.2.4-2.2.4c-1.8 0-3.4-1.1-3.4-3.1C6.4 13.4 8.8 11 12 11Z"
         fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-/** Three bars: the one shape an adult reads as "everything else" without a word. */
-function MenuIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
-      <path
-        d="M4 7h16M4 12h16M4 17h16"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
       />
     </svg>
   );
