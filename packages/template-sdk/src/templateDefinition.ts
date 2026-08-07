@@ -26,6 +26,7 @@ export type SelectionStrategy =
  */
 export const TEMPLATE_KINDS: Record<TemplateIdentifier, ResourceKind> = {
   "name-story": "cinematic",
+  "name-book": "cinematic",
   "illustrated-story": "cinematic",
   "initials-game": "minigame",
   "memory-album": "non-interactive",
@@ -39,4 +40,35 @@ export const TEMPLATE_KINDS: Record<TemplateIdentifier, ResourceKind> = {
 
 export function templateKind(id: TemplateIdentifier): ResourceKind {
   return TEMPLATE_KINDS[id];
+}
+
+/**
+ * Which templates cannot be built without a roster.
+ *
+ * Total over `TemplateIdentifier` for the same reason as `TEMPLATE_KINDS`: a
+ * new template must not silently inherit "plays on defaults", because that is
+ * the product's central promise and the one thing a reviewer would want to have
+ * been asked about.
+ *
+ * Exactly one is `true` today, and that is the point. `name-book` is the book
+ * of the class's own names, so with nobody recorded there is no book — the
+ * world shows it locked with an adult-facing reason rather than opening it onto
+ * nothing.
+ */
+export const TEMPLATES_NEEDING_ROSTER: Record<TemplateIdentifier, boolean> = {
+  "name-story": false,
+  "name-book": true,
+  "illustrated-story": false,
+  "initials-game": false,
+  "memory-album": false,
+  "pairs-game": false,
+  "word-picture-game": false,
+  "initial-letter-game": false,
+  "syllables-game": false,
+  "initial-syllable-game": false,
+  "letters-game": false
+};
+
+export function templateNeedsRoster(id: TemplateIdentifier): boolean {
+  return TEMPLATES_NEEDING_ROSTER[id];
 }
