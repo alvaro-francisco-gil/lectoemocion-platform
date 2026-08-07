@@ -299,3 +299,205 @@ Then `pnpm check`, and `pnpm test:e2e` because the player changed.
 
 The durable rationale — that one template is allowed to require personalisation,
 and why — belongs in `docs/decisions/` as an ADR, and this plan is deleted.
+
+---
+
+# Implementation plan
+
+**Status:** In progress on `feat/libro-nombres`. Task 1 next.
+
+**Architecture:** A new manifest branch (`name-book`) whose pages carry
+`PersonalisedCharacter` values grouped by `verifiedInitial`; a total
+`TEMPLATES_NEEDING_ROSTER` record that gives the world a fourth node state; and
+a second book renderer sharing page chrome with the illustrated story.
+
+**Tech stack:** TypeBox + Ajv schemas, Phaser 4 renderers, Vitest, pnpm
+workspaces. No new dependencies.
+
+## Global constraints
+
+- Template id `name-book`, version `1`. Kind `cinematic`.
+- Pages: 1–27. Names per page: 1–30. Grapheme: 1–2 characters.
+- Ordering everywhere through a single `Intl.Collator("es")`.
+- No `any`, no `@ts-ignore`; every switch over a union ends in `assertNever`.
+- Spanish user-facing copy. Locked line: «Añade los nombres y las fotos de los
+  niños para abrir este libro».
+- Synthetic children only. No real names, photos, or recordings.
+- RED → GREEN → REFACTOR, and a commit per task.
+
+## File structure
+
+| File | Responsibility |
+|---|---|
+| `packages/resource-schema/src/nameBookPage.ts` | `NameBookPageSchema`, `pageLetterLabel` |
+| `packages/resource-schema/src/resourceManifest.ts` | `NameBookManifestSchema` joins the union |
+| `packages/template-catalog/src/nameBook.ts` | `createNameBookResource` |
+| `packages/template-catalog/src/mediaUrl.ts` | asset id → URL, the capture seam |
+| `packages/template-sdk/src/templateDefinition.ts` | `TEMPLATES_NEEDING_ROSTER` |
+| `apps/player-web/src/game/templates/bookChrome.ts` | pills, picker, progress, curtain |
+| `apps/player-web/src/game/templates/renderNameBook.ts` | the book's screen |
+| `apps/player-web/src/world/devRoster.ts` | the DEV-only roster decision |
+| `scripts/generate-synthetic-cast.mjs` | synthetic avatars and silent audio |
+
+## Task 1 — the page and manifest schemas
+
+**Files:** create `packages/resource-schema/src/nameBookPage.ts` and its test;
+modify `resourceManifest.ts`, `index.ts`.
+
+**Produces:**
+```ts
+export const NameBookPageSchema; export type NameBookPage;
+export const NameBookManifestSchema;  // in resourceManifest.ts
+```
+
+- [ ] Write `nameBookPage.test.ts`: a page with `names: []` is rejected; a page
+      with 31 names is rejected; a grapheme of 3 characters is rejected; a valid
+      page passes.
+- [ ] Write `resourceManifest.test.ts` cases: a `name-book` manifest round-trips
+      through `parseResourceManifest`; one with `pages: []` throws; one with 28
+      pages throws; `isTemplate(manifest, "name-book")` narrows.
+- [ ] Run `pnpm --filter @lectoemocion/resource-schema test` — expect failures.
+- [ ] Implement both schemas as written in the spec above, reusing
+      `PersonalisedCharacterSchema`. Export from `index.ts`.
+- [ ] Run the tests — expect green.
+- [ ] Commit: `feat(schema): add the name-book manifest`.
+
+## Task 2 — the template kind and the roster requirement
+
+**Files:** modify `packages/template-sdk/src/templateDefinition.ts`, `index.ts`;
+create `templateDefinition.test.ts`.
+
+**Produces:**
+```ts
+export const TEMPLATES_NEEDING_ROSTER: Record<TemplateIdentifier, boolean>;
+export function templateNeedsRoster(id: TemplateIdentifier): boolean;
+```
+
+- [ ] Write the test: `templateKind("name-book") === "cinematic"`;
+      `templateNeedsRoster("name-book")` is true; every other template is false.
+- [ ] Run it — expect a type error, since `TEMPLATE_KINDS` is now incomplete.
+- [ ] Add `"name-book": "cinematic"` to `TEMPLATE_KINDS` and add the new total
+      record beside it, with the comment explaining why it is total.
+- [ ] Run the tests — green. Commit: `feat(sdk): declare which templates need a roster`.
+
+## Task 3 — synthetic children and the media seam
+
+**Files:** create `scripts/generate-synthetic-cast.mjs`,
+`packages/template-catalog/src/mediaUrl.ts`; modify `slots.ts`,
+`fixtures/syntheticClass.ts`; create `apps/player-web/public/synthetic/` with
+`PROVENANCE.md`.
+
+**Produces:**
+```ts
+export function photoUrl(assetId: MediaAssetId): string;         // /synthetic/{id}.svg
+export function pronunciationUrl(assetId: MediaAssetId): string; // /synthetic/{id}.mp3
+export function toPersonalisedCharacter(child: ChildRecord): PersonalisedCharacter;
+```
+`toPersonalisedCharacter` moves out of `slots.ts` into `mediaUrl.ts`; `slots.ts`
+imports it. This is the single expression the capture work replaces.
+
+- [ ] Write `mediaUrl.test.ts`: the two URL builders; `toPersonalisedCharacter`
+      carries `childRecordId` and `verifiedInitial` through unchanged.
+- [ ] Run — expect failure. Implement, and update `slots.ts` to import it.
+- [ ] Write `scripts/generate-synthetic-cast.mjs`: for each id in the synthetic
+      class, write a deterministic geometric SVG avatar (initial on a coloured
+      disc, colour chosen by hashing the id) and a silent MP3. Write
+      `PROVENANCE.md` stating every file is generated and no real child appears.
+- [ ] Grow `syntheticClass` to twenty children spanning the alphabet, including
+      `Ñuria` (Ñ), `Álex` (accented, verified initial `A`), and three names on
+      `A` so a multi-name page is exercised.
+- [ ] Run the script; confirm `public/synthetic/` holds forty files.
+- [ ] Run `pnpm --filter @lectoemocion/template-catalog test` — green.
+- [ ] Commit: `feat(catalog): generate a synthetic cast and one media seam`.
+
+## Task 4 — building the book
+
+**Files:** create `packages/template-catalog/src/nameBook.ts` and
+`nameBook.test.ts`; modify `index.ts`.
+
+**Produces:**
+```ts
+export function createNameBookResource(
+  roster: readonly ChildRecord[],
+  seed: string
+): ManifestFor<"name-book">;
+```
+
+- [ ] Write `nameBook.test.ts`, before any implementation:
+  - pages come out in Spanish alphabetical order, and `Ñ` sorts after `N`;
+  - `Álex` with `verifiedInitial: "A"` lands on the `A` page and keeps its accent;
+  - a child whose `verifiedInitial` disagrees with the first letter of their
+    name is filed under the **verified** letter — the regression that matters most;
+  - three names on one letter yield one page holding all three, name-ordered;
+  - an empty roster throws;
+  - the result parses through `parseResourceManifest`;
+  - `pageId` is the lowercased grapheme.
+- [ ] Run — expect failure. Implement with `Intl.Collator("es")`, one collator
+      instance used for both sorts.
+- [ ] Run — green. Commit: `feat(catalog): build the book of names from a roster`.
+
+## Task 5 — the world node
+
+**Files:** modify `packages/template-catalog/src/world/index.ts`,
+`packages/resource-schema/src/worldSchema.ts`; modify
+`publishedVersions.test.ts`, `world/world.test.ts`.
+
+- [ ] Write the tests: the world parses with `libro-nombres` present; its
+      surface is `recursos`; `createResourceForNode` on it with a roster returns
+      a `name-book` manifest and with an empty roster throws;
+      `publishedVersions.test.ts` records `name-book` at version 1.
+- [ ] Run — expect failure and a non-exhaustive-switch compile error.
+- [ ] Add the `{ template: "name-book", seed }` branch to `NodeResourceSchema`,
+      the node to `world`, and the `case "name-book"` to `createResourceForNode`.
+- [ ] Run — green. Commit: `feat(world): put the book of names on the shelf`.
+
+## Task 6 — the locked chapter
+
+**Files:** modify `apps/player-web/src/world/worldView.ts`,
+`worldView.test.ts`, `App.tsx`, `App.test.tsx`, `styles.css`.
+
+**Produces:** `NodeState = "locked" | "needs-roster" | "unlocked" | "completed"`,
+and `buildWorldView(world, progress, { hasRoster: boolean })`.
+
+- [ ] Write the tests: with `hasRoster: false` the node's state is
+      `"needs-roster"` and `playable` is false; with a roster it is `"unlocked"`;
+      no other node is affected by the flag.
+- [ ] Run — expect failure. Widen `NodeState`, thread the flag through, and
+      handle the new case at every `assertNever`-guarded site.
+- [ ] Write the component test: the chapter renders the locked line and does not
+      launch a game when tapped.
+- [ ] Implement the rendering and its style. Run — green.
+- [ ] Commit: `feat(player): lock the book of names until names exist`.
+
+## Task 7 — the screen
+
+**Files:** create `apps/player-web/src/game/templates/bookChrome.ts` and
+`renderNameBook.ts`; modify `renderIllustratedStory.ts`,
+`scenes/ResourceScene.ts`.
+
+- [ ] Extract `pill`, the progress bar, the picker overlay and the curtain from
+      `renderIllustratedStory.ts` into `bookChrome.ts`, unchanged in behaviour.
+      Run the existing player tests — still green. Commit the extraction alone:
+      `refactor(player): share page chrome between books`.
+- [ ] Change `ResourceScene.preload` to dispatch asset queuing on
+      `resource.template.id` rather than on `"pages" in resource`, and queue the
+      book's photos outside the fail-closed count.
+- [ ] Implement `renderNameBook`: grapheme, card grid, tap to enlarge and play,
+      manual turns, letter picker, progress bar, completion on the last page. A
+      card whose photo is missing renders the written name alone.
+- [ ] Add the `isTemplate(resource, "name-book")` branch to `ResourceScene`.
+- [ ] Run `pnpm check`. Commit: `feat(player): render the book of names`.
+
+## Task 8 — the roster the player passes, and the documents
+
+**Files:** create `apps/player-web/src/world/devRoster.ts` and its test; modify
+`App.tsx`, `AGENTS.md`, `docs/product/platform-design.md`.
+
+- [ ] Write `devRoster.test.ts`: the function returns the synthetic class when
+      told the build is development and an empty roster otherwise.
+- [ ] Implement `rosterForBuild(isDevelopment: boolean): readonly ChildRecord[]`
+      as a pure function, called from `App.tsx` with `import.meta.env.DEV`.
+- [ ] Amend `AGENTS.md` and `platform-design.md` to name this template as the
+      declared exception to "playable with no uploads", with the reason.
+- [ ] Run `pnpm check` and `pnpm test:e2e`.
+- [ ] Commit: `feat(player): pass a development roster, and record the exception`.
