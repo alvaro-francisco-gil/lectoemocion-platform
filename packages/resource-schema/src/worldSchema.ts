@@ -182,14 +182,24 @@ export const WorldNodeSchema = Type.Object(
     id: Type.String({ minLength: 1 }),
     title: Type.String({ minLength: 1, maxLength: 60 }),
     /**
-     * The picture that stands for this chapter on the map.
+     * The picture that stands for this chapter.
      *
      * Required, because it is how a child who cannot read finds a chapter
-     * again: the map is a row of pictures, not a row of numbered buttons, and a
-     * node without one would be a hole a three-year-old cannot navigate. The
+     * again: the world is a row of pictures, not a row of numbered buttons, and
+     * a node without one would be a hole a three-year-old cannot navigate. The
      * title stays for the adult and for the screen reader.
      */
     icon: Type.String({ minLength: 1 }),
+    /**
+     * Which of the shell's sections this chapter stands in.
+     *
+     * Authored, never derived from the template. "A book belongs on the shelf"
+     * is a rule that breaks the first time a game belongs there or a story
+     * belongs on the path — and it would break silently, by filing the node
+     * under the wrong section. Required with no default, so a node whose place
+     * nobody decided is a content error rather than a node missing from both.
+     */
+    surface: Type.Union([Type.Literal("juegos"), Type.Literal("recursos")]),
     /** Every listed node must be completed before this one opens. */
     unlockedBy: Type.Array(Type.String({ minLength: 1 })),
     resource: NodeResourceSchema,

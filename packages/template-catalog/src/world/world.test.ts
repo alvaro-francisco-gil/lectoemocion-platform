@@ -14,9 +14,40 @@ describe("the authored world", () => {
     expect(parseWorld(world)).toEqual(world);
   });
 
-  it("has exactly one entry node", () => {
-    const entries = worldNodes(world).filter((node) => node.unlockedBy.length === 0);
-    expect(entries).toHaveLength(1);
+  it("has exactly one entry node under Juegos", () => {
+    const entries = worldNodes(world).filter(
+      (node) => node.surface === "juegos" && node.unlockedBy.length === 0
+    );
+    expect(entries.map((node) => node.id)).toEqual(["encuentro"]);
+  });
+
+  /*
+   * The shelf is not a reward. A book a child has to unlock is a book most of
+   * them never open, so the story is reachable from the very first screen —
+   * and it is the only thing on the shelf, which is why this names it.
+   */
+  it("keeps the story on the shelf, open from the first screen", () => {
+    const shelf = worldNodes(world).filter(
+      (node) => node.surface === "recursos"
+    );
+    expect(shelf.map((node) => node.id)).toEqual(["gallo-rayo"]);
+    expect(shelf.every((node) => node.unlockedBy.length === 0)).toBe(true);
+  });
+
+  /* It is still a chapter of the world: it pays its stars and its chest, and
+     it keeps its slot in the collection. */
+  it("still pays a chest for the story on the shelf", () => {
+    const story = worldNodes(world).find((node) => node.id === "gallo-rayo");
+    expect(story?.reward.choices.map((choice) => choice.animalId)).toEqual([
+      "gallo",
+      "pollito",
+      "raton"
+    ]);
+  });
+
+  it("puts every other chapter under Juegos", () => {
+    const games = worldNodes(world).filter((node) => node.surface === "juegos");
+    expect(games).toHaveLength(worldNodes(world).length - 1);
   });
 
   it("reaches every node from the entry", () => {
@@ -121,10 +152,24 @@ describe("world validation", () => {
     id: "start",
     title: "Comienzo",
     icon: "/vocabulary/gato.webp",
+    surface: "juegos",
     unlockedBy: [],
     resource: { template: "name-story", seed: "start" },
     reward
   };
+
+  /* Where a chapter stands is authored, never guessed from its template: a
+     node with no surface would be a node missing from both tabs. */
+  it("rejects a node that does not say which surface it stands on", () => {
+    const { surface: _dropped, ...homeless } = entry;
+    expect(() => parseWorld(worldOf(homeless))).toThrow("Invalid world");
+  });
+
+  it("rejects a surface the shell has no tab for", () => {
+    expect(() =>
+      parseWorld(worldOf({ ...entry, surface: "multijugador" }))
+    ).toThrow("Invalid world");
+  });
 
   it("rejects an unlock pointing at a node that does not exist", () => {
     expect(() =>
@@ -133,6 +178,7 @@ describe("world validation", () => {
           id: "second",
           title: "Segundo",
           icon: "/vocabulary/perro.webp",
+          surface: "juegos",
           unlockedBy: ["nowhere"],
           resource: { template: "pairs-game", seed: "second", pairCount: 3 },
           reward
@@ -164,6 +210,7 @@ describe("world validation", () => {
             id: "a",
             title: "A",
             icon: "/vocabulary/luna.webp",
+            surface: "juegos",
             unlockedBy: ["b"],
             resource: { template: "pairs-game", seed: "a", pairCount: 3 },
             reward
@@ -172,6 +219,7 @@ describe("world validation", () => {
             id: "b",
             title: "B",
             icon: "/vocabulary/sol.webp",
+            surface: "juegos",
             unlockedBy: ["a"],
             resource: { template: "pairs-game", seed: "b", pairCount: 3 },
             reward

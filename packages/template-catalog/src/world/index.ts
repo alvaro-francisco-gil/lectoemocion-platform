@@ -60,6 +60,7 @@ export const world: World = parseWorld({
       id: "encuentro",
       title: "El encuentro",
       icon: "/world/duende.webp",
+      surface: "juegos",
       unlockedBy: [],
       resource: { template: "name-story", seed: "encuentro" },
       reward: {
@@ -67,16 +68,18 @@ export const world: World = parseWorld({
       }
     },
     /*
-     * The book sits beside the first minigame rather than in front of it, on
-     * the branch the world already allows. It is thirty-one pages long — far
-     * the longest thing here — and putting it across the only path would make
-     * every child read all of it before they could play anything.
+     * The book is on the shelf, not on the path, and it is open from the first
+     * screen. It is thirty-one pages long — far the longest thing here — and a
+     * book a child has to unlock is a book most of them never open. It still
+     * pays its letriestrellas and its chest: what a chapter is worth does not
+     * depend on which section it is reached from.
      */
     {
       id: "gallo-rayo",
       title: "El gallo Rayo",
       icon: picture("gallo"),
-      unlockedBy: ["encuentro"],
+      surface: "recursos",
+      unlockedBy: [],
       resource: {
         template: "illustrated-story",
         seed: "gallo-rayo",
@@ -95,6 +98,7 @@ export const world: World = parseWorld({
       id: "iniciales",
       title: "Las iniciales",
       icon: picture("abeja"),
+      surface: "juegos",
       unlockedBy: ["encuentro"],
       resource: {
         template: "initials-game",
@@ -113,6 +117,7 @@ export const world: World = parseWorld({
       id: "parejas",
       title: "El bosque de parejas",
       icon: picture("dados"),
+      surface: "juegos",
       unlockedBy: ["iniciales"],
       /* Named, not drawn: three short, unrelated words a child can tell apart. */
       resource: {
@@ -132,6 +137,7 @@ export const world: World = parseWorld({
       id: "cual-es",
       title: "¿Cuál es?",
       icon: picture("manzana"),
+      surface: "juegos",
       unlockedBy: ["parejas"],
       resource: {
         template: "word-picture-game",
@@ -152,6 +158,7 @@ export const world: World = parseWorld({
       id: "primeras-letras",
       title: "Las primeras letras",
       icon: picture("luna"),
+      surface: "juegos",
       unlockedBy: ["cual-es"],
       /*
        * Four letters a child can tell apart at a glance, on four unrelated
@@ -176,6 +183,7 @@ export const world: World = parseWorld({
       id: "silabas",
       title: "El puente de sílabas",
       icon: picture("mariposa"),
+      surface: "juegos",
       unlockedBy: ["parejas"],
       resource: {
         template: "syllables-game",
@@ -194,6 +202,7 @@ export const world: World = parseWorld({
       id: "letras",
       title: "El taller de letras",
       icon: picture("pato"),
+      surface: "juegos",
       unlockedBy: ["silabas"],
       /* Four letters, four distinct ones: nothing to place by elimination. */
       resource: {
@@ -213,6 +222,7 @@ export const world: World = parseWorld({
       id: "empieza-igual",
       title: "Empieza igual",
       icon: picture("gato"),
+      surface: "juegos",
       unlockedBy: ["letras"],
       /*
        * `GA-to` against `GA-llo` or `GA-fas`: the syllable, not the letter.
@@ -236,6 +246,7 @@ export const world: World = parseWorld({
       id: "album",
       title: "Nuestro álbum",
       icon: picture("camara"),
+      surface: "juegos",
       unlockedBy: ["primeras-letras", "empieza-igual"],
       resource: { template: "memory-album", seed: "album" },
       reward: {
