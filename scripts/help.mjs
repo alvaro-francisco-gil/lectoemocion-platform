@@ -21,6 +21,18 @@ const SECTIONS = [
     ]
   },
   {
+    title: "Native shell on an Android emulator",
+    commands: [
+      ["pnpm mobile:start", "Metro for the shell — long-lived, run this yourself"],
+      ["pnpm mobile:up", "boot the AVD, tunnel the ports, open the player"],
+      ["pnpm mobile", "doctor: what is up, what is not, what to run"],
+      ["pnpm mobile boot", "create and start the tablet AVD only"],
+      ["pnpm mobile shot", "screenshot the emulator to a file"],
+      ["pnpm mobile logs 30", "filtered logcat: JS and WebView errors"],
+      ["pnpm mobile stop", "shut the emulator down"]
+    ]
+  },
+  {
     title: "Guardrails (each runs standalone)",
     commands: [
       ["node scripts/check-engine-neutral.mjs", "invariant 2: contracts stay engine-neutral"],

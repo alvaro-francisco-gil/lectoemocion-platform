@@ -9,8 +9,18 @@
   `playerUrl` resolver with 11 tests; scripted Android emulator workflow
   (`scripts/mobile-emulator.mjs`, 30 tests) that creates the AVD, tunnels the
   ports, and reports what is up; `LectoEmocion_Tablet` AVD created and booting
-- **Next:** load the player in the emulator and confirm a minigame is playable
+- **Next:** decide hosted versus bundled — see "Open questions" — before
+  `packages/firebase/` lands, because auth token handling differs between a
+  remote origin and a local one
 - **Blockers:** none.
+
+Two things bit during that first run and are now fixed and covered by tests.
+Metro's `disableHierarchicalLookup` was on, which is right for npm's flat
+`node_modules` and wrong for pnpm, where a package's dependencies sit beside it
+in the store — it failed with `Unable to resolve "expo-modules-core"`, which
+reads as a broken install. And Expo's LAN default made Expo Go fetch over the
+network and fail with `Failed to download remote update`; `--localhost` over the
+`adb reverse` tunnel avoids the network entirely.
 - **Handoff:** the hosted-versus-bundled player decision is deliberately
   deferred — see "Open questions". Step 1 points at a dev server, which is a
   development affordance and not the shipping answer.
@@ -101,7 +111,9 @@ libraries it bundles. No EAS account, no store credentials, no Xcode.
       to load.
 - [x] Scripted emulator workflow: `scripts/mobile-emulator.mjs` plus the pure
       logic and tests in `scripts/lib/emulator.mjs`.
-- [ ] Verified in the Android emulator via Expo Go: map and one minigame.
+- [x] Verified in the Android emulator via Expo Go: the map hub renders
+      full-screen in landscape, and "El encuentro" plays through to its reward
+      screen. Touch input, progression, and the star counter all work.
 - [ ] Verified on physical hardware. Same commands — `adb reverse` makes
       `localhost` mean the dev machine over USB too.
 

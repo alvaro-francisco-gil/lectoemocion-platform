@@ -14,6 +14,8 @@ includes them.
 | `check-*.mjs` | One executable per invariant |
 | `help.mjs` | The `pnpm commands` index |
 | `import-*.mjs` | One-off content importers — not guardrails, not run by `pnpm check` |
+| `mobile-emulator.mjs` | Drives the native shell on an Android emulator — not a guardrail |
+| `lib/` | Pure logic for the non-guardrail scripts, with tests beside it |
 
 Rules live apart from the scripts that run them so they can be unit-tested. A
 guardrail nobody proved can fail is decoration — that is why `rules.test.ts`
