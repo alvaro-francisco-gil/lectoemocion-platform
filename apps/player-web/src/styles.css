@@ -731,6 +731,50 @@ main { height: 100dvh; }
   }
 }
 
+.gift__box {
+  width: min(40vh, 18rem);
+  animation: gift-wait 2.4s ease-in-out infinite;
+}
+
+.gift__reveal {
+  animation: gift-open 600ms ease-out both;
+}
+
+@keyframes gift-wait {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-0.5rem) rotate(2deg); }
+}
+
+@keyframes gift-open {
+  from { transform: scale(0.4); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/*
+  A child who needs less motion still gets the whole ceremony: the gift is
+  simply already open rather than opening.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .gift__box,
+  .gift__reveal {
+    animation: none;
+  }
+}
+
+/* The adult's own affordance, deliberately smaller than the child's buttons. */
+.gift__prepare {
+  padding: 0.4rem 1.1rem;
+  border: 2px solid #7b2cbf;
+  border-radius: 999px;
+  background: none;
+  color: #7b2cbf;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.gift__prepare:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
+
 /* Announced, never drawn. */
 .visually-hidden {
   position: absolute;
