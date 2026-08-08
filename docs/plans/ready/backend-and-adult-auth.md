@@ -283,11 +283,12 @@ Then `pnpm check`, and `pnpm test:e2e`, because the player's mount path changes.
 
 ## Documents this change rewrites
 
-- `docs/plans/ready/child-profiles.md` — superseded, rewritten as slice B
-  rather than left contradicting reality.
+- `docs/decisions/0013-child-profiles-and-the-drawer.md` — the local profile
+  model this supersedes for the hosted case. It is not deleted: it records why
+  the local store is shaped the way it is, and that shape is what the Firestore
+  store replaces behind the same interface.
 - `docs/product/platform-design.md` — §5.1 no longer opens with creating an
-  account; §6.2's link to `docs/plans/ongoing/child-profiles.md` is already
-  broken and is fixed here.
+  account; §6.2 now points at ADR 0013 and needs the account-era sentence.
 - `docs/plans/ongoing/native-shell.md` — the "no workspace dependency"
   property and the Expo Go assumption both end; open question 2 is affected.
 - `AGENTS.md` — `packages/auth-core/` joins the planned architecture.

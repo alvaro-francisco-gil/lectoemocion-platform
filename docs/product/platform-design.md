@@ -239,7 +239,7 @@ siblings sharing a tablet keep separate worlds.
 Profiles are local to the device today; there are no accounts yet. When
 accounts arrive a profile is read from a child record under a group, and the
 store behind the existing interface is replaced without the player changing.
-See `docs/plans/ongoing/child-profiles.md`.
+See [ADR 0013](../decisions/0013-child-profiles-and-the-drawer.md).
 
 A profile is never a prerequisite for playing. Every device creates one
 automatically on first launch, inheriting whatever progress is already there.
