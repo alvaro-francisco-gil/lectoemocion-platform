@@ -16,6 +16,11 @@ import { setDefaultResultOrder } from "node:dns";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
+import {
+  TARGET_COVERAGE,
+  inkArea,
+  squareCanvas
+} from "./lib/normalise-ink-area.mjs";
 import { removeWhiteBackground } from "./lib/remove-white-background.mjs";
 
 /* Some networks advertise IPv6 for github.com but cannot route it. */
@@ -123,11 +128,14 @@ async function main() {
  * an opaque square. A picture that already carries alpha was cut out by its
  * author and is left exactly as it is.
  *
- * Every picture is then trimmed to its subject. Both surfaces that draw these
- * scale to fit — `object-fit: contain` in the collection, `Math.min(inner / w,
- * inner / h, 1)` on a card — so whatever margin a picture carries becomes empty
- * space around it, and every stock picture carries a different one. Trimming is
- * what makes a chick and a whale come out the same size in the same box.
+ * Every picture is then trimmed to its subject and given a square canvas
+ * proportioned to the ink on it, by `scripts/lib/normalise-ink-area.mjs`. Both
+ * surfaces that draw these scale to fit — `object-fit: contain` in the
+ * collection, `Math.min(inner / w, inner / h, 1)` on a card — so a picture's
+ * own margin decides how big it comes out, and every stock picture carries a
+ * different one. Trimming throws that margin away; normalising then gives the
+ * margin back in the one amount that makes a chick and a whale read as the same
+ * size in the same box.
  */
 async function encode(source) {
   const resized = sharp(source).resize(EDGE, EDGE, {
@@ -136,7 +144,7 @@ async function encode(source) {
     background: { r: 255, g: 255, b: 255, alpha: 0 }
   });
   if ((await sharp(source).metadata()).hasAlpha) {
-    return trimmed(resized).webp({ quality: QUALITY }).toBuffer();
+    return normalised(trimmed(resized));
   }
 
   const { data, info } = await resized
@@ -144,9 +152,51 @@ async function encode(source) {
     .raw()
     .toBuffer({ resolveWithObject: true });
   removeWhiteBackground(data, info);
-  return trimmed(
-    sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
-  )
+  return normalised(
+    trimmed(
+      sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
+    )
+  );
+}
+
+/**
+ * Centres a trimmed subject on the square that gives it the standard weight,
+ * then encodes it.
+ *
+ * The subject is padded rather than scaled, so a picture that has to read
+ * smaller grows a canvas around itself at no cost in resolution. That canvas can
+ * exceed `EDGE`, which is a bundle-size budget rather than a shape, so the
+ * finished square is fitted back inside it — in a second pass, because sharp
+ * resizes before it extends whatever order the calls are written in, and a cap
+ * in the same pipeline would silently apply to the subject instead of to the
+ * canvas.
+ */
+async function normalised(image) {
+  const { data, info } = await image
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { size, left, top } = squareCanvas({
+    width: info.width,
+    height: info.height,
+    ink: inkArea(data)
+  });
+
+  const extended = await sharp(data, {
+    raw: { width: info.width, height: info.height, channels: 4 }
+  })
+    .extend({
+      top,
+      left,
+      bottom: size - info.height - top,
+      right: size - info.width - left,
+      background: { r: 0, g: 0, b: 0, alpha: 0 }
+    })
+    .png()
+    .toBuffer();
+
+  return sharp(extended)
+    .resize(EDGE, EDGE, { fit: "inside", withoutEnlargement: true })
     .webp({ quality: QUALITY })
     .toBuffer();
 }
@@ -245,9 +295,18 @@ would composite over painted scenery as an opaque square. Those are matted by
 inward from the border and so removes the card without touching white *inside*
 the silhouette. Sources that already carry alpha are not matted at all.
 
-Every picture is then trimmed to its subject, so that the surfaces which draw
-these — both of which scale to fit — put a chick and a whale in a box at the
-same size instead of at whatever margin each stock picture happened to carry.
+Every picture is then trimmed to its subject and centred on a transparent square
+proportioned so that its ink covers ${(TARGET_COVERAGE * 100).toFixed(0)}% of it.
+
+The surfaces which draw these all scale the whole picture to fit, so the margin
+a picture carries is what decides how big it comes out, and every stock picture
+carried a different one. Trimming alone equalises the *box*, which is not what a
+child sees: a llama fills its box and a kite fills a third of it, and fitted to
+the same square one came out more than twice the size of the other. Holding the
+ink constant instead is what puts a chick and a whale on the page at the same
+weight. A subject too thin to reach that share on any square containing it —
+a pencil, a bone — keeps its own box rather than shrinking every other picture
+to match it.
 
 ## Held back
 

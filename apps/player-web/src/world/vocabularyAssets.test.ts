@@ -1,8 +1,11 @@
 import { existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { worldNodes } from "@lectoemocion/resource-schema";
+// @ts-expect-error -- plain .mjs script module, deliberately untyped
+import { TARGET_COVERAGE, inkArea } from "../../../../scripts/lib/normalise-ink-area.mjs";
 import { defaultVocabulary, world } from "@lectoemocion/template-catalog";
 
 /**
@@ -77,4 +80,43 @@ describe("every reward animal is actually served", () => {
       expect(existsSync(fileFor(animal.imageUrl)), animal.imageUrl).toBe(true);
     }
   );
+});
+
+/*
+ * Every surface that draws these scales the whole picture to fit, so a picture's
+ * margin is what decides how big it comes out. `scripts/lib/normalise-ink-area.mjs`
+ * holds that constant at import time — but nothing downstream would notice a
+ * picture that skipped it, and the symptom is not an error: it is one animal
+ * quietly twice the size of its neighbour on a page meant to read as a set.
+ *
+ * This is that seam. A hand-added or stale picture fails here rather than in a
+ * classroom.
+ */
+describe("every picture carries the same visual weight", () => {
+  const files = readdirSync(join(publicDir, "vocabulary")).filter((name) =>
+    name.endsWith(".webp")
+  );
+
+  it.each(files)("%s", async (name) => {
+    const { data, info } = await sharp(join(publicDir, "vocabulary", name))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const ink = inkArea(data) as number;
+    const canvas = Math.max(info.width, info.height);
+    const coverage = ink / (canvas * canvas);
+
+    /*
+     * Below the target is the declared case: a subject too thin to reach it
+     * keeps its own box, and is then square in neither dimension nor coverage.
+     * Above it is a picture that never went through the normaliser.
+     *
+     * The tolerance absorbs whole-pixel canvases and lossy alpha; it is far
+     * tighter than the 5.6× spread the raw pictures arrived with.
+     */
+    expect(coverage, `${name} covers ${coverage.toFixed(3)}`).toBeLessThanOrEqual(
+      TARGET_COVERAGE + 0.01
+    );
+  });
 });
