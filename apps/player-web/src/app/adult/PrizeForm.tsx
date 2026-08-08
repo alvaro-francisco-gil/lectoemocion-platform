@@ -2,6 +2,9 @@ import {
   assertNever,
   checkCustomPrize,
   checkPrizeGoal,
+  DEFAULT_PRIZE_GOAL,
+  MAX_PRIZE_GOAL,
+  MIN_PRIZE_GOAL,
   PRIZE_PRESET_KEYS,
   type Prize,
   type PrizeContent,
@@ -9,7 +12,12 @@ import {
   type PrizeImageId,
   type PrizePresetKey
 } from "@lectoemocion/domain";
-import { prizePresetPhrase } from "@lectoemocion/template-catalog";
+import { STARS_PER_COMPLETION } from "../../world/worldView";
+import {
+  prizePresetPhrase,
+  prizePresetPlace
+} from "@lectoemocion/template-catalog";
+import { PrizeIllustration } from "../prizeIllustration";
 import { useId, useState } from "react";
 import type {
   PrizePick,
@@ -23,6 +31,34 @@ import type {
  * saved on its own submit, independent of whatever gifts are waiting below
  * it, so typing a new goal never risks half-filling out a gift by accident.
  */
+/**
+ * One chapter's worth, clamped to what the validator would accept.
+ *
+ * Stepping is the forgiving way in, so it never lands somewhere the adult
+ * would then be told off for: the typed field is still there for anyone who
+ * wants a number the steps do not reach.
+ */
+function stepGoal(value: string, direction: -1 | 1): number {
+  const current = Number.parseInt(value, 10);
+  const from = Number.isSafeInteger(current) ? current : DEFAULT_PRIZE_GOAL;
+  const next = from + direction * STARS_PER_COMPLETION;
+  return Math.min(MAX_PRIZE_GOAL, Math.max(MIN_PRIZE_GOAL, next));
+}
+
+/**
+ * The goal said in the unit an adult plans in.
+ *
+ * A number of letriestrellas is the child's unit; how many chapters it takes
+ * to get there is the adult's, and it is the difference between setting 30
+ * and knowing what setting 30 asks for.
+ */
+function goalInChapters(value: string): string {
+  const goal = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(goal) || goal < MIN_PRIZE_GOAL) return "";
+  const chapters = Math.ceil(goal / STARS_PER_COMPLETION);
+  return chapters === 1 ? "Un capítulo" : `Unos ${chapters} capítulos`;
+}
+
 export function GoalForm({
   goal,
   onSetGoal
@@ -57,23 +93,50 @@ export function GoalForm({
         }
       }}
     >
-      <label htmlFor={fieldId}>Letriestrellas para el próximo regalo</label>
-      <input
-        id={fieldId}
-        className="prize-goal__field"
-        type="number"
-        inputMode="numeric"
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-      />
+      <label className="prize-goal__label" htmlFor={fieldId}>
+        Letriestrellas para el próximo regalo
+      </label>
+      {/*
+        Stepped as well as typed, in chapters rather than stars: an adult on a
+        classroom panel is touching, not typing, and the number only means
+        something once it is said in the unit they actually plan in — a
+        chapter pays three, so the step is three.
+      */}
+      <div className="prize-goal__set">
+        <button
+          type="button"
+          className="prize-goal__step"
+          aria-label="Menos letriestrellas"
+          onClick={() => setValue(String(stepGoal(value, -1)))}
+        >
+          −
+        </button>
+        <input
+          id={fieldId}
+          className="prize-goal__field"
+          type="number"
+          inputMode="numeric"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+        />
+        <button
+          type="button"
+          className="prize-goal__step"
+          aria-label="Más letriestrellas"
+          onClick={() => setValue(String(stepGoal(value, 1)))}
+        >
+          +
+        </button>
+        <button type="submit" className="prize-goal__submit">
+          Guardar
+        </button>
+      </div>
+      <p className="prize-goal__hint">{goalInChapters(value)}</p>
       {error ? (
         <p className="prize-goal__error" role="alert">
           {error}
         </p>
       ) : null}
-      <button type="submit" className="prize-goal__submit">
-        Guardar
-      </button>
     </form>
   );
 }
@@ -234,25 +297,40 @@ export function PrizeForm({
     >
       <fieldset className="prize-form__presets">
         <legend>¿Qué hay dentro del regalo?</legend>
+        {/*
+          The picture carries the choice and the place names it. The full
+          phrase is still the card's accessible name — it is what a child is
+          read, and reading four cards that all open "Encuentra tu regalo…" is
+          exactly what the eye should not have to do.
+        */}
         {PRIZE_PRESET_KEYS.map((key) => (
-          <label key={key}>
+          <label key={key} className="prize-choice">
             <input
               type="radio"
               name={groupName}
               checked={selection === key}
               onChange={() => setSelection(key)}
             />
-            {prizePresetPhrase(key)}
+            <span className="prize-choice__art">
+              <PrizeIllustration preset={key} />
+            </span>
+            <span className="prize-choice__place" aria-hidden="true">
+              {prizePresetPlace(key)}
+            </span>
+            <span className="visually-hidden">{prizePresetPhrase(key)}</span>
           </label>
         ))}
-        <label>
+        <label className="prize-choice prize-choice--own">
           <input
             type="radio"
             name={groupName}
             checked={selection === "custom"}
             onChange={() => setSelection("custom")}
           />
-          Escribirlo yo
+          <span className="prize-choice__art" aria-hidden="true">
+            ✏️
+          </span>
+          <span className="prize-choice__place">Escribirlo yo</span>
         </label>
       </fieldset>
       {selection === "custom" ? (

@@ -18,5 +18,10 @@ export {
   createSyllablesGameResource,
   createWordPictureGameResource
 } from "./vocabularyGames";
-export { PRIZE_PRESET_PHRASES, prizePresetPhrase } from "./prizes";
+export {
+  PRIZE_PRESET_PHRASES,
+  PRIZE_PRESET_PLACES,
+  prizePresetPhrase,
+  prizePresetPlace
+} from "./prizes";
 export { createResourceForNode, world } from "./world";
