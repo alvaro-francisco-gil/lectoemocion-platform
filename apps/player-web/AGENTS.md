@@ -24,14 +24,16 @@ them apart is what lets accounts replace either one without touching the other.
 `storageKey` — the two names it needs to adopt existing progress and to delete
 a child's.
 
-**A profile's id is its progress namespace.** `storageKey(id)` is the only
-thing that may build `lectoemocion.progress.<id>`, and a profile id is the only
-thing that may be passed to it. That single derivation is what keeps two
-children's stars apart on a shared family tablet, and the failure when it
-breaks is completely silent — no error, no missing data, just a sibling's world
-quietly becoming yours. `scripts/check-progress-namespace.mjs` enforces it with
-no exceptions, tests included: a test that hand-builds the key is a test that
-keeps passing after the key changes shape.
+**A profile's id is the namespace for everything that is that child's.**
+`storageKey(id)` is the only thing that may build `lectoemocion.progress.<id>`
+and `giftsKey(id)` the only thing that may build `lectoemocion.gifts.<id>`, and
+a profile id is the only thing that may be passed to either. Those two
+derivations are what keep two children's stars and two children's regalos apart
+on a shared family tablet, and the failure when one breaks is completely
+silent — no error, no missing data, just a sibling's world quietly becoming
+yours. `scripts/check-child-namespace.mjs` enforces both with no exceptions,
+tests included: a test that hand-builds a key is a test that keeps passing after
+the key changes shape.
 `scripts/check-progress-boundary.mjs` stops a template or a shared package
 importing it. The shell reads progress, derives a `WorldView`, and draws the
 sections from it; it hands a template a manifest plus a completion callback.
@@ -53,6 +55,17 @@ its own opinion about whether a gift is owed. The adult area is reachable only
 through `src/app/adult/index.tsx`, which is what
 `scripts/check-adult-gate.mjs` enforces. Rationale is in
 [ADR 0012](../../docs/decisions/0012-prizes-and-the-star-meter.md).
+
+**A prize record has two owners.** The goal is the group's — one family or one
+class, one line — under `lectoemocion.prizeGoal.<group>`; the gifts are the
+child's, under `giftsKey(id)`, and the pictures follow the gifts. `PrizeOwners`
+carries both, `LOCAL_GROUP` names the one implicit group as `LOCAL_OWNER` names
+the one implicit profile, and `composePrizes` puts the two halves back together
+so `derivePrizeView` stays the single place a prize's state is decided. A
+record written before that split — one object under
+`lectoemocion.prizes.<owner>` — is read by nothing and written by nothing:
+which child earned those gifts is not recorded anywhere, and a regalo surfacing
+under the wrong child is the one outcome nobody can undo.
 
 **There is one adult gate.** `src/app/AdultGate.tsx` — a full-screen keypad
 over `src/profiles/adultYear.ts` — guards the profile drawer and the adult

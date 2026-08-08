@@ -117,7 +117,7 @@ above has an executable guardrail; `pnpm guardrails` runs them all, and
 |---|---|
 | 2 — engine-neutral contracts | `scripts/check-engine-neutral.mjs` |
 | 2 — templates never read progress | `scripts/check-progress-boundary.mjs` |
-| A progress namespace comes only from a profile id | `scripts/check-progress-namespace.mjs` |
+| A child's namespace comes only from a profile id | `scripts/check-child-namespace.mjs` |
 | 3 — Firebase boundary | `scripts/check-firebase-boundary.mjs` |
 | 4 — adult area behind its gate | `scripts/check-adult-gate.mjs` |
 | 5 — immutable published versions | `packages/template-catalog/src/publishedVersions.test.ts` |

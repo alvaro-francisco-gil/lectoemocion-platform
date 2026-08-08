@@ -31,9 +31,10 @@ import {
   type Progress,
   type WorldNodeView
 } from "../world/worldView";
-import { LOCAL_OWNER, LocalProgressStore } from "../world/progressStore";
+import { LocalProgressStore } from "../world/progressStore";
 import { derivePrizeView, EMPTY_PRIZES, type Prizes } from "../world/prizes";
 import {
+  LOCAL_GROUP,
   LocalPrizeStore,
   systemImageId,
   systemMinter
@@ -209,31 +210,6 @@ export function App({
   const host = useRef<HTMLDivElement>(null);
   const panWorld = useDragScroll();
 
-  /*
-   * The prizes are still the device's rather than a child's.
-   *
-   * Progress became per-profile when profiles arrived; the prize ledger and the
-   * pictures behind it have not moved yet, so both are still keyed by
-   * `LOCAL_OWNER`. That is a known gap, not a decision — on a shared family
-   * tablet one child's regalo is every child's — and closing it is its own
-   * change, tracked as the prize-ownership follow-up. This is where it closes:
-   * the owner becomes `selectedId`, exactly as `progressStore` below already
-   * does.
-   *
-   * Built here rather than beside `profiles` above for the same reason the
-   * progress store is: a store carries an in-memory fallback for a browser that
-   * denies storage, and one built at module scope carries that fallback across
-   * every mount the module ever sees.
-   */
-  const prizeStore = useMemo(
-    () => new LocalPrizeStore(browserStorage, LOCAL_OWNER, systemMinter()),
-    []
-  );
-  const imageStore = useMemo(
-    () => new LocalPrizeImageStore(browserStorage, LOCAL_OWNER),
-    []
-  );
-
   useEffect(() => {
     let cancelled = false;
     void profiles.read().then(
@@ -244,13 +220,10 @@ export function App({
         if (!cancelled) setProfileError(describeProfileFailure(error));
       }
     );
-    void prizeStore.read().then((stored) => {
-      if (!cancelled) setPrizes(stored);
-    });
     return () => {
       cancelled = true;
     };
-  }, [prizeStore]);
+  }, []);
 
   /*
    * One progress store per child, namespaced by their profile id. This is the
@@ -264,6 +237,44 @@ export function App({
       selectedId === null
         ? null
         : new LocalProgressStore(browserStorage, selectedId),
+    [selectedId]
+  );
+
+  /*
+   * The prizes are two things owned by two people, behind one store.
+   *
+   * The goal is the group's — one family or one class, one line every child in
+   * it fills a meter towards — and the gifts are the child's, namespaced by the
+   * same profile id their progress is. So a sibling picking up the tablet sees
+   * their own meter fill against the goal an adult set once, and never a regalo
+   * they did not earn. The pictures follow the gifts, because a photo an adult
+   * took belongs to the gift it is inside.
+   *
+   * `LOCAL_GROUP` is the one implicit group, exactly as the starter profile is
+   * the one implicit child; both become real ids at the Firestore stage with no
+   * caller changing.
+   *
+   * Built here rather than beside `profiles` above for the same reason the
+   * progress store is: a store carries an in-memory fallback for a browser that
+   * denies storage, and one built at module scope carries that fallback across
+   * every mount the module ever sees.
+   */
+  const prizeStore = useMemo(
+    () =>
+      selectedId === null
+        ? null
+        : new LocalPrizeStore(
+            browserStorage,
+            { group: LOCAL_GROUP, child: selectedId },
+            systemMinter()
+          ),
+    [selectedId]
+  );
+  const imageStore = useMemo(
+    () =>
+      selectedId === null
+        ? null
+        : new LocalPrizeImageStore(browserStorage, selectedId),
     [selectedId]
   );
 
@@ -283,6 +294,21 @@ export function App({
       cancelled = true;
     };
   }, [progressStore]);
+
+  /* Cleared before the read for the same reason, and it matters more here: a
+     frame of the previous child's gifts is a wrapped box on the map that is not
+     this child's to open. */
+  useEffect(() => {
+    if (prizeStore === null) return;
+    let cancelled = false;
+    setPrizes(EMPTY_PRIZES);
+    void prizeStore.read().then((stored) => {
+      if (!cancelled) setPrizes(stored);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [prizeStore]);
 
   const view = useMemo(
     () =>
@@ -396,7 +422,7 @@ export function App({
    * prize owed on the next read.
    */
   useEffect(() => {
-    if (prizeView.due === 0) return;
+    if (prizeStore === null || prizeView.due === 0) return;
     void prizeStore.awardDue(view.stars).then(setPrizes);
   }, [prizeView.due, view.stars, prizeStore]);
 
@@ -453,6 +479,7 @@ export function App({
 
   const openGift = useCallback(
     (id: PrizeId) => {
+      if (prizeStore === null) return;
       void prizeStore.open(id).then(setPrizes);
     },
     [prizeStore]
@@ -465,6 +492,7 @@ export function App({
 
   const setPrizeGoal = useCallback(
     (goal: number) => {
+      if (prizeStore === null) return;
       void prizeStore.setGoal(goal).then(setPrizes);
     },
     [prizeStore]
@@ -472,6 +500,7 @@ export function App({
 
   const configure = useCallback(
     (id: PrizeId, content: PrizeContent) => {
+      if (prizeStore === null) return;
       void prizeStore.configure(id, content).then(setPrizes);
     },
     [prizeStore]
@@ -488,6 +517,15 @@ export function App({
    */
   const pickImage = useCallback(
     async (file: File): Promise<PrizePick> => {
+      /*
+       * Unreachable: the adult area is only mounted from a screen that already
+       * knows who is playing. Explicit rather than defaulted, because either
+       * silent answer here — "no picture" or a picture filed under nobody — is
+       * a lie told to the adult saving the gift.
+       */
+      if (imageStore === null) {
+        throw new Error("A prize picture needs the child it belongs to");
+      }
       const id = systemImageId();
       let dataUrl: string;
       try {
@@ -511,6 +549,7 @@ export function App({
    */
   const discardImage = useCallback(
     (id: PrizeImageId) => {
+      if (imageStore === null) return;
       void imageStore.remove(id);
     },
     [imageStore]
@@ -527,6 +566,7 @@ export function App({
    */
   const [giftImage, setGiftImage] = useState<string | null>(null);
   useEffect(() => {
+    if (imageStore === null) return;
     const content =
       ceremonyPrize?.state === "unconfigured" ? null : ceremonyPrize?.content;
     if (content?.kind !== "custom" || content.imageId === null) {

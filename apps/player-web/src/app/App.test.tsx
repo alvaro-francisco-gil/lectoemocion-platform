@@ -12,7 +12,7 @@ import type { ChildRecord } from "@lectoemocion/domain";
 import { worldNodes } from "@lectoemocion/resource-schema";
 import { syntheticClass, world } from "@lectoemocion/template-catalog";
 import { LOCAL_OWNER, storageKey } from "../world/progressStore";
-import { prizeStorageKey } from "../world/prizeStore";
+import { giftsKey, LOCAL_GROUP, prizeGoalKey } from "../world/prizeStore";
 import { App } from "./App";
 
 type Destroyable = { destroy: () => void };
@@ -1117,10 +1117,7 @@ describe("reaching the goal", () => {
         stars: 3
       })
     );
-    localStorage.setItem(
-      prizeStorageKey(LOCAL_OWNER),
-      JSON.stringify({ goal: 6, prizes: [] })
-    );
+    localStorage.setItem(prizeGoalKey(LOCAL_GROUP), JSON.stringify({ goal: 6 }));
   }
 
   beforeEach(() => {
@@ -1233,10 +1230,7 @@ describe("reaching the goal", () => {
    * drops the prize just opened and picks up whatever is next.
    */
   it("keeps showing the gift just opened, not the next one waiting", async () => {
-    localStorage.setItem(
-      prizeStorageKey(LOCAL_OWNER),
-      JSON.stringify({ goal: 5, prizes: [] })
-    );
+    localStorage.setItem(prizeGoalKey(LOCAL_GROUP), JSON.stringify({ goal: 5 }));
     localStorage.setItem(
       storageKey(LOCAL_OWNER),
       JSON.stringify({
@@ -1312,6 +1306,93 @@ describe("profiles", () => {
     await renderApp();
 
     await waitFor(() => expect(meterTotal()).toBe("27 / 30"));
+  });
+
+  /**
+   * Adds a child and plays as them, the way an adult does: through the drawer
+   * and the gate.
+   */
+  function addChild(name: string): void {
+    fireEvent.click(screen.getByRole("button", { name: "Añadir niño" }));
+    passAdultGate();
+    fireEvent.change(screen.getByLabelText("Nombre"), {
+      target: { value: name }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+  }
+
+  /*
+   * The goal is the group's and the gifts are the child's. One adult sets one
+   * line for the family; each child fills their own meter towards it and keeps
+   * what they earn. A sibling seeing a wrapped box that is not theirs is the
+   * failure this pair exists to catch, and it is silent — a box on the map
+   * looks the same whoever earned it.
+   */
+  it("keeps one child's regalo out of their sibling's world", async () => {
+    localStorage.setItem(prizeGoalKey(LOCAL_GROUP), JSON.stringify({ goal: 6 }));
+    localStorage.setItem(
+      storageKey(LOCAL_OWNER),
+      JSON.stringify({
+        completedNodes: [],
+        lastPlayedNode: null,
+        rewards: [],
+        stars: 9
+      })
+    );
+    /* Not `renderApp`: a gift is owed the moment this mounts, so the ceremony
+       takes the screen and the avatar in its corner is never drawn. */
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Seguir" }));
+
+    /* Peque earned it: the box is on their map, and their meter has refilled
+       with the three letriestrellas the regalo did not cost. */
+    expect(
+      await screen.findByRole("button", { name: "Tu regalo" })
+    ).toBeVisible();
+    await waitFor(() => expect(meterTotal()).toBe("3 / 6"));
+
+    await openProfiles();
+    addChild("Vera");
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Quién juega: Vera" })
+      ).toBeInTheDocument()
+    );
+    /* Vera's own meter, against the goal the adult set for both of them. */
+    await waitFor(() => expect(meterTotal()).toBe("0 / 6"));
+    expect(screen.queryByRole("button", { name: "Tu regalo" })).toBeNull();
+
+    /* And Peque still has it when they come back. */
+    await openProfiles();
+    fireEvent.click(screen.getByRole("button", { name: "Jugar como Peque" }));
+    expect(
+      await screen.findByRole("button", { name: "Tu regalo" })
+    ).toBeVisible();
+    await waitFor(() => expect(meterTotal()).toBe("3 / 6"));
+  });
+
+  /* The gifts are filed under the playing child's id, exactly as progress is. */
+  it("files an earned regalo under the child who earned it", async () => {
+    localStorage.setItem(prizeGoalKey(LOCAL_GROUP), JSON.stringify({ goal: 6 }));
+    localStorage.setItem(
+      storageKey(LOCAL_OWNER),
+      JSON.stringify({
+        completedNodes: [],
+        lastPlayedNode: null,
+        rewards: [],
+        stars: 6
+      })
+    );
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Seguir" }));
+    await screen.findByRole("button", { name: "Tu regalo" });
+
+    await waitFor(() =>
+      expect(localStorage.getItem(giftsKey(LOCAL_OWNER))).toContain(
+        "unconfigured"
+      )
+    );
   });
 
   it("gives a new child a world of their own without touching the first one", async () => {

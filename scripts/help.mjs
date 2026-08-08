@@ -37,7 +37,7 @@ const SECTIONS = [
     commands: [
       ["node scripts/check-engine-neutral.mjs", "invariant 2: contracts stay engine-neutral"],
       ["node scripts/check-progress-boundary.mjs", "invariant 2: templates never read progress"],
-      ["node scripts/check-progress-namespace.mjs", "one child's stars never become another's"],
+      ["node scripts/check-child-namespace.mjs", "one child's stars and regalos never become another's"],
       ["node scripts/check-firebase-boundary.mjs", "invariant 3: Firebase confined to its boundary"],
       ["node scripts/check-adult-gate.mjs", "invariant 4: the adult area stays behind its gate"],
       ["node scripts/check-strict-types.mjs", "no escapes from strict typing"],

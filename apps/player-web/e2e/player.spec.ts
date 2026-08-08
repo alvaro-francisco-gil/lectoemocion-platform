@@ -31,7 +31,7 @@ import {
 } from "../src/game/templates/syllablesLayout";
 import { STARS_PER_COMPLETION } from "../src/world/worldView";
 import { LOCAL_OWNER, storageKey } from "../src/world/progressStore";
-import { prizeStorageKey } from "../src/world/prizeStore";
+import { LOCAL_GROUP, prizeGoalKey } from "../src/world/prizeStore";
 
 /*
  * The starter profile's progress, by the app's own key builder.
@@ -83,25 +83,23 @@ async function withProgress(page: Page, completedNodes: string[]) {
     },
     { key: STARTER_PROGRESS_KEY, nodes: completedNodes, rewards }
   );
-  await withPrizes(page, { goal: MAX_PRIZE_GOAL, prizes: [] });
+  await withGoal(page, MAX_PRIZE_GOAL);
 }
 
 /**
- * Seeds the adults' side: the goal, and any prizes already awarded.
+ * Seeds the adults' side: the goal the group is playing towards.
  *
  * Through the same key the app reads, for the same reason `withProgress` does:
  * a test that reaches past the store is testing something the product does not
- * do.
+ * do. The goal is the group's — the gifts a child earns against it are filed
+ * under that child, and no test here needs to plant one.
  */
-async function withPrizes(
-  page: Page,
-  prizes: { goal: number; prizes: unknown[] }
-) {
+async function withGoal(page: Page, goal: number) {
   await page.addInitScript(
     ({ key, seed }) => {
       localStorage.setItem(key, JSON.stringify(seed));
     },
-    { key: prizeStorageKey(LOCAL_OWNER), seed: prizes }
+    { key: prizeGoalKey(LOCAL_GROUP), seed: { goal } }
   );
 }
 
@@ -1032,7 +1030,7 @@ const PRIZE_GOAL = MIN_PRIZE_GOAL;
  */
 async function reachGiftScreen(page: Page): Promise<void> {
   await withBankedStars(page, PRIZE_GOAL - STARS_PER_COMPLETION);
-  await withPrizes(page, { goal: PRIZE_GOAL, prizes: [] });
+  await withGoal(page, PRIZE_GOAL);
   await page.goto("/");
   await page.getByRole("button", { name: ENTRY }).click();
   await completed(page, "encuentro");

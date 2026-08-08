@@ -26,6 +26,37 @@ chooses an animal from). An adult, behind a birth-year gate, says what is
 inside; the child opens it and a reveal shows an illustration and a phrase, or
 their own words and optionally a photo. Nothing is ever spent as currency.
 
+### The goal is the group's; the gifts are the child's
+
+One record under one owner would have been simpler and is wrong. Progress is
+already namespaced by the playing profile's id, so a shared family tablet keeps
+two children's stars apart — and a prize ledger keyed by the device would have
+put one child's regalo on their sibling's map while their stars stayed
+separate. Ownership follows what the thing *is*: a goal is a decision an adult
+makes for a family or a class, so it belongs to the group; a gift is something
+a child earned, so it belongs to that child, and the photo an adult attached
+belongs to the gift.
+
+So there are two records. `lectoemocion.prizeGoal.<group>` holds the line,
+`giftsKey(id)` builds `lectoemocion.gifts.<id>` for what one child has earned,
+and `PrizeOwners` carries both. `LOCAL_GROUP` names the one implicit group
+exactly as `LOCAL_OWNER` names the one implicit profile: at the Firestore stage
+each becomes a real id and no caller changes.
+
+`composePrizes` puts the halves back together into the `Prizes` shape every
+consumer already reads, so `derivePrizeView` stays the single place a prize's
+state is decided and no screen learns that the split exists. The split is a
+storage fact, not a domain one.
+
+A record written before the split — one object under
+`lectoemocion.prizes.<owner>`, belonging to the device rather than to anyone on
+it — is read by nothing and written by nothing. Which child earned those gifts
+is recorded nowhere and cannot be inferred, and adopting them under whoever
+happens to be playing is the one failure nobody can undo. It is left in place
+rather than deleted, because a gift an adult already promised is one they can
+still hand over, and throwing away an adult's own words and photo on their
+behalf is not the store's call.
+
 ### The meter is derived, never stored
 
 ```text
@@ -152,7 +183,14 @@ against, and it has to be re-measured when that changes.
 
 - A group's prizes need to live in Firestore. `PrizeStore` is already
   owner-keyed and async, mirroring `ProgressStore`, so this is an
-  implementation swap behind the interface rather than a redesign.
+  implementation swap behind the interface rather than a redesign: `group`
+  becomes a `GroupId` and `child` a child record's id.
+- **Deleting a child has to take their gifts with it.** `LocalProfileStore`
+  removes `storageKey(id)` when a profile is deleted; it does not yet remove
+  `giftsKey(id)` or the pictures under `lectoemocion.prizeImage.<id>.*`, which
+  became that child's only with this split. The pictures cannot be enumerated
+  through the `Storage` slice the stores are given, so this is a change to that
+  seam rather than a line, and it is the next thing owed here.
 - A fifth preset place is wanted. Adding it to `PrizePresetKey` is the one
   change; the compiler names every switch and record that then needs a case.
 - The gate needs to resist more than a curious child — a family sharing one

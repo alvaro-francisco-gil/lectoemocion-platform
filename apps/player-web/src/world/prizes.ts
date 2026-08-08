@@ -11,16 +11,37 @@ import {
  * Separate from `Progress` on purpose. Progress is what a child did; this is
  * what the adults around them decided a star is worth, and the two change for
  * entirely different reasons.
+ *
+ * One shape, two owners. The goal belongs to the group — one family or one
+ * class, one line to reach — and the gifts belong to the child who earned them,
+ * exactly as their stars do. They are stored apart and composed here, so
+ * `derivePrizeView` stays the one place a prize's state is decided and no
+ * screen has to know the split exists.
  */
 export interface Prizes {
   readonly goal: number;
   readonly prizes: readonly Prize[];
 }
 
-export const EMPTY_PRIZES: Prizes = {
-  goal: DEFAULT_PRIZE_GOAL,
-  prizes: []
-};
+/** The group's half: the line every child in it fills a meter towards. */
+export interface PrizeGoal {
+  readonly goal: number;
+}
+
+/** The child's half: the gifts they have earned, in the order they earned them. */
+export interface ChildGifts {
+  readonly prizes: readonly Prize[];
+}
+
+export const DEFAULT_GOAL: PrizeGoal = { goal: DEFAULT_PRIZE_GOAL };
+export const NO_GIFTS: ChildGifts = { prizes: [] };
+
+/** The two stored halves, as the one shape every consumer already reads. */
+export function composePrizes(goal: PrizeGoal, gifts: ChildGifts): Prizes {
+  return { goal: goal.goal, prizes: gifts.prizes };
+}
+
+export const EMPTY_PRIZES: Prizes = composePrizes(DEFAULT_GOAL, NO_GIFTS);
 
 /** The identity and the moment a prize is about to be awarded. */
 export interface PrizeMint {

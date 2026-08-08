@@ -45,23 +45,24 @@ export const isProgressImport = (line) =>
   /from\s+["'][^"']*worldView["']/.test(line);
 
 /**
- * A hand-built progress storage key.
+ * A hand-built per-child storage key.
  *
- * A profile's id *is* its progress namespace: `storageKey(id)` builds
- * `lectoemocion.progress.<id>`, and that is the whole mechanism keeping two
- * children's stars apart. It is a guarantee only while exactly one function
- * builds it. A second place spelling the prefix out can namespace progress by
- * something that is not a profile id — a name, a stale constant, an index —
- * and the failure is silent: no error, no missing data, just a sibling's world
- * quietly becoming yours.
+ * A profile's id *is* its namespace: `storageKey(id)` builds
+ * `lectoemocion.progress.<id>` and `giftsKey(id)` builds
+ * `lectoemocion.gifts.<id>`, and that is the whole mechanism keeping two
+ * children's stars and two children's regalos apart. It is a guarantee only
+ * while exactly one function builds each. A second place spelling a prefix out
+ * can namespace a child's things by something that is not a profile id — a
+ * name, a stale constant, an index — and the failure is silent: no error, no
+ * missing data, just a sibling's world quietly becoming yours.
  *
  * Only a quoted occurrence in code counts. A comment may name the key, and may
  * format it as code in backticks, because documenting the shape is not a second
  * place that builds it.
  */
-export const isProgressKeyLiteral = (line) =>
+export const isChildNamespaceLiteral = (line) =>
   !/^\s*(?:\/\/|\/\*|\*)/.test(line) &&
-  /["'`]lectoemocion\.progress\./.test(line);
+  /["'`]lectoemocion\.(?:progress|gifts)\./.test(line);
 
 export const isConsoleCall = (line) =>
   /\bconsole\.(log|info|warn|error|debug|trace|table|dir)\b/.test(line);

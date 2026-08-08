@@ -11,11 +11,15 @@ import {
 } from "@lectoemocion/domain";
 import {
   awardDue,
+  composePrizes,
   configurePrize,
-  EMPTY_PRIZES,
+  DEFAULT_GOAL,
+  NO_GIFTS,
   openPrize,
   prizesDue,
   setGoal,
+  type ChildGifts,
+  type PrizeGoal,
   type PrizeMint,
   type Prizes
 } from "./prizes";
@@ -24,8 +28,8 @@ import {
  * Where the prizes live.
  *
  * Async and owner-keyed for exactly the reasons `ProgressStore` is: stage 4
- * puts a group's prizes in Firestore behind this interface, and `owner` becomes
- * the group id, without a caller changing.
+ * puts these in Firestore behind this interface, and the owners become real
+ * ids, without a caller changing.
  */
 export interface PrizeStore {
   read(): Promise<Prizes>;
@@ -50,8 +54,49 @@ export interface Minter {
   now(): string;
 }
 
-export function prizeStorageKey(owner: string): string {
-  return `lectoemocion.prizes.${owner}`;
+/**
+ * Who a prize record belongs to.
+ *
+ * Two owners rather than one, because the two halves belong to different
+ * people. An adult sets one goal for a family or a class; each child fills
+ * their own meter against it and owns the gifts they earn — so a sibling
+ * cannot see a regalo they did not earn, just as they cannot see the stars.
+ *
+ * Both are plain strings for the same reason `ProgressStore`'s `owner` is:
+ * today `group` is the one implicit group and `child` is the playing profile's
+ * id, and at the Firestore stage they become a real `GroupId` and a real child
+ * id without a caller changing.
+ */
+export interface PrizeOwners {
+  /** The family or the class the goal is set for. */
+  readonly group: string;
+  /** The profile whose gifts these are — the same id progress is keyed by. */
+  readonly child: string;
+}
+
+/**
+ * The single implicit group, as `LOCAL_OWNER` is the single implicit profile.
+ *
+ * A device with no account still has exactly one family or one class on it, and
+ * naming that seam is what lets the goal become a real group id later without
+ * every caller learning a new concept.
+ */
+export const LOCAL_GROUP = "local";
+
+/** Where the group's goal lives. One line, for every child in the group. */
+export function prizeGoalKey(group: string): string {
+  return `lectoemocion.prizeGoal.${group}`;
+}
+
+/**
+ * Where one child's gifts live, namespaced by their profile id.
+ *
+ * The same derivation `storageKey` makes for progress and for the same reason:
+ * a gift belongs to the child who earned it, and a namespace built from
+ * anything but a profile id hands it silently to a sibling.
+ */
+export function giftsKey(child: string): string {
+  return `lectoemocion.gifts.${child}`;
 }
 
 /**
@@ -79,28 +124,38 @@ export function systemImageId(): PrizeImageId {
 
 type MinimalStorage = Pick<Storage, "getItem" | "setItem">;
 
-/**
- * Reads the list back defensively, on the same terms as stored progress: this
- * is untrusted client state, and a corrupt entry costs one prize rather than
- * the screen. A dropped prize is one an adult can hand over anyway; a thrown
- * error is a child who cannot see any of them.
- */
-function parsePrizes(raw: string | null): Prizes {
-  if (raw === null) return EMPTY_PRIZES;
+/** Anything that is not an object is not a record. */
+function parseRecord(raw: string | null): Record<string, unknown> | null {
+  if (raw === null) return null;
 
   let value: unknown;
   try {
     value = JSON.parse(raw);
   } catch {
-    return EMPTY_PRIZES;
+    return null;
   }
 
-  if (typeof value !== "object" || value === null) return EMPTY_PRIZES;
-  const candidate = value as Record<string, unknown>;
-  return {
-    goal: parseGoal(candidate["goal"]),
-    prizes: parsePrizeList(candidate["prizes"])
-  };
+  if (typeof value !== "object" || value === null) return null;
+  return value as Record<string, unknown>;
+}
+
+/** The group's goal, or the default. A goal is one number and nothing else. */
+function parseStoredGoal(raw: string | null): PrizeGoal {
+  const record = parseRecord(raw);
+  return record === null
+    ? DEFAULT_GOAL
+    : { goal: parseGoal(record["goal"]) };
+}
+
+/**
+ * Reads one child's gifts back defensively, on the same terms as stored
+ * progress: this is untrusted client state, and a corrupt entry costs one
+ * prize rather than the screen. A dropped prize is one an adult can hand over
+ * anyway; a thrown error is a child who cannot see any of them.
+ */
+function parseStoredGifts(raw: string | null): ChildGifts {
+  const record = parseRecord(raw);
+  return record === null ? NO_GIFTS : { prizes: parsePrizeList(record["prizes"]) };
 }
 
 /*
@@ -211,29 +266,30 @@ function parsePrizeList(value: unknown): readonly Prize[] {
   return prizes;
 }
 
+/**
+ * The two records, read and written apart, handed out composed.
+ *
+ * A record written before the goal and the gifts were split — one object under
+ * `lectoemocion.prizes.<owner>`, belonging to the device rather than to anyone
+ * on it — is read by nothing here and written by nothing. Which child earned
+ * those gifts is not recorded anywhere and cannot be inferred, and a regalo
+ * surfacing under the wrong child's name is the one outcome nobody can undo. It
+ * is left where it is rather than deleted: a gift an adult already promised is
+ * one they can still hand over, and throwing away an adult's own words and
+ * photo on their behalf is not this store's call.
+ */
 export class LocalPrizeStore implements PrizeStore {
-  private fallback: Prizes = EMPTY_PRIZES;
+  private goalFallback: PrizeGoal = DEFAULT_GOAL;
+  private giftsFallback: ChildGifts = NO_GIFTS;
 
   constructor(
     private readonly storage: MinimalStorage,
-    private readonly owner: string,
+    private readonly owners: PrizeOwners,
     private readonly minter: Minter
   ) {}
 
   async read(): Promise<Prizes> {
-    try {
-      const raw = this.storage.getItem(prizeStorageKey(this.owner));
-      /*
-       * A denied write never reaches storage, so a later read sees `null`
-       * rather than an exception. Preferring the in-memory fallback whenever
-       * storage has nothing keeps a session self-consistent even when every
-       * write this device makes is silently dropped.
-       */
-      return raw === null ? this.fallback : parsePrizes(raw);
-    } catch {
-      /* Private browsing and locked-down panel browsers can deny storage. */
-      return this.fallback;
-    }
+    return composePrizes(this.readGoal(), this.readGifts());
   }
 
   async awardDue(starsEarned: number): Promise<Prizes> {
@@ -245,15 +301,15 @@ export class LocalPrizeStore implements PrizeStore {
       id: this.minter.prizeId(),
       at: this.minter.now()
     }));
-    return this.write(awardDue(current, starsEarned, mints));
+    return this.writeGifts(awardDue(current, starsEarned, mints));
   }
 
   async configure(id: PrizeId, content: PrizeContent): Promise<Prizes> {
-    return this.write(configurePrize(await this.read(), id, content));
+    return this.writeGifts(configurePrize(await this.read(), id, content));
   }
 
   async open(id: PrizeId): Promise<Prizes> {
-    return this.write(openPrize(await this.read(), id, this.minter.now()));
+    return this.writeGifts(openPrize(await this.read(), id, this.minter.now()));
   }
 
   /**
@@ -267,16 +323,56 @@ export class LocalPrizeStore implements PrizeStore {
     const current = await this.read();
     const checked = checkPrizeGoal(goal);
     if (!checked.ok) return current;
-    return this.write(setGoal(current, checked.goal));
+    return this.writeGoal(setGoal(current, checked.goal));
   }
 
-  private write(next: Prizes): Prizes {
-    this.fallback = next;
+  /*
+   * A denied write never reaches storage, so a later read sees `null` rather
+   * than an exception. Preferring the in-memory fallback whenever storage has
+   * nothing keeps a session self-consistent even when every write this device
+   * makes is silently dropped.
+   */
+  private readGoal(): PrizeGoal {
     try {
-      this.storage.setItem(prizeStorageKey(this.owner), JSON.stringify(next));
+      const raw = this.storage.getItem(prizeGoalKey(this.owners.group));
+      return raw === null ? this.goalFallback : parseStoredGoal(raw);
+    } catch {
+      /* Private browsing and locked-down panel browsers can deny storage. */
+      return this.goalFallback;
+    }
+  }
+
+  private readGifts(): ChildGifts {
+    try {
+      const raw = this.storage.getItem(giftsKey(this.owners.child));
+      return raw === null ? this.giftsFallback : parseStoredGifts(raw);
+    } catch {
+      return this.giftsFallback;
+    }
+  }
+
+  /*
+   * Each half is written under its own key, so a change to one is never a
+   * rewrite of the other: an adult moving the goal cannot touch a child's
+   * gifts, and a gift awarded by one child cannot restate the group's line.
+   */
+  private writeGoal(next: Prizes): Prizes {
+    this.goalFallback = { goal: next.goal };
+    this.put(prizeGoalKey(this.owners.group), this.goalFallback);
+    return next;
+  }
+
+  private writeGifts(next: Prizes): Prizes {
+    this.giftsFallback = { prizes: next.prizes };
+    this.put(giftsKey(this.owners.child), this.giftsFallback);
+    return next;
+  }
+
+  private put(key: string, record: PrizeGoal | ChildGifts): void {
+    try {
+      this.storage.setItem(key, JSON.stringify(record));
     } catch {
       /* Same as above: an unwritable store must not break the session. */
     }
-    return next;
   }
 }
