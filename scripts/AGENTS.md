@@ -14,12 +14,19 @@ includes them.
 | `check-*.mjs` | One executable per invariant |
 | `help.mjs` | The `pnpm commands` index |
 | `import-*.mjs` | One-off content importers — not guardrails, not run by `pnpm check` |
+| `verify-deployment.mjs` | Checks the live site after a deploy — not a guardrail |
 | `mobile-emulator.mjs` | Drives the native shell on an Android emulator — not a guardrail |
 | `lib/` | Pure logic for the non-guardrail scripts, with tests beside it |
 
 Rules live apart from the scripts that run them so they can be unit-tested. A
 guardrail nobody proved can fail is decoration — that is why `rules.test.ts`
 exists and why every new rule needs a case there.
+
+`verify-deployment.mjs` is deliberately outside that set. Guardrails scan source
+and must run offline before any install; it needs a site that exists, so
+`pnpm check` cannot depend on it without making the gate require a network and
+a deploy. Its rules still live in `lib/deployed-player.mjs` and are tested
+beside it, for the same reason every other rule is.
 
 ## Adding a guardrail
 

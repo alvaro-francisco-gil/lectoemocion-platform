@@ -56,6 +56,14 @@ disk. Assets are served immutable and `index.html` is not, so a tester picks up
 a new build on reload instead of reporting bugs you already fixed. That caching
 is the fallback ADR 0009 names for offline launch, not an optimisation.
 
+```bash
+pnpm verify:deployment
+```
+
+checks the live site afterwards: the page answers and is uncached, every hashed
+asset resolves and is cached hard, and an unknown path still 404s. It does not
+prove the player renders — a bundle that downloads and then throws passes it.
+
 `.firebaserc` pins the project to `lectoemocion-game`, whose Firestore is in
 `europe-southwest1`. The project belongs to a different Google account than the
 Firebase CLI's global default, so each checkout needs the account set once:

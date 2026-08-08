@@ -36,7 +36,8 @@ const SECTIONS = [
   {
     title: "Share a build",
     commands: [
-      ["pnpm deploy:player", "build, then publish the player to Firebase Hosting"]
+      ["pnpm deploy:player", "build, then publish the player to Firebase Hosting"],
+      ["pnpm verify:deployment", "check the live site's headers, assets, and 404"]
     ]
   },
   {
