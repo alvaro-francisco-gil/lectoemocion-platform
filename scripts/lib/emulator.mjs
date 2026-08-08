@@ -213,6 +213,86 @@ export function metroArgs(extraArgs = []) {
 }
 
 /**
+ * Interfaces that exist on this machine and never reach a phone.
+ *
+ * Container bridges, VPN tunnels, and Hyper-V switches all hold ordinary-looking
+ * private addresses. `172.20.144.1` on `vEthernet (Default Switch)` is
+ * indistinguishable from a real LAN address by its octets alone.
+ */
+const VIRTUAL_INTERFACE = /^(lo|docker|br-|veth|virbr|tun|tap|vEthernet|Tailscale|Bluetooth)/i;
+
+const IPV4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+
+/** Octets, or null if this is not a dotted-quad in range. */
+function parseIpv4(address) {
+  const match = IPV4.exec(address);
+  if (!match) return null;
+  const octets = match.slice(1).map(Number);
+  return octets.every((octet) => octet >= 0 && octet <= 255) ? octets : null;
+}
+
+/**
+ * RFC 1918 space — what a home or classroom router hands out.
+ *
+ * Requiring it rejects three traps at once, without naming any of them: the
+ * `169.254/16` address a WiFi adapter keeps when it has no DHCP lease, the
+ * `100.64/10` carrier-grade NAT space Tailscale uses, and any public address,
+ * which must never be advertised as a dev server.
+ */
+function isPrivateLan([a, b]) {
+  if (a === 10) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  return a === 192 && b === 168;
+}
+
+/**
+ * The address a phone on the same network uses to reach this machine.
+ *
+ * Expo's own `--lan` picks an adapter heuristically, and on a machine with a
+ * Tailscale tunnel, two container bridges, a Hyper-V switch and a leaseless
+ * WiFi adapter it will happily advertise one that routes nowhere. The failure
+ * is a QR code that scans correctly and then dies inside Expo Go with a message
+ * naming neither the address it tried nor why it was unreachable.
+ *
+ * So this never guesses. Exactly one surviving candidate resolves; anything
+ * else is a stated failure listing what was considered. `MOBILE_LAN_HOST` is
+ * the escape hatch, and it wins outright — mirrored WSL networking and VPNs
+ * both produce reachable addresses that are absent from this list.
+ */
+export function selectLanHost(interfaces, override) {
+  if (override !== undefined) {
+    if (!parseIpv4(override)) {
+      return { kind: "unusable", problem: "override-invalid", candidates: [], rejected: [] };
+    }
+    return { kind: "resolved", host: override, label: "MOBILE_LAN_HOST" };
+  }
+
+  const candidates = [];
+  const rejected = [];
+  for (const entry of [...interfaces]) {
+    if (entry.family !== "IPv4" || entry.internal) continue;
+    const octets = parseIpv4(entry.address);
+    const described = { host: entry.address, label: entry.name };
+    if (octets && isPrivateLan(octets) && !VIRTUAL_INTERFACE.test(entry.name)) {
+      candidates.push(described);
+    } else {
+      rejected.push(described);
+    }
+  }
+
+  const [only] = candidates;
+  if (only && candidates.length === 1) {
+    return { kind: "resolved", host: only.host, label: only.label };
+  }
+  return {
+    kind: "unusable",
+    problem: candidates.length === 0 ? "none" : "ambiguous",
+    candidates,
+    rejected
+  };
+}
+
+/**
  * The first candidate that is a *Windows* Android SDK.
  *
  * Existence is not the test. This machine has a Linux SDK in
@@ -310,6 +390,60 @@ export function problem(kind, detail = {}) {
       return [
         `Metro is not answering on port ${METRO_PORT}.`,
         "→ In another terminal, from the repository root: pnpm mobile:start"
+      ].join("\n");
+    case "lan-host-unknown":
+      return [
+        "No usable LAN address on this machine.",
+        ...(detail.rejected ?? []).map((entry) => `  rejected: ${entry.host} (${entry.label})`),
+        "→ Connect to the network the phone is on, then retry. If the address is",
+        "  one this cannot see — a VPN, or mirrored WSL networking — set it",
+        "  explicitly: MOBILE_LAN_HOST=<address> pnpm mobile:lan"
+      ].join("\n");
+    case "lan-host-ambiguous":
+      return [
+        "More than one LAN address — refusing to guess which one the phone can reach.",
+        ...(detail.candidates ?? []).map((entry) => `  ${entry.host} (${entry.label})`),
+        "→ Pick the one on the phone's network:",
+        "  MOBILE_LAN_HOST=<address> pnpm mobile:lan"
+      ].join("\n");
+    case "lan-host-invalid":
+      return [
+        `MOBILE_LAN_HOST is not an IPv4 address: ${detail.host}`,
+        "→ Use a dotted quad, such as 192.168.1.186. A hostname will not do:",
+        "  it is baked into the JS bundle and resolved on the phone, not here."
+      ].join("\n");
+    case "player-dev-exited":
+      return [
+        "The player's dev server exited instead of starting.",
+        `Its output is above; the usual cause is that port ${detail.port} is`,
+        "already taken by a 'pnpm dev' from an earlier session.",
+        "",
+        `→ Stop that one — Ctrl+C in its terminal — and run this again.`,
+        `  To find it:  ss -ltnp | grep ${detail.port}`
+      ].join("\n");
+    case "player-not-on-lan":
+      return [
+        `The player's dev server is not reachable at http://${detail.host}:${detail.port}.`,
+        "Two things cause this, and from the phone both look like a blank screen:",
+        "",
+        "  1. It is bound to loopback. Check the 'Local:' line Vite printed",
+        `     above — if it says 127.0.0.1 rather than ${detail.host}, then`,
+        "     PLAYER_HOST did not reach it. Turbo runs tasks in strict env mode,",
+        "     so it must be listed in turbo.json's 'dev' passThroughEnv.",
+        "",
+        "  2. The Windows firewall is dropping the port. In an *Administrator*",
+        "     PowerShell, once:",
+        `       New-NetFirewallRule -DisplayName "LectoEmocion player WSL" \``,
+        `         -Direction Inbound -Action Allow -Protocol TCP \``,
+        `         -LocalPort ${detail.port} -Profile Any`,
+        "",
+        "     `-Profile Any` deliberately. Windows classifies most wired and",
+        "     unfamiliar networks as *Public*, so a rule scoped Private is",
+        "     accepted, listed, and never matches — which looks identical to",
+        "     having no rule at all. Check with:",
+        "       Get-NetConnectionProfile | Select Name,NetworkCategory",
+        "",
+        "→ Rule out (1) first: it costs nothing and needs no administrator."
       ].join("\n");
     case "expo-go-missing":
       return [
