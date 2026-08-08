@@ -964,11 +964,15 @@ function PrizeMeter({ filled, goal }: { filled: number; goal: number }) {
         Hidden from a screen reader, not because it says nothing but because
         the meter below says it already, and in fuller words.
       */}
+      {/*
+        The number first, then what it counts: "3 letriestrellas", the way it
+        is said aloud, rather than a label with a figure hung off it.
+      */}
       <p className="prize-count" aria-hidden="true">
+        {filled}
         <span className="prize-count__star">
           <StarIcon />
         </span>
-        {filled}
       </p>
       <section
         className="prize-meter"
