@@ -17,7 +17,14 @@ const server = resolvePlayerServer(import.meta.dirname, process.env["PLAYER_PORT
  * A physical phone running the native shell cannot reach loopback, so
  * developing `apps/mobile` against this server needs `PLAYER_HOST=0.0.0.0`.
  * That is opt-in: exposing a dev server to the local network is a deliberate
- * act, not a default.
+ * act, not a default. `pnpm mobile:lan` sets it.
+ *
+ * It must also be listed in `turbo.json`'s `dev` task under `passThroughEnv`,
+ * along with `PLAYER_PORT`. Turbo runs tasks in strict env mode, so anything
+ * not named there is stripped before this file runs — and both variables fail
+ * *silently* when that happens. `PLAYER_HOST` falls back to loopback, which a
+ * phone cannot reach; `PLAYER_PORT` falls back to the derived port, which is
+ * how a worktree ends up serving the primary checkout's code.
  */
 const host = process.env["PLAYER_HOST"] ?? "127.0.0.1";
 
