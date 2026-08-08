@@ -58,13 +58,8 @@ import {
 import { ProfileMenu } from "./ProfileMenu";
 import { AdultArea } from "./adult";
 import { Gift } from "./Gift";
-import {
-  BackArrow,
-  ChestIcon,
-  GiftIcon,
-  GiftShadow,
-  StarIcon
-} from "./icons";
+import { BackArrow, ChestIcon, GiftIcon, StarIcon } from "./icons";
+import { PrizeCount, PrizeRing } from "./PrizeReadout";
 
 /*
  * A store that answers nothing, for a browser that has no storage at all —
@@ -205,6 +200,8 @@ export function App({
    */
   const [tab, setTab] = useState<TabId>("juegos");
   const host = useRef<HTMLDivElement>(null);
+  /* Where the stars are flying to. Measured, never derived from the stylesheet. */
+  const pill = useRef<HTMLParagraphElement>(null);
   const panWorld = useDragScroll();
 
   useEffect(() => {
@@ -737,7 +734,12 @@ export function App({
           <img src={avatarImageUrl(playing.avatarId)} alt="" />
         </button>
       ) : null}
-      <PrizeCount filled={prizeView.filled} />
+      <PrizeCount
+        shown={prizeView.filled}
+        arriving={false}
+        landings={0}
+        pill={pill}
+      />
       {/*
         The reward corner, as one column.
 
@@ -749,7 +751,7 @@ export function App({
         make the corner's order a thing each branch has to remember.
       */}
       <div className="world__gifts">
-        <PrizeRing filled={prizeView.filled} goal={prizeView.goal} />
+        <PrizeRing shown={prizeView.filled} goal={prizeView.goal} landings={0} />
         {waiting ? (
           <button
             type="button"
@@ -940,110 +942,6 @@ function describeProfileFailure(error: unknown): string {
   return error instanceof ProfileStoreError
     ? error.message
     : "Ha ocurrido un fallo inesperado.";
-}
-
-/**
- * How close the child is to the next regalo.
- *
- * The one readout on the world screen. A lifetime total used to sit beside it,
- * and two numbers in one corner is one too many for a child of three who reads
- * neither: what a child at this age can actually use is the one that says how
- * much further.
- *
- * Two things in two corners, because they answer two questions. What a child
- * has is a count of letriestrellas, and it sits top-right where the readout has
- * always been. What they are working towards is the gift, and the ring closing
- * around it sits bottom-left, out of the way of both the avatar above it and
- * the animals opposite — directly above the gift already won, when there is
- * one, because "what is coming" belongs over "what is here".
- *
- * Which is why these are two components and not one. They are rendered into
- * two different places on the screen: `PrizeCount` into its own corner, and
- * `PrizeRing` into the reward column that the waiting gift shares.
- *
- * A ring rather than a bar, and no second number. "24 / 30" asks a pre-reader
- * to hold two figures and divide them; a ring three-quarters round says the
- * same thing in the one language they already have, and the goal it is measured
- * against never has to be read at all. It is still stated on the element, so a
- * screen reader gets the whole sentence — once, from the meter, which is why
- * the count opposite is hidden from it.
- *
- * Inside the ring is the gift itself, as a shadow: what the ring is filling
- * towards, drawn as the thing rather than named as a number. It arrives in
- * colour on the gift screen, and the shadow is the promise of that arrival.
- * Nothing is drawn behind it — the shadow and the gold arc are the whole
- * picture, and a disc under them would only be a second shape to read.
- *
- * Neither half exists before the first letriestrella. "0" is a fact only a
- * reader can take, and an empty ring around a gift nobody has started earning
- * is a promise made to a child who has not asked for one yet. The whole readout
- * arrives with the first star, which makes its appearance part of the reward.
- *
- * Display only, and that is what keeps the reach-band rule intact: neither half
- * is a thing to press, so neither competes with the bar for the band where
- * hands land. They live on the world alone, because a meter filling beside a
- * running game is a second thing to watch.
- */
-function PrizeCount({ filled }: { filled: number }) {
-  /* Nothing yet is nothing to show, in either corner. */
-  if (filled === 0) return null;
-
-  return (
-    /*
-      Hidden from a screen reader, not because it says nothing but because the
-      ring says it already, and in fuller words.
-
-      The number first, then what it counts: "3 letriestrellas", the way it is
-      said aloud, rather than a label with a figure hung off it.
-    */
-    <p className="prize-count" aria-hidden="true">
-      {filled}
-      <span className="prize-count__star">
-        <StarIcon />
-      </span>
-    </p>
-  );
-}
-
-function PrizeRing({ filled, goal }: { filled: number; goal: number }) {
-  if (filled === 0) return null;
-
-  /* Whole percent, because the ring is drawn in hundredths of its own path. */
-  const percentFilled = Math.round((filled / goal) * 100);
-  return (
-    <section
-      className="prize-meter"
-      role="meter"
-      aria-label="Letriestrellas hacia el próximo regalo"
-      aria-valuenow={filled}
-      aria-valuemin={0}
-      aria-valuemax={goal}
-    >
-      {/*
-        Decoration: the meter itself already states the fill and the goal, and
-        a screen reader reading the ring as well would say it twice.
-
-        `pathLength="100"` makes the dash array a percentage regardless of the
-        radius, so the geometry can be retuned without recomputing anything —
-        and the ring starts at twelve o'clock, which is where a child watching
-        something fill expects it to start.
-      */}
-      <svg className="prize-meter__ring" viewBox="0 0 48 48" aria-hidden="true">
-        <circle
-          className="prize-meter__fill"
-          cx="24"
-          cy="24"
-          r="21"
-          pathLength="100"
-          strokeDasharray={`${percentFilled} ${100 - percentFilled}`}
-          transform="rotate(-90 24 24)"
-        />
-      </svg>
-      <span className="prize-meter__gift" aria-hidden="true">
-        <GiftShadow />
-      </span>
-    </section>
-  );
 }
 
 /**

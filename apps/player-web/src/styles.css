@@ -530,6 +530,25 @@ main { height: 100dvh; }
   pointer-events: none;
 }
 
+/*
+ * A landing, drawn on the thing that received it.
+ *
+ * A scale rather than a colour: the pill is white on a busy map, and a child
+ * watching a star arrive is watching the corner, not reading it. It transitions
+ * both ways from one rule, so a second star landing mid-flare simply retargets
+ * the same transition instead of restarting an animation.
+ */
+.prize-count {
+  transition: transform 180ms ease-out;
+}
+.prize-count[data-flaring] {
+  transform: scale(1.18);
+}
+/* Laid out so a flight can measure it, unseen because it still says nought. */
+.prize-count[data-waiting] {
+  visibility: hidden;
+}
+
 /* Sized off the pill it sits in, so the two never drift apart. */
 .prize-count__star {
   display: block;
@@ -591,10 +610,24 @@ main { height: 100dvh; }
   stroke: #f4c95d;
   stroke-width: 5;
   stroke-linecap: butt;
-  transition: stroke-dasharray 400ms ease-out;
+  transition:
+    stroke-dasharray 400ms ease-out,
+    stroke 200ms ease-out,
+    stroke-width 200ms ease-out;
+}
+
+/*
+ * The ring answers the same landing, brighter and a little heavier. Not a
+ * `drop-shadow`: the classroom panel's fill rate is a product concern, and a
+ * stroke change costs nothing.
+ */
+.prize-meter[data-flaring] .prize-meter__fill {
+  stroke: #ffe4a3;
+  stroke-width: 6.5;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .prize-count,
   .prize-meter__fill {
     transition: none;
   }

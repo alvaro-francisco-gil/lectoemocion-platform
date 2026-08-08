@@ -1,0 +1,164 @@
+import { useEffect, useState, type RefObject } from "react";
+import { GiftShadow, StarIcon } from "./icons";
+
+/** How long a landing is marked for, so the flare reads as one beat. */
+export const FLARE_MS = 420;
+
+/**
+ * True for one beat after each landing.
+ *
+ * Driven by the running total rather than by a boolean, because two stars
+ * landing 110ms apart must flare twice: a flag that was already `true` would
+ * swallow the second, and the child would see three stars arrive and two
+ * things happen.
+ */
+function useFlare(landings: number): boolean {
+  const [flaring, setFlaring] = useState(false);
+  useEffect(() => {
+    if (landings === 0) return undefined;
+    setFlaring(true);
+    const timer = window.setTimeout(() => setFlaring(false), FLARE_MS);
+    return () => window.clearTimeout(timer);
+  }, [landings]);
+  return flaring;
+}
+
+/**
+ * How close the child is to the next regalo.
+ *
+ * The one readout on the world screen. A lifetime total used to sit beside it,
+ * and two numbers in one corner is one too many for a child of three who reads
+ * neither: what a child at this age can actually use is the one that says how
+ * much further.
+ *
+ * Two things in two corners, because they answer two questions. What a child
+ * has is a count of letriestrellas, and it sits top-right where the readout has
+ * always been. What they are working towards is the gift, and the ring closing
+ * around it sits bottom-left, out of the way of both the avatar above it and
+ * the animals opposite — directly above the gift already won, when there is
+ * one, because "what is coming" belongs over "what is here".
+ *
+ * Which is why these are two components and not one. They are rendered into
+ * two different places on the screen: `PrizeCount` into its own corner, and
+ * `PrizeRing` into the reward column that the waiting gift shares.
+ *
+ * A ring rather than a bar, and no second number. "24 / 30" asks a pre-reader
+ * to hold two figures and divide them; a ring three-quarters round says the
+ * same thing in the one language they already have, and the goal it is measured
+ * against never has to be read at all. It is still stated on the element, so a
+ * screen reader gets the whole sentence — once, from the meter, which is why
+ * the count opposite is hidden from it.
+ *
+ * Inside the ring is the gift itself, as a shadow: what the ring is filling
+ * towards, drawn as the thing rather than named as a number. It arrives in
+ * colour on the gift screen, and the shadow is the promise of that arrival.
+ * Nothing is drawn behind it — the shadow and the gold arc are the whole
+ * picture, and a disc under them would only be a second shape to read.
+ *
+ * Neither half exists before the first letriestrella. "0" is a fact only a
+ * reader can take, and an empty ring around a gift nobody has started earning
+ * is a promise made to a child who has not asked for one yet. The whole readout
+ * arrives with the first star, which makes its appearance part of the reward.
+ *
+ * Display only, and that is what keeps the reach-band rule intact: neither half
+ * is a thing to press, so neither competes with the bar for the band where
+ * hands land. They live on the world alone, because a meter filling beside a
+ * running game is a second thing to watch.
+ *
+ * Both halves draw `shown` rather than what the child has earned. The two part
+ * company for about a second after a finish, while the stars are still on their
+ * way here — see `src/world/starArrival.ts`. `role="meter"` is polled rather
+ * than announced, so that lag is invisible to a screen reader and there is no
+ * need for a second number.
+ */
+export function PrizeCount({
+  shown,
+  arriving,
+  landings,
+  pill
+}: {
+  shown: number;
+  /** Stars are in the air, so the pill must be laid out for them to aim at. */
+  arriving: boolean;
+  landings: number;
+  pill: RefObject<HTMLParagraphElement | null>;
+}) {
+  const flaring = useFlare(landings);
+
+  /* Nothing yet, and nothing on its way: nothing to show. */
+  if (shown === 0 && !arriving) return null;
+
+  return (
+    /*
+      Hidden from a screen reader, not because it says nothing but because the
+      ring says it already, and in fuller words.
+
+      The number first, then what it counts: "3 letriestrellas", the way it is
+      said aloud, rather than a label with a figure hung off it.
+    */
+    <p
+      ref={pill}
+      className="prize-count"
+      aria-hidden="true"
+      data-waiting={shown === 0 ? "" : undefined}
+      data-flaring={flaring ? "" : undefined}
+    >
+      {shown}
+      <span className="prize-count__star">
+        <StarIcon />
+      </span>
+    </p>
+  );
+}
+
+export function PrizeRing({
+  shown,
+  goal,
+  landings
+}: {
+  shown: number;
+  goal: number;
+  landings: number;
+}) {
+  const flaring = useFlare(landings);
+
+  if (shown === 0) return null;
+
+  /* Whole percent, because the ring is drawn in hundredths of its own path. */
+  const percentFilled = Math.round((shown / goal) * 100);
+  return (
+    <section
+      className="prize-meter"
+      role="meter"
+      aria-label="Letriestrellas hacia el próximo regalo"
+      aria-valuenow={shown}
+      aria-valuemin={0}
+      aria-valuemax={goal}
+      data-flaring={flaring ? "" : undefined}
+    >
+      {/*
+        Decoration: the meter itself already states the fill and the goal, and
+        a screen reader reading the ring as well would say it twice.
+
+        `pathLength="100"` makes the dash array a percentage regardless of the
+        radius, so the geometry can be retuned without recomputing anything —
+        and the ring starts at twelve o'clock, which is where a child watching
+        something fill expects it to start.
+      */}
+      <svg className="prize-meter__ring" viewBox="0 0 48 48" aria-hidden="true">
+        <circle
+          className="prize-meter__fill"
+          cx="24"
+          cy="24"
+          r="21"
+          pathLength="100"
+          strokeDasharray={`${percentFilled} ${100 - percentFilled}`}
+          transform="rotate(-90 24 24)"
+        />
+      </svg>
+      <span className="prize-meter__gift" aria-hidden="true">
+        <GiftShadow />
+      </span>
+    </section>
+  );
+}
