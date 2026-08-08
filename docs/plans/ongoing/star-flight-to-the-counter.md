@@ -3,10 +3,33 @@
 ## Status
 
 - **Updated:** 2026-08-08
-- **Stage:** designed and planned; implementation not started.
-- **Branch:** `feat/star-flight`, worktree `.worktrees/star-flight`, branched
-  from `86fc8fa`.
-- **Next:** Task 1.
+- **Stage:** built and verified; merging.
+- **Branch:** `feat/star-flight`, worktree `.worktrees/star-flight`, rebased
+  onto `ef6d575`.
+- **Done:** the arrival reducer, the readout's own file, the flight itself,
+  its wiring into `App`, and a browser proof all shipped and are covered by
+  `pnpm check` and `pnpm test:e2e`. A chapter finish now returns the child to
+  a world still showing the old letriestrella count, and three stars fly from
+  the middle of the screen to the counter, landing one at a time, each landing
+  ticking the pill and the ring together.
+
+  Two corrections to the design below, made during Task 4, that the rest of
+  this document does not yet reflect:
+
+  - **Readiness is an identity, not a boolean.** The reducer's first `reading`
+    must not fire until `progress` and `prizes` have actually answered *for
+    the child currently selected* — a first reading carrying the placeholder
+    zero spends the reducer's "a cold start never flies" branch, after which
+    the real total arrives as an increase and is withheld. A boolean flag
+    lags one commit behind `selectedId` and showed the previous child's total
+    on a profile switch, so readiness is `progressReadFor === selectedId &&
+    prizesReadFor === selectedId`, compared at render.
+  - **The flight is gated on `bookOverlaid`, not on `stamping` alone.**
+    `bookOverlaid = animalBookOpen || stamping !== null` is the same
+    predicate that draws the animal book. A flight playing out behind the
+    book is a flight the child never sees, landing in a corner the book is
+    covering.
+- **Next:** merge to main, distil into ADR 0012, delete this file.
 - **Blockers:** none.
 
 ## What a child sees
@@ -172,6 +195,21 @@ motion explicitly.
   `prizes.ts` is untouched.
 - Sound. The award screen is silent today and this does not change that.
 - Animating the gift ceremony or the chests.
+
+## Known limitation
+
+The reducer learns that the world is on screen only from `StarFlight`
+mounting — a one-shot signal, not an arrive/leave pair. If `filled` ever rose
+while the world stayed mounted, the `reading` that carried the increase would
+have no further `arrived` to collect it, and the displayed count would sit
+permanently behind the truth.
+
+That path is currently unreachable: stars are only paid by a finish, and a
+finish always unmounts the world for the award screen, so every increase is
+guaranteed a fresh mount to arrive on. Closing it properly would mean giving
+the reducer an arrive/leave pair instead of a mount signal, which is a change
+to the event set — left here for whoever next changes what pays a
+letriestrella without also unmounting the world.
 
 ---
 

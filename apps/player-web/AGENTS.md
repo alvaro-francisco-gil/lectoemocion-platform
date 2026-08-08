@@ -102,6 +102,15 @@ The world is what a child who cannot read navigates, so it is pictures first.
   and reach the prize goal. The gift is held in `detour` until the animal's
   stamp has landed, because the book is a layer over the world and a screen
   returning early would replace the frame the stamp is drawn in.
+- **The counter draws `shown`, not what the child has earned.** For about a
+  second after a finish the two differ: the letriestrellas are still flying
+  from the middle of the screen to the corner, and the number climbs as each
+  one lands. `src/world/starArrival.ts` is the one place that gap is decided —
+  it holds an increase until the world is back on screen, snaps rather than
+  counting down when a regalo has just spent the meter, and never flies on a
+  cold start or a change of player. A screen that wants the true figure reads
+  `PrizeView.filled`; nothing else may grow a second opinion about what the
+  corner says.
 
 ## Rendering rules
 

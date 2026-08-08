@@ -851,8 +851,11 @@ export function App({
         a flight that plays out behind the book is a flight the child never
         sees, landing in a corner the book is covering. Gated on `bookOverlaid`
         rather than `stamping` alone, so a child opening the book mid-flight
-        does not unmount `StarFlight`, clear its timers, and have already-
-        landed stars fly again from the start on remount.
+        does unmount `StarFlight` and clear its timers — a flight resumes,
+        restarted, when the book closes, and the count still lands exactly
+        right, because any landings the restart double-schedules are swallowed
+        as stray timers on a flight that has already cleared. A flight the
+        child cannot see is worse than a flight that restarts.
       */}
       {bookOverlaid ? null : (
         <StarFlight
