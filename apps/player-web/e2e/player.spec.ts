@@ -512,12 +512,8 @@ test("the world list is gone while a resource plays", async ({ page }) => {
   await expect(page.locator("canvas")).toBeVisible();
   await expect(worldList).toBeHidden();
   await expect(page.getByRole("button", { name: SECOND })).toHaveCount(0);
-  /* The counter, the meter and the bar belong to the world screens too:
-     nothing counts up, nothing fills, and nothing offers a way out sideways,
-     beside a running game. */
-  await expect(page.getByRole("region", { name: "Letriestrellas" })).toHaveCount(
-    0
-  );
+  /* The meter and the bar belong to the world screens too: nothing fills, and
+     nothing offers a way out sideways, beside a running game. */
   await expect(
     page.getByRole("meter", { name: "Letriestrellas hacia el próximo regalo" })
   ).toHaveCount(0);

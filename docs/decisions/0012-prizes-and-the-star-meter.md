@@ -41,6 +41,19 @@ safe — lowering the goal owes a prize at once without rewriting what an
 earlier prize cost, and raising it just moves the line the same fill is
 measured against.
 
+### The meter is the world's only readout
+
+The star on the meter is the meter's picture, so a lifetime total drawn with
+the same star beside it is the same symbol carrying two different numbers in
+one corner. A child of three reads neither number; what they can use is the one
+that says how much further, and the collapse to `PrizeMeter` alone is what
+makes the corner say one thing.
+
+The lifetime total is not lost, only undrawn: `Progress.stars` is still what
+the meter is derived from, and `starsClaimed` still records what each regalo
+cost, so a screen that ever needs "how many have you earned in all" can ask
+`derivePrizeView` for it rather than keeping a second badge on a child's map.
+
 ### A prize is a three-state union
 
 `"unconfigured" | "ready" | "opened"`, one object rather than optional fields,

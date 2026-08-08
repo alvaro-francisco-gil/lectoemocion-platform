@@ -89,16 +89,13 @@ main { height: 100dvh; }
   /*
    * The band the world's own chrome lives in, in one place.
    *
-   * Four boxes hang off the top corners — the avatar, the menu button, the star
-   * counter and the prize meter — and each of the two stacks has to sit under
-   * the one above it. Written once here so a stack cannot drift: `--readout-top`
-   * is how far in from the edge the first box starts, `--readout-height` is the
-   * counter's own box (a `1.3em` star with `0.3em` of padding above and below
-   * it) and `--avatar-size` is the face's.
+   * Three boxes hang off the top corners — the avatar and the menu button on
+   * the left, the prize meter alone on the right — and the menu button has to
+   * sit under the face above it. Written once here so that stack cannot drift:
+   * `--readout-top` is how far in from the edge the first box starts, and
+   * `--avatar-size` is the face's own.
    */
   --readout-top: clamp(0.5rem, 2vh, 1.25rem);
-  --readout-font: clamp(1.1rem, 3.8vw, 2.6rem);
-  --readout-height: calc(1.9 * var(--readout-font));
   --avatar-size: clamp(72px, 8vw, 104px);
   position: relative;
   display: grid;
@@ -400,63 +397,26 @@ main { height: 100dvh; }
 /* ---------------------------------------------------------------- stars */
 
 /*
- * The running total, over the world's top-right corner.
+ * How close the child is to the next regalo, over the world's top-right corner.
  *
- * On the right because the corner opposite is where the app's own controls
- * live: what was won and what an adult can change never share a corner. The
- * two swapped sides when the child's avatar became that control — a
- * pre-reader's own face is what they find first, so it earns the corner a
- * left-to-right reader looks at first — and the rule itself is unchanged.
+ * The world's one readout. A lifetime total used to sit above it and this hung
+ * off its height; two numbers in one corner is one too many for a child who
+ * reads neither, and the one that says how much further is the one that is any
+ * use at three. So this sits where the counter sat, on the right, because the
+ * rule that put it there has not changed: what was won and what an adult can
+ * change never share a corner. The two sides swapped when the child's avatar
+ * became that control — a pre-reader's own face is what they find first, so it
+ * earns the corner a left-to-right reader looks at first.
  *
  * Out of the flow on purpose: the row of cards owns the middle of the screen,
  * so a band for one number would push it off centre. `pointer-events: none`
  * because it is a readout, not a control — it must never eat a tap aimed at the
- * first card of the row.
- */
-.star-counter {
-  position: absolute;
-  top: var(--readout-top);
-  right: clamp(0.5rem, 2vw, 1.5rem);
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.4em;
-  padding: 0.3em 0.9em 0.3em 0.5em;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.9);
-  font-size: var(--readout-font);
-  font-weight: 800;
-  color: #402060;
-  pointer-events: none;
-}
-
-.star-counter > svg {
-  width: 1.3em;
-  height: 1.3em;
-}
-
-/*
- * How close the child is to the next regalo, directly under the running total.
- *
- * Two readouts rather than one, because they answer different questions: the
- * counter above only ever climbs, and this empties every time a regalo is paid
- * for. A child who has just spent thirty letriestrellas on a gift would
- * otherwise watch their total drop to nothing.
- *
- * Stacked under the counter rather than placed by hand: `--readout-height` is
- * the counter's own box — a `1.3em` star with `0.3em` above and below it —
- * derived from the same font size, so the two cannot drift apart when that
- * size changes. The whole stack shares the counter's corner because it is
- * still the same rule keeping it there: readouts on the right, the controls an
- * adult reaches for on the left.
- *
- * Out of the flow and `pointer-events: none` for the counter's reasons: the
- * row of cards owns the middle of the screen, and neither box may eat a tap
- * aimed at the first card of the row.
+ * first card of the row, and it sits above the reach band a child's hands work
+ * in anyway.
  */
 .prize-meter {
   position: absolute;
-  top: calc(var(--readout-top) + var(--readout-height) + 0.5rem);
+  top: var(--readout-top);
   right: clamp(0.5rem, 2vw, 1.5rem);
   z-index: 1;
   display: flex;

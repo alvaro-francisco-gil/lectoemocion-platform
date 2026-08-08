@@ -669,7 +669,6 @@ export function App({
           <img src={avatarImageUrl(playing.avatarId)} alt="" />
         </button>
       ) : null}
-      <StarCounter stars={view.stars} />
       <PrizeMeter filled={prizeView.filled} goal={prizeView.goal} />
       <button
         type="button"
@@ -857,38 +856,22 @@ function describeProfileFailure(error: unknown): string {
 }
 
 /**
- * Every letriestrella won so far, in the world's top-right corner.
+ * How close the child is to the next regalo, in the world's top-right corner.
  *
- * A running total rather than a per-chapter mark: stars are paid for playing,
- * including replaying, and a number that only ever goes up is the part of the
- * world a child can move on their own. It is display only — nothing here is
- * pressable — and it lives on the world alone, because a total counting up
- * beside a running game is a second thing to watch.
+ * The one readout on the world screen. A lifetime total used to sit above it,
+ * and two numbers in one corner is one too many for a child of three who reads
+ * neither: the star is already the picture the total was drawn with, and what a
+ * child at this age can actually use is the one that says how much further.
  *
- * It moved here from the left when the avatar took that corner. The rule it
- * was placed by is unchanged: what was won and what an adult can change never
- * share a corner. They traded sides, and the child's own face earned the more
- * prominent one because it is what a pre-reader reads first.
- *
- * It is not the same number as the meter below it. This one only ever climbs;
- * the meter empties every time a regalo is paid for, so a child who has just
- * spent thirty letriestrellas on a gift can still see the thirty they earned.
- */
-function StarCounter({ stars }: { stars: number }) {
-  return (
-    <section className="star-counter" aria-label="Letriestrellas">
-      <StarIcon />
-      <span className="star-counter__count">{stars}</span>
-    </section>
-  );
-}
-
-/**
- * How close the child is to the next regalo, under the running total.
+ * It moved to this corner when the avatar took the other one. The rule it was
+ * placed by is unchanged: what was won and what an adult can change never share
+ * a corner, and the child's own face earned the more prominent side because it
+ * is what a pre-reader reads first.
  *
  * Display only, and that is what keeps the reach-band rule intact: nothing a
- * child needs to touch sits at the top of an 86-inch panel. The star is the
- * picture here too, because the stars are what fills it.
+ * child needs to touch sits at the top of an 86-inch panel. It lives on the
+ * world alone, because a meter filling beside a running game is a second thing
+ * to watch.
  */
 function PrizeMeter({ filled, goal }: { filled: number; goal: number }) {
   return (

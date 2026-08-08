@@ -74,20 +74,6 @@ function meterTotal(): string {
 }
 
 /**
- * The running total in the world's corner.
- *
- * Not the same number as the meter beside it: this one only climbs, and the
- * meter empties every time a regalo is paid for. Both are asserted wherever the
- * total moves, because a change that quietly conflated them would otherwise
- * pass.
- */
-function starTotal(): string {
-  return (
-    screen.getByRole("region", { name: "Letriestrellas" }).textContent ?? ""
-  );
-}
-
-/**
  * The chapters on the path.
  *
  * Scoped to the world list rather than the whole map, so the corner controls —
@@ -1011,7 +997,6 @@ describe("the letriestrellas every finish is worth", () => {
 
   it("starts a new player at zero", async () => {
     await renderApp();
-    expect(starTotal()).toBe("0");
     expect(meterTotal()).toBe("0 / 30");
   });
 
@@ -1025,8 +1010,7 @@ describe("the letriestrellas every finish is worth", () => {
     expect(screen.getByRole("button", { name: "Abrir el cofre 1" })).toBeInTheDocument();
 
     await openChest();
-    await waitFor(() => expect(starTotal()).toBe("3"));
-    expect(meterTotal()).toBe("3 / 30");
+    await waitFor(() => expect(meterTotal()).toBe("3 / 30"));
   });
 
   /* The animals are once each; the stars are every time. */
@@ -1040,8 +1024,7 @@ describe("the letriestrellas every finish is worth", () => {
     expect(await collectStars()).toContain("+3");
 
     /* Straight back to the map: no second chest for the same chapter. */
-    await waitFor(() => expect(starTotal()).toBe("6"));
-    expect(meterTotal()).toBe("6 / 30");
+    await waitFor(() => expect(meterTotal()).toBe("6 / 30"));
     expect(screen.queryByRole("button", { name: /Abrir el cofre/ })).toBeNull();
   });
 
@@ -1050,20 +1033,17 @@ describe("the letriestrellas every finish is worth", () => {
     finish("El encuentro");
     await collectStars();
     await openChest();
-    await waitFor(() => expect(starTotal()).toBe("3"));
-    expect(meterTotal()).toBe("3 / 30");
+    await waitFor(() => expect(meterTotal()).toBe("3 / 30"));
 
     cleanup();
     await renderApp();
 
-    await waitFor(() => expect(starTotal()).toBe("3"));
-    expect(meterTotal()).toBe("3 / 30");
+    await waitFor(() => expect(meterTotal()).toBe("3 / 30"));
   });
 
-  it("keeps the counter off a running game and out of the ceremonies", async () => {
+  it("keeps the meter off a running game and out of the ceremonies", async () => {
     await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
-    expect(screen.queryByRole("region", { name: "Letriestrellas" })).toBeNull();
     expect(
       screen.queryByRole("meter", {
         name: "Letriestrellas hacia el próximo regalo"
@@ -1073,7 +1053,6 @@ describe("the letriestrellas every finish is worth", () => {
 
     completeActiveResource();
     await screen.findByRole("status");
-    expect(screen.queryByRole("region", { name: "Letriestrellas" })).toBeNull();
     expect(
       screen.queryByRole("meter", {
         name: "Letriestrellas hacia el próximo regalo"
@@ -1082,18 +1061,26 @@ describe("the letriestrellas every finish is worth", () => {
   });
 
   /* A readout, not a route: nothing in the corner opens anything. */
-  it("keeps the counter unpressable", async () => {
+  it("keeps the meter unpressable", async () => {
     await renderApp();
-    expect(
-      screen
-        .getByRole("region", { name: "Letriestrellas" })
-        .querySelectorAll("button")
-    ).toHaveLength(0);
     expect(prizeMeter().querySelectorAll("button")).toHaveLength(0);
   });
 });
 
 describe("the prize meter", () => {
+  /*
+   * One readout, not two. A lifetime total beside the meter is a second number
+   * in the same corner, saying something different, for a child who cannot
+   * read either — and the star on the meter is already the picture the total
+   * was drawn with.
+   */
+  it("is the only readout in the world's corner", async () => {
+    await renderApp();
+    expect(await screen.findByRole("meter")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Letriestrellas" })).toBeNull();
+    expect(screen.getAllByRole("meter")).toHaveLength(1);
+  });
+
   it("shows what is filled against the goal", async () => {
     await renderApp();
     const meter = await screen.findByRole("meter", {
@@ -1324,7 +1311,7 @@ describe("profiles", () => {
 
     await renderApp();
 
-    await waitFor(() => expect(starTotal()).toBe("27"));
+    await waitFor(() => expect(meterTotal()).toBe("27 / 30"));
   });
 
   it("gives a new child a world of their own without touching the first one", async () => {
@@ -1333,7 +1320,7 @@ describe("profiles", () => {
     completeActiveResource();
     await collectStars();
     await openChest();
-    await waitFor(() => expect(starTotal()).toBe("3"));
+    await waitFor(() => expect(meterTotal()).toBe("3 / 30"));
 
     await openProfiles();
     fireEvent.click(screen.getByRole("button", { name: "Añadir niño" }));
@@ -1343,7 +1330,7 @@ describe("profiles", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
 
-    await waitFor(() => expect(starTotal()).toBe("0"));
+    await waitFor(() => expect(meterTotal()).toBe("0 / 30"));
     expect(
       screen.getByRole("button", { name: "Quién juega: Vera" })
     ).toBeInTheDocument();
@@ -1355,7 +1342,7 @@ describe("profiles", () => {
     completeActiveResource();
     await collectStars();
     await openChest();
-    await waitFor(() => expect(starTotal()).toBe("3"));
+    await waitFor(() => expect(meterTotal()).toBe("3 / 30"));
 
     await openProfiles();
     fireEvent.click(screen.getByRole("button", { name: "Añadir niño" }));
@@ -1364,12 +1351,12 @@ describe("profiles", () => {
       target: { value: "Vera" }
     });
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
-    await waitFor(() => expect(starTotal()).toBe("0"));
+    await waitFor(() => expect(meterTotal()).toBe("0 / 30"));
 
     await openProfiles();
     fireEvent.click(screen.getByRole("button", { name: "Jugar como Peque" }));
 
-    await waitFor(() => expect(starTotal()).toBe("3"));
+    await waitFor(() => expect(meterTotal()).toBe("3 / 30"));
   });
 
   /* Switching is the one thing a child may do here unaided. */
@@ -1495,7 +1482,7 @@ describe("profiles", () => {
     completeActiveResource();
     await collectStars();
     await openChest();
-    await waitFor(() => expect(starTotal()).toBe("3"));
+    await waitFor(() => expect(meterTotal()).toBe("3 / 30"));
 
     await openProfiles();
     fireEvent.click(screen.getByRole("button", { name: "Editar a Vera" }));
