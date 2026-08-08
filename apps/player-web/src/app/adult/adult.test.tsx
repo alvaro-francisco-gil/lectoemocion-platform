@@ -15,12 +15,12 @@ import {
 import type { PrizePick } from "../../world/prizeImageStore";
 import { AdultArea } from "./index";
 
-const NOW = 2026;
+const TODAY = new Date("2026-08-07");
 
 function open(overrides: Partial<Parameters<typeof AdultArea>[0]> = {}) {
   const props = {
     view: derivePrizeView(EMPTY_PRIZES, 0),
-    currentYear: NOW,
+    today: TODAY,
     onSetGoal: vi.fn(),
     onConfigure: vi.fn(),
     onPickImage: vi.fn(
@@ -37,49 +37,52 @@ function open(overrides: Partial<Parameters<typeof AdultArea>[0]> = {}) {
   return props;
 }
 
-/** Answers the gate the way an adult does. */
-function passGate(year = 1988) {
-  fireEvent.change(screen.getByLabelText("¿En qué año naciste?"), {
-    target: { value: String(year) }
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+/**
+ * Answers the gate the way an adult does: a year tapped into the pad.
+ *
+ * The same pad the profile drawer puts up, because there is one gate. What it
+ * does with the answer is `isAdultBirthYear`'s business and is proven in
+ * `AdultGate.test.tsx`; here it is only the door onto this area.
+ */
+function passGate(year = "1988") {
+  for (const digit of year) {
+    fireEvent.click(screen.getByRole("button", { name: digit }));
+  }
 }
 
 describe("the adult gate", () => {
   it("shows nothing of the adult area before it is answered", () => {
     open();
+    expect(
+      screen.getByRole("dialog", { name: "Sólo para adultos" })
+    ).toBeInTheDocument();
     expect(screen.queryByLabelText("Letriestrellas para el próximo regalo"))
       .toBeNull();
   });
 
   it("opens the area for a year that would make an adult", () => {
     open();
-    passGate(1988);
+    passGate();
     expect(
       screen.getByLabelText("Letriestrellas para el próximo regalo")
     ).toBeVisible();
   });
 
-  it("refuses a year a child would type and says so", () => {
+  /* The one year a child might have heard said aloud is their own. */
+  it("refuses a year that would make a child, and says so", () => {
     open();
-    passGate(7);
+    passGate("2024");
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Ese año no puede ser. Inténtalo otra vez."
     );
     expect(screen.queryByLabelText("Letriestrellas para el próximo regalo"))
       .toBeNull();
   });
-
-  it("refuses a year that would make a child", () => {
-    open();
-    passGate(NOW - 5);
-    expect(screen.getByRole("alert")).toBeVisible();
-  });
 });
 
 /* A panel with no way out is a trap on a device with no back button. */
 describe("closing the area", () => {
-  it("closes on Escape, gate answered or not", () => {
+  it("closes on Escape while the gate is still asking", () => {
     const props = open();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(props.onClose).toHaveBeenCalledTimes(1);

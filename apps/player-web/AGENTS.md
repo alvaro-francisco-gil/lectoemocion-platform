@@ -54,21 +54,12 @@ through `src/app/adult/index.tsx`, which is what
 `scripts/check-adult-gate.mjs` enforces. Rationale is in
 [ADR 0012](../../docs/decisions/0012-prizes-and-the-star-meter.md).
 
-Two things about the prizes are knowingly unfinished, and neither is a licence
-to add more of the same:
-
-- **There are two adult gates.** `src/app/AdultGate.tsx` — a full-screen keypad
-  over `src/profiles/adultYear.ts` — guards the profile drawer, and
-  `src/app/adult/AdultGate.tsx` — a field over `adultGate.ts` in
-  `@lectoemocion/domain` — guards the prize settings. One question, two
-  implementations, two sets of stylesheet classes (`.adult-gate*` and
-  `.prize-gate*`). A new adult surface uses one of these; it does not write a
-  third.
-- **The prizes are the device's, not a child's.** `progressStore` is namespaced
-  by the playing profile's id; `prizeStore` and `prizeImageStore` are still
-  keyed by `LOCAL_OWNER`, so on a shared family tablet one child's regalo is
-  every child's. Both are built in `App` beside the progress store, which is
-  where that changes.
+**There is one adult gate.** `src/app/AdultGate.tsx` — a full-screen keypad
+over `src/profiles/adultYear.ts` — guards the profile drawer and the adult
+area alike. It sits outside `src/app/adult/` on purpose: it is built to be put
+in front of anything, and the area it guards is a caller rather than its owner.
+A new adult surface renders that component; it does not write a second gate,
+and it does not add a second set of `.adult-gate*` classes.
 
 ## The world
 

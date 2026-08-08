@@ -1134,49 +1134,24 @@ main { height: 100dvh; }
   overflow-y: auto;
 }
 
-/*
- * The prize area's own gate, shown in place of the area it guards.
- *
- * Named apart from `.adult-gate` — the profile drawer's full-screen keypad —
- * because the two are different surfaces with the same job, which is exactly
- * the duplication the adult-gate follow-up exists to remove. Sharing the class
- * name until then would have one gate's rules silently restyle the other.
- */
-.prize-gate {
+/* The way out, in the corner the drawer's cross also sits in — dark on the
+   light panel rather than the drawer's white on purple. */
+.adult__close {
+  position: absolute;
+  top: clamp(0.5rem, 2vh, 1.25rem);
+  right: clamp(0.5rem, 2vw, 1.5rem);
+  width: 56px;
+  height: 56px;
   display: grid;
-  justify-items: start;
-  gap: 0.75rem;
-  max-width: 24rem;
-  margin: clamp(3rem, 20vh, 8rem) auto 0;
-}
-
-.prize-gate__field {
-  width: 100%;
-  padding: 0.6rem 0.9rem;
+  place-items: center;
+  padding: 0;
   border: 2px solid #7b2cbf;
-  border-radius: 0.75rem;
-  font: inherit;
-  font-size: 1.1rem;
-}
-.prize-gate__field:focus-visible { outline: 3px solid #402060; outline-offset: 2px; }
-
-.prize-gate__refusal {
-  margin: 0;
-  color: #b3261e;
-  font-weight: 700;
-}
-
-.prize-gate__submit {
-  padding: 0.6rem 1.75rem;
-  border: 0;
-  border-radius: 999px;
-  background: #7b2cbf;
-  color: #fff;
-  font: inherit;
-  font-weight: 800;
+  border-radius: 50%;
+  background: #fff;
+  color: #402060;
   cursor: pointer;
 }
-.prize-gate__submit:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
+.adult__close:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
 
 /* ------------------------------------------------------------ the book */
 

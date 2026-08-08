@@ -139,9 +139,20 @@ describe("isDeepAdultAreaImport", () => {
     ).toBe(true);
     expect(
       isDeepAdultAreaImport(
-        'import { AdultGate } from "../app/adult/AdultGate";'
+        'import { PrizeSettings } from "../app/adult/PrizeSettings";'
       )
     ).toBe(true);
+  });
+
+  /*
+   * The gate itself lives outside the guarded directory — it is the shell's one
+   * reusable `AdultGate`, and the profile drawer puts up the same one. Importing
+   * it is not reaching past the door.
+   */
+  it("accepts the gate, which is not inside the area it guards", () => {
+    expect(isDeepAdultAreaImport('import { AdultGate } from "../AdultGate";')).toBe(
+      false
+    );
   });
 
   it("accepts the gate's own entry point", () => {

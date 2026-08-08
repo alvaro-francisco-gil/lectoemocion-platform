@@ -140,21 +140,6 @@ async function openFirstChest(): Promise<string> {
 }
 
 /**
- * Answers the prize area's birth-year gate the way an adult does.
- *
- * Named apart from `passAdultGate` below, which is the profile drawer's keypad.
- * There are two gates in this shell and they are answered differently; folding
- * them into one is the adult-gate follow-up, and until then a single helper
- * would have to guess which one is on screen.
- */
-function passPrizeGate(year = 1988): void {
-  fireEvent.change(screen.getByLabelText("¿En qué año naciste?"), {
-    target: { value: String(year) }
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
-}
-
-/**
  * Renders the shell and waits for it to know who is playing.
  *
  * The world is not interactive until the profile read lands — a chapter
@@ -358,9 +343,31 @@ describe("the world shell", () => {
     expect(screen.queryByRole("dialog", { name: "Ajustes" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+    /* The gate first, and nothing of the area behind it. */
+    expect(screen.queryByRole("dialog", { name: "Ajustes" })).toBeNull();
+    passAdultGate();
     expect(screen.getByRole("dialog", { name: "Ajustes" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Cerrar los ajustes" }));
+    expect(screen.queryByRole("dialog", { name: "Ajustes" })).toBeNull();
+  });
+
+  /*
+   * Passing the gate opens the area for this visit only. Leaving unmounts the
+   * area, and with it the fact that it was ever answered — so a device left on
+   * the map is a device a child cannot walk back into the settings on.
+   */
+  it("asks again the next time the adult area is opened", async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+    passAdultGate();
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar los ajustes" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+
+    expect(
+      screen.getByRole("dialog", { name: "Sólo para adultos" })
+    ).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Ajustes" })).toBeNull();
   });
 
@@ -368,10 +375,24 @@ describe("the world shell", () => {
   it("closes the adult area on Escape", async () => {
     await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+    passAdultGate();
 
     fireEvent.keyDown(document, { key: "Escape" });
 
     expect(screen.queryByRole("dialog", { name: "Ajustes" })).toBeNull();
+    expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
+  });
+
+  /* And on the gate's side of it, where there is nothing to close but the ask. */
+  it("closes the adult gate on Escape, back to the world", async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(
+      screen.queryByRole("dialog", { name: "Sólo para adultos" })
+    ).toBeNull();
     expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
   });
 
@@ -384,7 +405,9 @@ describe("the world shell", () => {
   it("puts the world away while the adult area is open", async () => {
     await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+    expect(screen.queryByRole("navigation", { name: "Mundo" })).toBeNull();
 
+    passAdultGate();
     expect(screen.queryByRole("navigation", { name: "Mundo" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Cerrar los ajustes" }));
@@ -1163,7 +1186,7 @@ describe("reaching the goal", () => {
     fireEvent.click(
       screen.getAllByRole("button", { name: "Preparar el regalo" })[0]!
     );
-    passPrizeGate();
+    passAdultGate();
     fill();
     fireEvent.click(
       screen.getAllByRole("button", { name: "Guardar el regalo" })[formIndex]!

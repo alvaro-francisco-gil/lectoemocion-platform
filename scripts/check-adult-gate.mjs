@@ -11,6 +11,13 @@
  * progress-boundary checks. Hiding UI is never authorization (invariant 4),
  * and this check does not prove access control — it only proves nothing
  * bypasses the one door that applies `AdultGate`.
+ *
+ * `AdultGate` itself lives outside this directory, at
+ * `apps/player-web/src/app/AdultGate.tsx`, and is shared with the profile
+ * drawer: what is guarded is the area, not the gate. Importing the gate is
+ * therefore not a violation, and nothing here needs to know where it lives —
+ * only that `adult/index.tsx` is the one module that may be imported from
+ * outside `adult/`.
  */
 import { findViolations, report, sourceFiles } from "./guardrails.mjs";
 import { ADULT_AREA, isDeepAdultAreaImport } from "./rules.mjs";

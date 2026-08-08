@@ -1044,22 +1044,27 @@ async function reachGiftScreen(page: Page): Promise<void> {
 }
 
 /**
- * Enters the birth year the prize area's gate accepts.
+ * Taps a year into the adult gate's pad.
  *
- * The profile drawer has a gate of its own — a keypad, answered by tapping
- * digits — so this one is named for the area it opens. Folding the two into
- * one is the adult-gate follow-up.
+ * One gate guards every adult surface — the prize settings and the profile
+ * drawer alike — so this is the only way past any of them.
  */
-async function passPrizeGate(page: Page): Promise<void> {
-  await page.getByLabel("¿En qué año naciste?").fill("1988");
-  await page.getByRole("button", { name: "Entrar" }).click();
+async function tapYear(page: Page, year: string): Promise<void> {
+  for (const digit of year) {
+    await page.getByRole("button", { name: digit, exact: true }).click();
+  }
+}
+
+/** Answers it with a year old enough to be an adult's. */
+async function passAdultGate(page: Page): Promise<void> {
+  await tapYear(page, "1988");
 }
 
 /** Reaches the gift, then the adult area past its gate, form open. */
 async function openGiftForm(page: Page): Promise<void> {
   await reachGiftScreen(page);
   await page.getByRole("button", { name: "Preparar el regalo" }).click();
-  await passPrizeGate(page);
+  await passAdultGate(page);
 }
 
 test("the meter reads 0 / 30 on a fresh session", async ({ page }) => {
@@ -1096,13 +1101,12 @@ test("Preparar el regalo reaches the gate, refuses an implausible year, and 1988
   await reachGiftScreen(page);
   await page.getByRole("button", { name: "Preparar el regalo" }).click();
 
-  await page.getByLabel("¿En qué año naciste?").fill("2024");
-  await page.getByRole("button", { name: "Entrar" }).click();
+  await tapYear(page, "2024");
   await expect(page.getByRole("alert")).toHaveText(
     "Ese año no puede ser. Inténtalo otra vez."
   );
 
-  await passPrizeGate(page);
+  await passAdultGate(page);
 
   await expect(
     page.getByLabel("Letriestrellas para el próximo regalo")
@@ -1163,7 +1167,7 @@ test("the goal field refuses 0 and accepts 12, and the meter then reads against 
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Menú" }).click();
-  await passPrizeGate(page);
+  await passAdultGate(page);
 
   const goalField = page.getByLabel("Letriestrellas para el próximo regalo");
   await goalField.fill("0");

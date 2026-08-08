@@ -56,24 +56,31 @@ added to the union without a picture or a phrase fails to compile. A branded
 string id would accept the new key silently at every call site and render a
 child nothing at the one that matters.
 
-### The gate is a birth year, and is not security
+### The gate is a birth year, and there is one of it
 
-`isPlausibleBirthYear` guards entry to the adult area as a whole, once per
-visit — not each individual control inside it. It is sized to the actual
-threat, a curious three-year-old with a finger, not to a determined adult:
-a four-digit year is past what that child can do, and costs a literate adult
-two seconds. Every present and future adult control inherits the one gate
-instead of growing its own, and there is one place to change if the mechanism
-ever needs to be stronger.
+`isAdultBirthYear` guards entry to the adult area as a whole, once per visit —
+not each individual control inside it. It is sized to the actual threat, a
+curious three-year-old with a finger, not to a determined adult: a four-digit
+year is past what that child can do, and costs a literate adult two seconds.
+Every present and future adult control inherits the one gate instead of growing
+its own, and there is one place to change if the mechanism ever needs to be
+stronger.
 
-**This is currently untrue, and knowingly so.** Merging profiles brought a
-second gate — `src/app/AdultGate.tsx`, a full-screen keypad reading the same
-year through `src/profiles/adultYear.ts` — beside this one at
-`src/app/adult/AdultGate.tsx`. Two gates asking one question is exactly the
-duplication this section rules out, and consolidating them is tracked as its
-own change. Until it lands, `src/app/adult/` still has exactly one door and
-`scripts/check-adult-gate.mjs` still proves it; what is duplicated is the door,
-not the rule.
+Merging profiles briefly made that untrue — a second gate, a field over
+`adultGate.ts` in `@lectoemocion/domain`, sat at `src/app/adult/AdultGate.tsx`
+beside the drawer's keypad. The keypad won and the field is gone, along with
+the domain module and the `.prize-gate*` stylesheet classes that existed only
+for it. `src/app/AdultGate.tsx` is the survivor: a full-screen pad over
+`src/profiles/adultYear.ts`, built to be put in front of anything, and the
+adult area is now one of its callers rather than the owner of a gate.
+
+The gate therefore lives *outside* the directory it guards, which is what
+`scripts/check-adult-gate.mjs` had to be read against rather than changed for:
+the rule is that `adult/index.tsx` is the only module importable from outside
+`src/app/adult/`, and a gate that is not inside that directory does not weaken
+it. Nothing behind the gate is mounted until it is answered, and `unlocked`
+is `AdultArea`'s own state — leaving the area unmounts it, so a device left on
+the map is a device a child cannot walk back into the settings on.
 
 ## Rejected alternatives
 

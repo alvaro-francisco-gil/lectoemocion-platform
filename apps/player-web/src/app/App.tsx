@@ -643,7 +643,7 @@ export function App({
     return (
       <AdultArea
         view={prizeView}
-        currentYear={new Date().getFullYear()}
+        today={new Date()}
         onSetGoal={setPrizeGoal}
         onConfigure={configure}
         onPickImage={pickImage}
