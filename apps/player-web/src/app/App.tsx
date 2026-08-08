@@ -46,6 +46,7 @@ import {
 } from "../world/prizeImageStore";
 import { unlockAllEnabled } from "../world/unlockAll";
 import { bookShape } from "./bookShape";
+import { cardTint, type CardTint } from "./cardTints";
 import { useDragScroll } from "./useDragScroll";
 import { avatarImageUrl } from "../profiles/avatarCatalogue";
 import {
@@ -86,16 +87,6 @@ const profiles = new LocalProfileStore(browserStorage, () =>
  * runtime.
  */
 type TabId = "juegos" | "recursos";
-
-/**
- * How many card colours the row cycles through.
- *
- * It agrees with `.world-node[data-tint="N"]` in `styles.css`, and this is the
- * only number that has to: the palette itself is the stylesheet's business.
- * Six, because a row long enough to repeat has put four cards between the
- * repeats, which is further than a child compares.
- */
-const CARD_TINTS = 6;
 
 /**
  * How many chests the duende offers.
@@ -324,10 +315,29 @@ export function App({
     [prizes, view.stars]
   );
 
-  const activeNode = useMemo(
-    () => worldNodes(world).find((node) => node.id === activeNodeId) ?? null,
-    [activeNodeId]
-  );
+  /**
+   * The open chapter and the colour its card was wearing, together.
+   *
+   * One object rather than two lookups, so "a chapter is open but has no
+   * colour" is a state the shell cannot get into: the game and its background
+   * are decided at the same moment, from the same section list that drew the
+   * card. The row is what decides a tint, so the row is what answers for it.
+   */
+  const active = useMemo(() => {
+    if (activeNodeId === null) return null;
+    for (const section of [view.games, view.resources]) {
+      const index = section.findIndex((node) => node.id === activeNodeId);
+      if (index === -1) continue;
+      const node = worldNodes(world).find((entry) => entry.id === activeNodeId);
+      /* The view is derived from the world; a node in one and not the other is
+         a broken invariant, not a chapter to open onto a default (invariant 6). */
+      if (node === undefined) {
+        throw new Error(`Chapter ${activeNodeId} is in the view but not the world`);
+      }
+      return { node, tint: cardTint(index) };
+    }
+    return null;
+  }, [view, activeNodeId]);
 
   const select = useCallback(
     (nodeId: string) => {
@@ -584,13 +594,16 @@ export function App({
 
   useEffect(() => {
     const parent = host.current;
-    if (!activeNode || !parent) return;
+    if (!active || !parent) return;
 
-    const game = createGame(parent, createResourceForNode(activeNode, roster), () =>
-      complete(activeNode.id)
+    const game = createGame(
+      parent,
+      createResourceForNode(active.node, roster),
+      active.tint.wash,
+      () => complete(active.node.id)
     );
     return () => game.destroy(true);
-  }, [activeNode, complete, roster]);
+  }, [active, complete, roster]);
 
   /*
    * Profiles that cannot be read stop everything, deliberately.
@@ -624,9 +637,18 @@ export function App({
     return <main className="loading" aria-busy="true" aria-label="Cargando" />;
   }
 
-  if (activeNode) {
+  if (active) {
     return (
-      <main className="playing">
+      /*
+       * The wash goes on the shell, not only into Phaser: the canvas keeps a
+       * fixed 16:9 and every other shape of screen letterboxes it, so a colour
+       * that stopped at the canvas would leave the chapter's own colour in a
+       * band of the shell's lavender.
+       */
+      <main
+        className="playing"
+        style={{ "--game-wash": active.tint.wash } as CSSProperties}
+      >
         <button
           type="button"
           className="back"
@@ -744,16 +766,12 @@ export function App({
           {/*
             The tint comes from the card's place in the row rather than from
             the node, because it is decoration: what colour a chapter is is not
-            a fact about the chapter, and the stylesheet is where colour lives.
-            Cycling by position is also what guarantees no two neighbours match.
+            a fact about the chapter. Cycling by position is also what
+            guarantees no two neighbours match.
           */}
           {standing.map((node, index) => (
             <li key={node.id}>
-              <WorldNode
-                node={node}
-                tint={index % CARD_TINTS}
-                onSelect={select}
-              />
+              <WorldNode node={node} tint={cardTint(index)} onSelect={select} />
             </li>
           ))}
         </ol>
@@ -1204,7 +1222,7 @@ function WorldNode({
   onSelect
 }: {
   node: WorldNodeView;
-  tint: number;
+  tint: CardTint;
   onSelect: (nodeId: string) => void;
 }) {
   const titleId = useId();
@@ -1214,7 +1232,7 @@ function WorldNode({
       type="button"
       className="world-node"
       data-state={node.state}
-      data-tint={tint}
+      style={{ "--card-tint": tint.card } as CSSProperties}
       disabled={!node.playable}
       /*
        * The node is named by its title alone and described by its state, so a

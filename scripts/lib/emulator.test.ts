@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 // prettier-ignore
 // @ts-expect-error -- plain .mjs script module, deliberately untyped
-import { AVD_NAME, EXPO_GO_PACKAGE, METRO_PORT, avdConfig, avdIni, bootCompleted, checkoutMismatch, expoGoDeepLink, packageInstalled, parseAttachedDevices, problem, reversedPorts, selectSdk, toWindowsPath, metroArgs } from "./emulator.mjs";
+import { AVD_NAME, EXPO_GO_PACKAGE, METRO_PORT, avdConfig, avdIni, bootCompleted, checkoutMismatch, expoGoDeepLink, packageInstalled, parseAttachedDevices, problem, reversedPorts, selectLanHost, selectSdk, toWindowsPath, metroArgs } from "./emulator.mjs";
 
 describe("parseAttachedDevices", () => {
   it("returns serials that are ready", () => {
@@ -192,6 +192,133 @@ describe("metroArgs", () => {
   });
 });
 
+describe("selectLanHost", () => {
+  /*
+   * The layout of the machine this was written on. Six IPv4 addresses, exactly
+   * one of which a phone on the house WiFi can reach — which is the whole
+   * reason this function exists rather than a call to Expo's `--lan`.
+   */
+  const thisMachine = [
+    { name: "lo", address: "127.0.0.1", family: "IPv4", internal: true },
+    { name: "lo", address: "10.255.255.254", family: "IPv4", internal: true },
+    { name: "eth0", address: "100.68.195.48", family: "IPv4", internal: false },
+    { name: "eth1", address: "192.168.1.186", family: "IPv4", internal: false },
+    { name: "br-9381c01191ad", address: "172.20.0.1", family: "IPv4", internal: false },
+    { name: "br-ba55ca5ea61c", address: "172.19.0.1", family: "IPv4", internal: false }
+  ];
+
+  it("picks the one address a phone on the same network can reach", () => {
+    expect(selectLanHost(thisMachine)).toEqual({
+      kind: "resolved",
+      host: "192.168.1.186",
+      label: "eth1"
+    });
+  });
+
+  it("rejects the Tailscale address", () => {
+    /*
+     * 100.64/10 is carrier-grade NAT space, which Tailscale uses. It is
+     * reachable only from the tailnet, so advertising it to a phone on the
+     * house WiFi yields a QR code that times out.
+     */
+    const only = [{ name: "eth0", address: "100.68.195.48", family: "IPv4", internal: false }];
+    expect(selectLanHost(only)).toMatchObject({ kind: "unusable", problem: "none" });
+  });
+
+  it("rejects an adapter with no DHCP lease", () => {
+    /*
+     * The regression this exists for. This machine's WiFi adapter sits at
+     * 169.254.5.75 — link-local, meaning no lease. It looks like a plausible
+     * WiFi address and routes nowhere.
+     */
+    const only = [{ name: "wlan0", address: "169.254.5.75", family: "IPv4", internal: false }];
+    expect(selectLanHost(only)).toMatchObject({ kind: "unusable", problem: "none" });
+  });
+
+  it("rejects container bridges by interface name", () => {
+    const bridges = [
+      { name: "br-9381c01191ad", address: "172.20.0.1", family: "IPv4", internal: false },
+      { name: "docker0", address: "172.17.0.1", family: "IPv4", internal: false },
+      { name: "vEthernet (Default Switch)", address: "172.20.144.1", family: "IPv4", internal: false }
+    ];
+    expect(selectLanHost(bridges)).toMatchObject({ kind: "unusable", problem: "none" });
+  });
+
+  it("rejects loopback and IPv6", () => {
+    const neither = [
+      { name: "lo", address: "127.0.0.1", family: "IPv4", internal: true },
+      { name: "eth1", address: "fd7a:115c:a1e0::1", family: "IPv6", internal: false }
+    ];
+    expect(selectLanHost(neither)).toMatchObject({ kind: "unusable", problem: "none" });
+  });
+
+  it("refuses to guess between two real candidates", () => {
+    /*
+     * Guessing is the expensive failure. A wrong pick produces a QR code that
+     * scans fine and then fails with Expo Go's generic error, which names
+     * neither the address it tried nor why it was unreachable.
+     */
+    const two = [
+      { name: "eth1", address: "192.168.1.186", family: "IPv4", internal: false },
+      { name: "eth2", address: "10.0.0.4", family: "IPv4", internal: false }
+    ];
+    const result = selectLanHost(two);
+    expect(result).toMatchObject({ kind: "unusable", problem: "ambiguous" });
+    expect(result.candidates).toEqual([
+      { host: "192.168.1.186", label: "eth1" },
+      { host: "10.0.0.4", label: "eth2" }
+    ]);
+  });
+
+  it("lists what it rejected when nothing qualifies", () => {
+    /* A bare "no address found" costs a round trip to work out why. */
+    const result = selectLanHost([
+      { name: "eth0", address: "100.68.195.48", family: "IPv4", internal: false }
+    ]);
+    expect(result.candidates).toEqual([]);
+    expect(result.rejected).toEqual([{ host: "100.68.195.48", label: "eth0" }]);
+  });
+
+  it("lets an explicit override win, including over an ambiguous set", () => {
+    const two = [
+      { name: "eth1", address: "192.168.1.186", family: "IPv4", internal: false },
+      { name: "eth2", address: "10.0.0.4", family: "IPv4", internal: false }
+    ];
+    expect(selectLanHost(two, "10.0.0.4")).toEqual({
+      kind: "resolved",
+      host: "10.0.0.4",
+      label: "MOBILE_LAN_HOST"
+    });
+  });
+
+  it("accepts an override the interface list does not know about", () => {
+    /*
+     * Deliberate. Mirrored WSL networking and VPNs both produce addresses that
+     * reach the phone but do not appear here; refusing them would make the
+     * escape hatch useless exactly when it is needed.
+     */
+    expect(selectLanHost([], "192.168.4.20")).toMatchObject({
+      kind: "resolved",
+      host: "192.168.4.20"
+    });
+  });
+
+  it("refuses an override that is not an IPv4 address", () => {
+    for (const bad of ["my-laptop.local", "192.168.1", "192.168.1.999", ""]) {
+      expect(selectLanHost([], bad)).toMatchObject({
+        kind: "unusable",
+        problem: "override-invalid"
+      });
+    }
+  });
+
+  it("does not mutate what it is given", () => {
+    const original = [...thisMachine];
+    selectLanHost(thisMachine);
+    expect(thisMachine).toEqual(original);
+  });
+});
+
 describe("selectSdk", () => {
   const windowsSdk = "/mnt/c/Users/x/AppData/Local/Android/Sdk";
   const linuxSdk = "/home/x/android-sdk";
@@ -249,12 +376,50 @@ describe("problem", () => {
       "no-emulator",
       "no-sdk",
       "no-system-image",
-      "boot-timeout"
+      "boot-timeout",
+      "lan-host-unknown",
+      "lan-host-ambiguous",
+      "lan-host-invalid",
+      "player-not-on-lan",
+      "player-dev-exited"
     ]) {
-      expect(problem(kind, { port: 4173, seconds: 180, path: "/x", searched: ["/y"] })).toContain(
-        "→"
-      );
+      expect(
+        problem(kind, {
+          port: 4173,
+          seconds: 180,
+          path: "/x",
+          searched: ["/y"],
+          host: "192.168.1.186",
+          candidates: [{ host: "10.0.0.4", label: "eth2" }],
+          rejected: [{ host: "100.68.195.48", label: "eth0" }]
+        })
+      ).toContain("→");
     }
+  });
+
+  it("blames the port, not the network, when the dev server exits at once", () => {
+    /*
+     * The regression this exists for. An already-running `pnpm dev` makes Vite
+     * exit with "Port 4173 is already in use" — and the LAN probe then spent
+     * ninety seconds proving the obvious before reporting a firewall problem
+     * that did not exist. Naming the wrong cause is worse than being slow.
+     */
+    const message = problem("player-dev-exited", { port: 4173 });
+    expect(message).toContain("4173");
+    expect(message).toContain("pnpm dev");
+    expect(message).not.toContain("New-NetFirewallRule");
+    expect(message).toContain("→");
+  });
+
+  it("names the firewall command when the player is unreachable on the LAN", () => {
+    /*
+     * Two different causes produce one symptom — a WebView that never loads —
+     * and an adult cannot tell them apart from the device. Both are named.
+     */
+    const message = problem("player-not-on-lan", { host: "192.168.1.186", port: 4173 });
+    expect(message).toContain("192.168.1.186:4173");
+    expect(message).toContain("PLAYER_HOST");
+    expect(message).toContain("New-NetFirewallRule");
   });
 
   it("names the AVD when no device is attached", () => {

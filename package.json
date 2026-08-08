@@ -11,6 +11,7 @@
     "mobile:up": "node scripts/mobile-emulator.mjs up",
     "mobile:boot": "node scripts/mobile-emulator.mjs boot",
     "mobile:start": "node scripts/mobile-emulator.mjs start",
+    "mobile:lan": "node scripts/mobile-emulator.mjs lan",
     "guardrails": "node scripts/check-engine-neutral.mjs && node scripts/check-firebase-boundary.mjs && node scripts/check-strict-types.mjs && node scripts/check-privacy.mjs && node scripts/check-progress-boundary.mjs && node scripts/check-child-namespace.mjs && node scripts/check-adult-gate.mjs",
     "test": "vitest run",
     "test:e2e": "pnpm --filter @lectoemocion/player-web test:e2e",

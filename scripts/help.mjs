@@ -25,6 +25,7 @@ const SECTIONS = [
     commands: [
       ["pnpm mobile:start", "Metro for the shell — long-lived, run this yourself"],
       ["pnpm mobile:up", "boot the AVD, tunnel the ports, open the player"],
+      ["pnpm mobile:lan", "both servers on the LAN for a phone — scan the QR"],
       ["pnpm mobile", "doctor: what is up, what is not, what to run"],
       ["pnpm mobile boot", "create and start the tablet AVD only"],
       ["pnpm mobile shot", "screenshot the emulator to a file"],

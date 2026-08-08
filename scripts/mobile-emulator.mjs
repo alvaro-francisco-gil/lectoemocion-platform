@@ -14,6 +14,8 @@
  *   open            Point Expo Go at Metro.
  *   up              boot + wire + verify + open. The one to reach for.
  *   start           Metro, with the environment Expo needs. Long-lived.
+ *   lan             Both servers on the LAN, for a phone that is not plugged
+ *                   in. Prints a QR code to scan. Long-lived.
  *   shot [file]     Screenshot to a file. Defaults under the scratch dir.
  *   logs [seconds]  Filtered logcat: JS errors and WebView failures.
  *   stop            Shut the emulator down.
@@ -25,11 +27,12 @@
 
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { networkInterfaces } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // prettier-ignore
-import { AVD_NAME, EXPO_GO_PACKAGE, METRO_PORT, avdConfig, avdIni, bootCompleted, checkoutMismatch, expoGoDeepLink, packageInstalled, parseAttachedDevices, problem, reversedPorts, selectSdk, toWindowsPath, metroArgs } from "./lib/emulator.mjs";
+import { AVD_NAME, EXPO_GO_PACKAGE, METRO_PORT, avdConfig, avdIni, bootCompleted, checkoutMismatch, expoGoDeepLink, packageInstalled, parseAttachedDevices, problem, reversedPorts, selectLanHost, selectSdk, toWindowsPath, metroArgs } from "./lib/emulator.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const BOOT_TIMEOUT_SECONDS = 240;
@@ -383,6 +386,153 @@ function start(extraArgs) {
   child.on("exit", (code) => process.exit(code ?? 0));
 }
 
+/* -- LAN mode, for a phone that is not plugged in ------------------------- */
+
+/** `os.networkInterfaces()` flattened into the shape `selectLanHost` takes. */
+function localInterfaces() {
+  const flattened = [];
+  for (const [name, addresses] of Object.entries(networkInterfaces())) {
+    for (const address of addresses ?? []) {
+      flattened.push({
+        name,
+        address: address.address,
+        family: address.family,
+        internal: address.internal
+      });
+    }
+  }
+  return flattened;
+}
+
+const LAN_PLAYER_TIMEOUT_SECONDS = 90;
+
+/**
+ * Waits for the player's dev server to answer *on the LAN address*.
+ *
+ * Loopback is not the test. The two ways this mode fails — a server still bound
+ * to `127.0.0.1`, and a Windows firewall with no rule for the port — both leave
+ * loopback working perfectly and the phone staring at a blank WebView. Only the
+ * LAN address distinguishes them, so only the LAN address is polled.
+ */
+async function waitForPlayerOnLan(playerUrl, expectedCheckoutId, hasExited) {
+  const deadline = Date.now() + LAN_PLAYER_TIMEOUT_SECONDS * 1000;
+  while (Date.now() < deadline) {
+    /*
+     * Checked before the probe, not only after the timeout. A dev server that
+     * died on "port already in use" is never coming back, and waiting the full
+     * ninety seconds to say so reports a network problem for a local one.
+     */
+    if (hasExited()) return "exited";
+    try {
+      const response = await fetch(`${playerUrl}/__checkout`, {
+        signal: AbortSignal.timeout(2000)
+      });
+      if (response.ok) return checkoutMismatch({
+        expected: expectedCheckoutId,
+        actual: (await response.text()).trim()
+      });
+    } catch {
+      /* Not up yet. Vite behind turbo takes a few seconds from cold. */
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  return "timeout";
+}
+
+/**
+ * Both servers, bound so a phone on the same network can reach them.
+ *
+ * One command rather than two terminals, because the two halves must agree on a
+ * single address and a human keeping them in sync by hand is the bug this
+ * replaces: Metro advertising `127.0.0.1` in the QR while the bundle carried
+ * `EXPO_PUBLIC_PLAYER_URL=http://localhost:4173` produced a scan that failed
+ * with Expo Go's generic error and no indication that two different mistakes
+ * were involved.
+ *
+ * This deliberately puts the player's dev server on the local network, which
+ * the USB and emulator paths deliberately avoid. It is dev-only and serves
+ * product-authored default content; no child data is involved.
+ */
+async function lan(extraArgs) {
+  const { port, checkoutId } = playerServer();
+  const override = process.env["MOBILE_LAN_HOST"];
+  const chosen = selectLanHost(localInterfaces(), override);
+  if (chosen.kind === "unusable") {
+    const kind = {
+      ambiguous: "lan-host-ambiguous",
+      "override-invalid": "lan-host-invalid",
+      none: "lan-host-unknown"
+    }[chosen.problem];
+    fail(problem(kind, { ...chosen, host: override }));
+  }
+
+  const playerUrl = `http://${chosen.host}:${port}`;
+  say(`LAN host: ${chosen.host} (${chosen.label})`);
+  say(`Player:   ${playerUrl}`);
+  say(`Metro:    exp://${chosen.host}:${METRO_PORT}`);
+  say("");
+  say("Starting the player's dev server on the network…");
+
+  const player = spawn("pnpm", ["dev"], {
+    cwd: ROOT,
+    stdio: "inherit",
+    env: { ...process.env, PLAYER_HOST: "0.0.0.0" }
+  });
+
+  let playerExited = false;
+  player.on("exit", () => {
+    playerExited = true;
+  });
+
+  const stopPlayer = () => {
+    if (!playerExited && !player.killed) player.kill();
+  };
+  process.on("exit", stopPlayer);
+  process.on("SIGINT", () => process.exit(0));
+
+  const trouble = await waitForPlayerOnLan(playerUrl, checkoutId, () => playerExited);
+  if (trouble === "exited") {
+    fail(problem("player-dev-exited", { port }));
+  }
+  if (trouble === "timeout") {
+    stopPlayer();
+    fail(problem("player-not-on-lan", { host: chosen.host, port }));
+  }
+  if (trouble) {
+    stopPlayer();
+    fail(trouble);
+  }
+  say("");
+  say(`Player reachable at ${playerUrl}, serving this checkout.`);
+  say("Starting Metro. Scan the QR code below with Expo Go.");
+  say("");
+
+  /*
+   * `REACT_NATIVE_PACKAGER_HOSTNAME` rather than trusting `--lan` to choose.
+   * `--lan` sets the mode; this pins the address, which is the whole point —
+   * `selectLanHost` already rejected four adapters that `--lan` might have
+   * picked instead.
+   */
+  const metro = spawn(
+    "pnpm",
+    ["--filter", "@lectoemocion/mobile", "start", ...metroArgs(["--lan", ...extraArgs])],
+    {
+      cwd: ROOT,
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        ADB_PATH: ADB,
+        REACT_NATIVE_PACKAGER_HOSTNAME: chosen.host,
+        EXPO_PUBLIC_PLAYER_URL: playerUrl
+      }
+    }
+  );
+  metro.on("exit", (code) => {
+    stopPlayer();
+    process.exit(code ?? 0);
+  });
+}
+
 function shot(target) {
   const serial = attachedDevice();
   if (!serial) fail(problem("no-device"));
@@ -464,6 +614,9 @@ switch (command) {
     break;
   case "start":
     start(rest);
+    break;
+  case "lan":
+    await lan(rest);
     break;
   case "shot":
     shot(rest[0]);

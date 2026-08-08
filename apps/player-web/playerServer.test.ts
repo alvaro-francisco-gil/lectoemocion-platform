@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   PRIMARY_PORT,
@@ -123,5 +125,38 @@ describe("resolvePlayerServer", () => {
     expect(server.port).toBe(4321);
     expect(server.baseURL).toBe("http://127.0.0.1:4321");
     expect(server.checkoutId).toBe(checkoutId(server.root));
+  });
+});
+
+describe("turbo passes through the variables vite.config.ts reads", () => {
+  /*
+   * The regression this exists for. `pnpm dev` runs Vite through turbo, which
+   * uses strict env mode: a variable not declared in `passThroughEnv` is
+   * stripped before `vite.config.ts` runs. Both variables read there fail
+   * *silently* when that happens — PLAYER_HOST falls back to loopback, which a
+   * phone on the LAN cannot reach, and PLAYER_PORT falls back to the derived
+   * port, which is exactly the worktree-serves-the-wrong-checkout trap this
+   * module exists to prevent.
+   *
+   * Derived from the config rather than restated, so adding a third variable
+   * without declaring it fails here instead of in someone's evening.
+   */
+  const root = join(import.meta.dirname, "..", "..");
+  const viteConfig = readFileSync(join(import.meta.dirname, "vite.config.ts"), "utf8");
+  const turbo: { tasks: { dev: { passThroughEnv?: string[] } } } = JSON.parse(
+    readFileSync(join(root, "turbo.json"), "utf8")
+  );
+
+  const read = [...viteConfig.matchAll(/process\.env\["([A-Z0-9_]+)"\]/g)].map(
+    (match) => match[1]
+  );
+
+  it("reads at least the host and the port", () => {
+    expect(read).toContain("PLAYER_HOST");
+    expect(read).toContain("PLAYER_PORT");
+  });
+
+  it("declares every one of them", () => {
+    expect(turbo.tasks.dev.passThroughEnv ?? []).toEqual(expect.arrayContaining(read));
   });
 });

@@ -14,23 +14,32 @@ import { syntheticClass, world } from "@lectoemocion/template-catalog";
 import { LOCAL_OWNER, storageKey } from "../world/progressStore";
 import { giftsKey, LOCAL_GROUP, prizeGoalKey } from "../world/prizeStore";
 import { App } from "./App";
+import { cardTint } from "./cardTints";
 
 type Destroyable = { destroy: () => void };
 
 const createGame = vi.fn(
-  (_parent: HTMLElement, _resource: unknown, _onComplete: () => void):
-    Destroyable => ({ destroy: () => undefined })
+  (
+    _parent: HTMLElement,
+    _resource: unknown,
+    _background: string,
+    _onComplete: () => void
+  ): Destroyable => ({ destroy: () => undefined })
 );
 vi.mock("../game/createGame", () => ({
-  createGame: (parent: HTMLElement, resource: unknown, onComplete: () => void) =>
-    createGame(parent, resource, onComplete)
+  createGame: (
+    parent: HTMLElement,
+    resource: unknown,
+    background: string,
+    onComplete: () => void
+  ) => createGame(parent, resource, background, onComplete)
 }));
 
 /** Completes the resource the shell most recently opened. */
 function completeActiveResource(): void {
   const call = createGame.mock.calls.at(-1);
   expect(call).toBeDefined();
-  call?.[2]();
+  call?.[3]();
 }
 
 /** Leaves a resource the child has not finished. */
@@ -467,13 +476,48 @@ describe("the world shell", () => {
   it("gives neighbouring cards different colours", async () => {
     await renderApp();
     const tints = worldButtons().map((button) =>
-      button.getAttribute("data-tint")
+      button.style.getPropertyValue("--card-tint")
     );
 
-    expect(tints.every((tint) => tint !== null)).toBe(true);
+    expect(tints.every((tint) => tint !== "")).toBe(true);
     for (const [index, tint] of tints.entries()) {
       if (index > 0) expect(tint).not.toBe(tints[index - 1]);
     }
+  });
+
+  /*
+   * A chapter is one place, and its colour is how a child who reads nothing
+   * knows they arrived where they pressed. The card's colour and the field the
+   * game stands on come from one entry in the palette, so they cannot drift.
+   */
+  it("opens each card onto its own colour", async () => {
+    await renderApp({ roster: syntheticClass });
+    /* Both sections, because each counts its cards from its own first one. */
+    let opened = 0;
+    for (const section of ["Juegos", "Recursos"]) {
+      openTab(section);
+      /* Re-queried every turn: leaving a game rebuilds the row. */
+      for (let index = 0; index < worldButtons().length; index += 1) {
+        const card = worldButtons()[index];
+        if (card === undefined || card.hasAttribute("disabled")) continue;
+
+        const { card: field, wash } = cardTint(index);
+        expect(card.style.getPropertyValue("--card-tint")).toBe(field);
+
+        createGame.mockClear();
+        fireEvent.click(card);
+        expect(createGame.mock.calls.at(-1)?.[2]).toBe(wash);
+        /* And the shell around the canvas, which the letterbox shows. */
+        const shell = screen.getByTestId("game-host").parentElement;
+        expect(shell?.style.getPropertyValue("--game-wash")).toBe(wash);
+
+        returnToMap();
+        opened += 1;
+      }
+    }
+    /* Most of the world is locked at the start; a run that opened one card, or
+       none, would pass every assertion above without proving anything. */
+    expect(opened).toBeGreaterThan(1);
   });
 
   /* Colour is decoration over a card that already says what it is. */
