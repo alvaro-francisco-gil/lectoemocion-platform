@@ -35,11 +35,17 @@ main { height: 100dvh; }
 .playing { height: 100dvh; display: grid; background: var(--game-wash); }
 .playing .game-host { grid-area: 1 / 1; }
 
+/*
+ * The way back, as one disc wherever it is put. A game has one, and so does
+ * the gift screen: the same shape in the same corner saying the same words, so
+ * leaving is one gesture in this app rather than one per screen. The look is
+ * declared once here; each placement is a modifier below.
+ */
 .back {
   grid-area: 1 / 1;
-  z-index: 1;
   align-self: start;
   justify-self: start;
+  z-index: 1;
   margin: 0.75rem;
   width: 56px;
   height: 56px;
@@ -54,6 +60,20 @@ main { height: 100dvh; }
 }
 .back:hover { background: #fff; }
 .back:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
+
+/*
+ * Over a ceremony rather than over a game. Those screens stack their content
+ * from the bottom, so a grid item in the corner would push that stack down.
+ * Out of the flow instead, and the grid area reset with it: an absolutely
+ * positioned grid child is otherwise placed against the cell it was assigned,
+ * which here is wherever the gift happens to be.
+ */
+.back--over {
+  position: absolute;
+  grid-area: auto;
+  top: 0;
+  left: 0;
+}
 
 .game-host { min-height: 0; display: grid; place-items: center; overflow: hidden; }
 .game-host canvas { max-width: 100%; max-height: 100%; touch-action: none; }
@@ -381,12 +401,32 @@ main { height: 100dvh; }
  * A locked chapter still shows its picture, dimmed, with the padlock over it:
  * what is behind the lock is the reason to come back for it. Dimmed, never
  * hidden — the state is also read aloud, so the dimming never carries it alone.
+ *
+ * It keeps its own colour while it waits. Repainting every locked card the same
+ * purple made the row read as one grey block with a few coloured cards in it,
+ * and threw away the thing the palette is for: the card a child comes back to
+ * is the pink one, whether or not it is open yet. So the tint stays and a dark
+ * scrim goes over it — the same card, in shadow, rather than a different card.
  */
-.world-node[data-state="locked"] .world-node__marker { background: #3a2159; }
-.world-node[data-state="locked"] .world-node__icon { opacity: 0.35; }
+.world-node[data-state="locked"] .world-node__marker::after {
+  /*
+   * A grid item like the picture, painted after it, so it shades field and
+   * illustration together. The padlock and the title chip carry `z-index: 1`
+   * and stay above it: what says "locked" is never itself dimmed.
+   */
+  content: "";
+  grid-area: 1 / 1;
+  background: rgb(24 12 36 / 42%);
+}
+.world-node[data-state="locked"] .world-node__icon { opacity: 0.65; }
+/*
+ * The chip pales towards the card's own colour rather than to a fixed lilac, so
+ * the one warm thing on a shaded card still belongs to it. Dark text on it, at
+ * this much white, clears contrast against every colour in the palette.
+ */
 .world-node[data-state="locked"] .world-node__title {
-  background: #d9cfe8;
-  color: #4a3a63;
+  background: color-mix(in srgb, var(--card-tint) 16%, #fff);
+  color: #3a3040;
 }
 
 .world-node__lock {
@@ -1452,6 +1492,7 @@ main { height: 100dvh; }
 .award,
 .reward,
 .reveal {
+  position: relative;
   display: grid;
   align-content: end;
   justify-items: center;
