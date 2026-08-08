@@ -1,6 +1,7 @@
 import {
   useEffect,
   useLayoutEffect,
+  useRef,
   useState,
   type CSSProperties,
   type RefObject
@@ -239,6 +240,18 @@ function Flight({
   } | null>(null);
   const [flying, setFlying] = useState(false);
 
+  /*
+   * A flight's timers are scheduled once, when it sets off, and must not
+   * restart when a caller re-renders with a new `onLanded` identity — stars
+   * that have already landed would land a second time. The ref lets the
+   * scheduling effect below depend on `count` alone while still calling
+   * whichever `onLanded` is current when a timer fires.
+   */
+  const onLandedRef = useRef(onLanded);
+  useEffect(() => {
+    onLandedRef.current = onLanded;
+  }, [onLanded]);
+
   useLayoutEffect(() => {
     const box = pill.current?.getBoundingClientRect();
     /*
@@ -262,10 +275,13 @@ function Flight({
 
   useEffect(() => {
     const timers = Array.from({ length: count }, (_unused, index) =>
-      window.setTimeout(onLanded, index * STAR_STAGGER_MS + STAR_TRAVEL_MS)
+      window.setTimeout(
+        () => onLandedRef.current(),
+        index * STAR_STAGGER_MS + STAR_TRAVEL_MS
+      )
     );
     return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [count, onLanded]);
+  }, [count]);
 
   return (
     <div

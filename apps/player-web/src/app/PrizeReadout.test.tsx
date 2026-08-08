@@ -230,4 +230,44 @@ describe("the flight to the counter", () => {
     );
     expect(document.querySelector(".star-flight")).toBeNull();
   });
+
+  /*
+   * A caller re-rendering with a new `onLanded` identity mid-flight must not
+   * restart the timers: the star that already landed may not land again.
+   */
+  it("does not re-land stars already landed when onLanded's identity changes", () => {
+    const firstOnLanded = vi.fn();
+    const secondOnLanded = vi.fn();
+    const pill = createRef<HTMLParagraphElement>();
+    const { rerender } = render(
+      <StarFlight
+        flight={{ id: 1, count: 3, landed: 0 }}
+        pill={pill}
+        onArrive={vi.fn()}
+        onLanded={firstOnLanded}
+      />
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(STAR_TRAVEL_MS);
+    });
+    expect(firstOnLanded).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <StarFlight
+        flight={{ id: 1, count: 3, landed: 0 }}
+        pill={pill}
+        onArrive={vi.fn()}
+        onLanded={secondOnLanded}
+      />
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(STAR_STAGGER_MS * 2);
+    });
+
+    expect(
+      firstOnLanded.mock.calls.length + secondOnLanded.mock.calls.length
+    ).toBe(3);
+  });
 });
