@@ -487,11 +487,15 @@ main { height: 100dvh; }
  * The gift and the ring closing on it, and nothing else: no disc behind them.
  * A plate under the shadow would be a third shape competing with the two that
  * carry the meaning, and the world's own colour is already the ground.
+ *
+ * Sized by the column it stands in — `--reward-size` and `--reward-gift` are
+ * `.world__gifts`, which is the only place this is ever rendered, and the only
+ * place that decides how big a reward is drawn.
  */
 .prize-meter {
   display: grid;
   place-items: center;
-  width: clamp(56px, 9vmin, 150px);
+  width: var(--reward-size);
   aspect-ratio: 1;
   pointer-events: none;
 }
@@ -508,10 +512,19 @@ main { height: 100dvh; }
  * The gift, as its own shape rather than as a picture of one: a shadow of the
  * thing to come, cast on the world's own dark ground, which must never compete
  * with the gold arc closing around it.
+ *
+ * The same width as the gift already won below it, from the same token: this
+ * shadow is a promise, and a promise drawn at a different size from the thing
+ * it promises is a different thing.
+ *
+ * A grid rather than a block, so the shape lands on the ring's true centre. An
+ * inline `<svg>` in a block sits on a text baseline and carries the leading
+ * under it — four pixels of nothing that pushed the shadow two pixels above the
+ * centre of the ring drawn around it.
  */
 .prize-meter__gift {
-  display: block;
-  width: 46%;
+  display: grid;
+  width: var(--reward-gift);
   color: #000;
   opacity: 0.38;
 }
@@ -1710,40 +1723,61 @@ main { height: 100dvh; }
  * bar's left edge is the wall this column must stay behind.
  */
 .world__gifts {
+  /*
+   * The size of a thing in this column, and the share of it the gift itself
+   * takes, both named once. The ring and the button are the same box, and the
+   * gift drawn in each is the same size — the one already won is the shadow in
+   * the ring above it, filled in. Two boxes and one shape; a child reading down
+   * this column sees the same object twice, once got and once coming.
+   */
+  --reward-size: clamp(56px, 9vmin, 150px);
+  --reward-gift: 46%;
   position: absolute;
   bottom: clamp(0.75rem, 3vh, 2rem);
   left: clamp(0.5rem, 3vw, 2rem);
   z-index: 2;
   display: grid;
   justify-items: center;
-  gap: clamp(0.35rem, 1.2vmin, 1rem);
   pointer-events: none;
 }
 
 /*
- * The one control in a world corner. Everything else up there — the counter,
- * the ring, the avatar — is chrome a child never needs to touch, so this is
- * sized as the largest thing in the band it sits in, and never below the 56px
- * a small hand needs to land on.
+ * The one control in a world corner, and the only one drawn without a plate.
+ *
+ * No disc behind it and no ring around it, for the reason the meter above has
+ * none either: the gift is the shape that carries the meaning, and a circle
+ * around it would be a second shape competing with the gold arc a hand's width
+ * higher. What is left is a box a child can press that looks like nothing but
+ * the gift, at exactly the size the shadow promised it at.
+ *
+ * The button keeps the full `--reward-size` even though the gift fills less
+ * than half of it: that transparent margin is the touch target, never below
+ * the 56px a small hand needs to land on.
  */
 .world__gift {
-  /* Its own size, named once: the badge is measured off it too. */
-  --gift-size: clamp(56px, 11vmin, 168px);
-  width: var(--gift-size);
-  height: var(--gift-size);
+  width: var(--reward-size);
+  height: var(--reward-size);
+  /*
+   * Pulled up into the ring's box, because the gap between the two gifts is not
+   * the gap between the two boxes: each shape stands in the middle of a box more
+   * than twice its width, so stacking the boxes edge to edge left the two shapes
+   * a whole gift's height apart and reading as two separate things. The overlap
+   * is with empty space — the ring's own margin — and the button paints last, so
+   * it keeps the tap.
+   */
+  margin-top: calc(var(--reward-size) * -0.18);
   position: relative;
   display: grid;
   place-items: center;
   padding: 0;
-  border: 2px solid #7b2cbf;
+  border: 0;
   border-radius: 50%;
-  background: rgb(255 255 255 / 0.9);
+  background: none;
   cursor: pointer;
   pointer-events: auto;
 }
-.world__gift:hover { background: #fff; }
-.world__gift:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
-.world__gift > svg { width: 62%; height: auto; }
+.world__gift:focus-visible { outline: 3px solid #f4c95d; outline-offset: 3px; }
+.world__gift > svg { width: var(--reward-gift); height: auto; }
 
 /*
  * How many are wrapped, when it is more than one.
@@ -1752,20 +1786,24 @@ main { height: 100dvh; }
  * say "two" only to someone who counts edges, and say nothing at all at three.
  * A digit on a disc is the same shape a child already meets on the chests, and
  * it is the only part of this screen where a number is the point.
+ *
+ * Pinned to the gift rather than to the button. The button is mostly empty
+ * space now, so a badge in its corner would float off on its own; these offsets
+ * put it on the shoulder of the shape a child is actually looking at.
  */
 .world__gift-count {
   position: absolute;
-  top: -4%;
-  right: -4%;
+  top: 16%;
+  right: 16%;
   display: grid;
   place-items: center;
-  min-width: 38%;
-  height: 38%;
+  min-width: 26%;
+  height: 26%;
   padding: 0 0.2em;
   border-radius: 999px;
   background: #7b2cbf;
   color: #fff;
-  font-size: calc(var(--gift-size) * 0.26);
+  font-size: calc(var(--reward-size) * 0.19);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
