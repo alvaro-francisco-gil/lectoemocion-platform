@@ -49,23 +49,20 @@ export function PrizeSettings({
    * confirmation would have unchanged text in an unchanged node, and
    * aria-live announces nothing for that.
    *
-   * `dismissed` is the second half: a confirmation that stays mounted for the
-   * rest of the panel session can end up on screen next to a later
-   * validation error, which makes `role="alert"` ambiguous. Any interaction
-   * with the panel — captured once, on the wrapping element, so no form has
-   * to know the confirmation exists — dismisses a stale confirmation before
-   * that interaction's own handler runs. A save that follows still shows: its
-   * `configure` call sets `dismissed` back to `false` after the capture
-   * handler has already set it, in the same event.
+   * It is a `status` rather than an `alert`, and that is what lets it simply
+   * stay: `alert` is for something gone wrong and is announced assertively, so
+   * a confirmation wearing that role both overstates itself and competes with
+   * the panel's real errors for `role="alert"`. As a status it can sit beside
+   * a later validation error without either becoming ambiguous, which means
+   * nothing has to dismiss it — and nothing may, because dismissing it on the
+   * way through an interaction re-renders this panel mid-event and React then
+   * reverts the controlled radio that interaction was selecting.
    */
   const [savedCount, setSavedCount] = useState(0);
-  const [dismissed, setDismissed] = useState(false);
   const configure = (id: PrizeId, content: PrizeContent) => {
     setSavedCount((count) => count + 1);
-    setDismissed(false);
     onConfigure(id, content);
   };
-  const dismissStaleConfirmation = () => setDismissed(true);
 
   const form = (prize: Prize) => (
     <PrizeForm
@@ -77,15 +74,10 @@ export function PrizeSettings({
   );
 
   return (
-    <div
-      className="prize-settings"
-      onClickCapture={dismissStaleConfirmation}
-      onChangeCapture={dismissStaleConfirmation}
-      onSubmitCapture={dismissStaleConfirmation}
-    >
+    <div className="prize-settings">
       <GoalForm goal={view.goal} onSetGoal={onSetGoal} />
-      {savedCount > 0 && !dismissed ? (
-        <p key={savedCount} className="prize-settings__saved" role="alert">
+      {savedCount > 0 ? (
+        <p key={savedCount} className="prize-settings__saved" role="status">
           Regalo guardado
         </p>
       ) : null}

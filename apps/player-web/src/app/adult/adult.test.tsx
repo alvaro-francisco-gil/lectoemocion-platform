@@ -214,7 +214,7 @@ describe("configuring a waiting gift", () => {
       screen.getByRole("radio", { name: "Encuentra tu regalo en el patio" })
     );
     fireEvent.click(screen.getByRole("button", { name: "Guardar el regalo" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("Regalo guardado");
+    expect(screen.getByRole("status")).toHaveTextContent("Regalo guardado");
   });
 
   it("says what is missing when nothing has been chosen", () => {
@@ -244,34 +244,36 @@ describe("configuring a waiting gift", () => {
     open({ view: derivePrizeView(prepared, 30) });
     passGate();
     fireEvent.click(screen.getByRole("button", { name: "Guardar el regalo" }));
-    const firstAlert = screen.getByRole("alert");
-    expect(firstAlert).toHaveTextContent("Regalo guardado");
+    const firstSaved = screen.getByRole("status");
+    expect(firstSaved).toHaveTextContent("Regalo guardado");
 
     fireEvent.change(screen.getByLabelText("¿Qué hay dentro?"), {
       target: { value: "un caramelo" }
     });
     fireEvent.click(screen.getByRole("button", { name: "Guardar el regalo" }));
-    const secondAlert = screen.getByRole("alert");
-    expect(secondAlert).toHaveTextContent("Regalo guardado");
+    const secondSaved = screen.getByRole("status");
+    expect(secondSaved).toHaveTextContent("Regalo guardado");
     /* A different node, not the same one left with unchanged text: aria-live
        only announces text a screen reader has not already read. */
-    expect(secondAlert).not.toBe(firstAlert);
+    expect(secondSaved).not.toBe(firstSaved);
   });
 
   /*
-   * The confirmation must not outlive its moment. Left mounted forever, an
-   * unrelated validation error later in the panel — here, an out-of-range
-   * goal — puts two `role="alert"` nodes on screen at once, which is
-   * ambiguous for anything that queries by that role.
+   * A save that went well and something that went wrong are different kinds of
+   * news, so they carry different roles and can be on screen together without
+   * either being mistaken for the other. Nothing dismisses the confirmation on
+   * the adult's way through the panel — doing that re-rendered this panel
+   * inside the interaction and React reverted the radio being selected, which
+   * only a real browser caught.
    */
-  it("clears the saved confirmation once the adult acts again", () => {
+  it("keeps a save confirmation out of the way of a later error", () => {
     open({ view: derivePrizeView(waiting, 30) });
     passGate();
     fireEvent.click(
       screen.getByRole("radio", { name: "Encuentra tu regalo en el patio" })
     );
     fireEvent.click(screen.getByRole("button", { name: "Guardar el regalo" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("Regalo guardado");
+    expect(screen.getByRole("status")).toHaveTextContent("Regalo guardado");
 
     fireEvent.change(
       screen.getByLabelText("Letriestrellas para el próximo regalo"),
@@ -281,6 +283,28 @@ describe("configuring a waiting gift", () => {
 
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     expect(screen.getByRole("alert")).toHaveTextContent("entre 5 y 200");
+    expect(screen.getByRole("status")).toHaveTextContent("Regalo guardado");
+  });
+
+  /*
+   * The regression the browser found and jsdom did not: selecting a preset
+   * must survive whatever else the panel does in the same event. Asserting the
+   * radio is checked — rather than only that the form moved on — is what
+   * catches a controlled input being reverted mid-interaction.
+   */
+  it("keeps a chosen place selected after a save has been confirmed", () => {
+    open({ view: derivePrizeView(waiting, 30) });
+    passGate();
+    const patio = screen.getByRole("radio", {
+      name: "Encuentra tu regalo en el patio"
+    });
+    fireEvent.click(patio);
+    fireEvent.click(screen.getByRole("button", { name: "Guardar el regalo" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Regalo guardado");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Escribirlo yo" }));
+    expect(screen.getByRole("radio", { name: "Escribirlo yo" })).toBeChecked();
+    expect(screen.getByLabelText("¿Qué hay dentro?")).toBeVisible();
   });
 });
 
