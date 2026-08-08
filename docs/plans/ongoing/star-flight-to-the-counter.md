@@ -948,7 +948,10 @@ and beside `.prize-meter__fill`:
  */
 .prize-meter__fill {
   transition:
-    stroke-dasharray 400ms ease-out,
+    /* One step per landing: `--prize-step` is `STAR_STAGGER_MS`, handed over
+       by `PrizeRing`, so an arc step cannot outlive the gap to the next star
+       and blend three landings into one sweep. */
+    stroke-dasharray var(--prize-step) ease-out,
     stroke 200ms ease-out,
     stroke-width 200ms ease-out;
 }

@@ -15,15 +15,26 @@ export const FLARE_MS = 420;
 /**
  * True for one beat after each landing.
  *
- * Driven by the running total rather than by a boolean, because two stars
- * landing 110ms apart must flare twice: a flag that was already `true` would
- * swallow the second, and the child would see three stars arrive and two
- * things happen.
+ * Driven by the running total rather than by a boolean, because what the total
+ * buys is where the beat ends: a star landing while the corner is already
+ * flaring pushes the settling out to `FLARE_MS` past the *last* landing rather
+ * than the first, so the pop lasts as long as the flight does instead of dying
+ * under it. Against a stagger this much shorter than `FLARE_MS`, that is one
+ * pop per flight by construction, which is the one a child can actually see.
+ *
+ * A change in the total, never the total itself, because a mount is not a
+ * landing. The world is unmounted for the whole ceremony and comes back holding
+ * the count it left with — flaring on that would spend the pop before the first
+ * star is in the air, and every landing after it would set a flag that was
+ * already `true`, which transitions nothing. Every finish after a child's first
+ * would arrive at a corner that no longer moves.
  */
 function useFlare(landings: number): boolean {
   const [flaring, setFlaring] = useState(false);
+  const previous = useRef(landings);
   useEffect(() => {
-    if (landings === 0) return undefined;
+    if (landings === previous.current) return undefined;
+    previous.current = landings;
     setFlaring(true);
     const timer = window.setTimeout(() => setFlaring(false), FLARE_MS);
     return () => window.clearTimeout(timer);
@@ -137,6 +148,18 @@ export function PrizeRing({
   return (
     <section
       className="prize-meter"
+      /*
+        One step of the arc lasts exactly one stagger, handed to the stylesheet
+        from the constant that spaces the landings so the two cannot drift. A
+        step that outlived the gap to the next star would blend three landings
+        into one continuous sweep, which is the thing the ring is here not to
+        be: it follows each star in, one step per arrival.
+      */
+      style={
+        {
+          "--prize-step": `${STAR_STAGGER_MS}ms`
+        } as CSSProperties
+      }
       role="meter"
       aria-label="Letriestrellas hacia el próximo regalo"
       aria-valuenow={shown}
@@ -204,7 +227,14 @@ export function StarFlight({
   onArrive: () => void;
   onLanded: () => void;
 }) {
-  useEffect(onArrive, [onArrive]);
+  /*
+   * Called, not handed over: an effect body's return value is its destructor,
+   * and `() => void` accepts a caller that returns something. Wrapping it keeps
+   * a future `onArrive` with a return value from silently becoming cleanup.
+   */
+  useEffect(() => {
+    onArrive();
+  }, [onArrive]);
 
   if (flight === null) return null;
 
@@ -254,11 +284,7 @@ function Flight({
 
   useLayoutEffect(() => {
     const box = pill.current?.getBoundingClientRect();
-    /*
-     * No pill to aim at means no flight — but the landings below still fire,
-     * so the counter reaches the truth either way. What is lost is the
-     * decoration, never the number.
-     */
+    /* No pill to aim at means no course, and no course means nothing drawn. */
     if (box === undefined) return undefined;
 
     setCourse({
@@ -283,6 +309,15 @@ function Flight({
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [count]);
 
+  /*
+   * Nothing to draw until there is somewhere to draw it, and nothing at all if
+   * that never comes: stars with no course would stack in the top-left corner
+   * of the screen, which is a defect rather than a degradation. The landings
+   * above are unaffected, so the counter still reaches the truth — what is lost
+   * is the decoration, never the number.
+   */
+  if (course === null) return null;
+
   return (
     <div
       className="star-flight"
@@ -295,9 +330,9 @@ function Flight({
     >
       {Array.from({ length: count }, (_unused, index) => {
         const spread = (index - (count - 1) / 2) * STAR_SPREAD_PX;
-        const startX = (course?.originX ?? 0) + spread;
-        const across = flying && course !== null ? course.targetX - startX : 0;
-        const up = flying && course !== null ? course.targetY - course.originY : 0;
+        const startX = course.originX + spread;
+        const across = flying ? course.targetX - startX : 0;
+        const up = flying ? course.targetY - course.originY : 0;
         const delay = `${index * STAR_STAGGER_MS}ms`;
         return (
           /*
@@ -311,7 +346,7 @@ function Flight({
             className="star-flight__star"
             style={{
               left: `${startX}px`,
-              top: `${course?.originY ?? 0}px`,
+              top: `${course.originY}px`,
               transitionDelay: delay,
               transform: `translateX(${across}px)`
             }}

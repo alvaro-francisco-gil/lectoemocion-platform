@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { act, createRef } from "react";
+import { act, createRef, useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   FLARE_MS,
@@ -103,6 +103,30 @@ describe("the flare", () => {
     );
   });
 
+  /*
+   * The world is unmounted for every ceremony and comes back holding the
+   * landings of every flight before it, so from a child's second finish onwards
+   * this mounts already counting. A flare fired on that mount is spent before
+   * the first star of the new flight is even in the air — and worse, it is
+   * still on when that star lands, so the landing sets a flag that is already
+   * `true` and nothing transitions. The corner would go still for the rest of
+   * the session.
+   */
+  it("flares on a landing after a remount, never on the remount itself", () => {
+    const pill = createRef<HTMLParagraphElement>();
+    const { rerender } = render(
+      <PrizeCount shown={6} arriving landings={3} pill={pill} />
+    );
+    expect(document.querySelector(".prize-count")).not.toHaveAttribute(
+      "data-flaring"
+    );
+
+    rerender(<PrizeCount shown={7} arriving landings={4} pill={pill} />);
+    expect(document.querySelector(".prize-count")).toHaveAttribute(
+      "data-flaring"
+    );
+  });
+
   it("flares the ring on the same landing", () => {
     const { rerender } = render(
       <PrizeRing shown={3} goal={30} landings={0} />
@@ -142,6 +166,34 @@ describe("the flight to the counter", () => {
     vi.useRealTimers();
   });
 
+  /**
+   * The flight with something to aim at, the way the world renders it.
+   *
+   * The pill comes first in the tree, because that is what puts it in the ref
+   * before the flight measures it — and a flight with nowhere to land draws
+   * nothing at all, so a test about what is drawn has to supply one.
+   */
+  function Aimed({
+    count,
+    onLanded
+  }: {
+    count: number;
+    onLanded: () => void;
+  }) {
+    const pill = useRef<HTMLParagraphElement>(null);
+    return (
+      <>
+        <p ref={pill} />
+        <StarFlight
+          flight={{ id: 1, count, landed: 0 }}
+          pill={pill}
+          onArrive={vi.fn()}
+          onLanded={onLanded}
+        />
+      </>
+    );
+  }
+
   /*
    * The world screen is the only thing that renders this, so its mount is how
    * the reducer learns the world is on screen. Deriving that in `App` from the
@@ -169,15 +221,33 @@ describe("the flight to the counter", () => {
   });
 
   it("draws one star per letriestrella still in the air", () => {
+    render(<Aimed count={3} onLanded={vi.fn()} />);
+    expect(document.querySelectorAll(".star-flight__star")).toHaveLength(3);
+  });
+
+  /*
+   * A corner that is not there to be measured costs the decoration and nothing
+   * else. Stars with nowhere to land would otherwise stack in the top-left of
+   * the screen, which is a defect rather than a degradation — while the
+   * counter, which is fed by the landings and not by the drawing, still reaches
+   * the truth.
+   */
+  it("draws nothing when there is no pill to aim at, and still lands", () => {
+    const onLanded = vi.fn();
     render(
       <StarFlight
         flight={{ id: 1, count: 3, landed: 0 }}
         pill={createRef<HTMLParagraphElement>()}
         onArrive={vi.fn()}
-        onLanded={vi.fn()}
+        onLanded={onLanded}
       />
     );
-    expect(document.querySelectorAll(".star-flight__star")).toHaveLength(3);
+    expect(document.querySelector(".star-flight")).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(STAR_TRAVEL_MS + STAR_STAGGER_MS * 2);
+    });
+    expect(onLanded).toHaveBeenCalledTimes(3);
   });
 
   /* Staggered, so three stars are three arrivals rather than one. */
@@ -205,14 +275,7 @@ describe("the flight to the counter", () => {
 
   /* Decoration only: it must not be read out, and it must not eat a tap. */
   it("is hidden from a screen reader", () => {
-    render(
-      <StarFlight
-        flight={{ id: 1, count: 3, landed: 0 }}
-        pill={createRef<HTMLParagraphElement>()}
-        onArrive={vi.fn()}
-        onLanded={vi.fn()}
-      />
-    );
+    render(<Aimed count={3} onLanded={vi.fn()} />);
     expect(document.querySelector(".star-flight")).toHaveAttribute(
       "aria-hidden",
       "true"

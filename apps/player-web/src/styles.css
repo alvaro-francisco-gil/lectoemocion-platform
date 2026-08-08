@@ -604,6 +604,10 @@ main { height: 100dvh; }
 /*
  * Butt caps, not round: a rounded cap on an empty ring draws a gold dot at
  * twelve o'clock, which says "you have one" to a child who has none.
+ *
+ * `--prize-step` is set by the component from the same constant that spaces the
+ * stars, so one landing is one step of the arc: a longer fill would run into
+ * the next star's arrival and three steps would read as one sweep.
  */
 .prize-meter__fill {
   fill: none;
@@ -611,7 +615,7 @@ main { height: 100dvh; }
   stroke-width: 5;
   stroke-linecap: butt;
   transition:
-    stroke-dasharray 400ms ease-out,
+    stroke-dasharray var(--prize-step) ease-out,
     stroke 200ms ease-out,
     stroke-width 200ms ease-out;
 }

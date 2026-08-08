@@ -15,6 +15,7 @@ import { LOCAL_OWNER, storageKey } from "../world/progressStore";
 import { giftsKey, LOCAL_GROUP, prizeGoalKey } from "../world/prizeStore";
 import { App } from "./App";
 import { cardTint } from "./cardTints";
+import { STAR_STAGGER_MS } from "./PrizeReadout";
 import { preferMotion } from "../test/setupTests";
 
 type Destroyable = { destroy: () => void };
@@ -1173,6 +1174,43 @@ describe("the letriestrellas every finish is worth", () => {
     await waitFor(() =>
       expect(document.querySelector(".star-flight")).toBeNull()
     );
+  });
+
+  /*
+   * A child who opens the book mid-flight loses the flight, not the stars.
+   *
+   * The book covers the corner the stars are aiming at, so the world withholds
+   * them while it is up: `StarFlight` unmounts and its timers go with it. What
+   * comes back when the book closes is the whole flight again, its full count
+   * restarted from the beginning — so a star that had already landed is paid a
+   * second time, and the reducer swallows those surplus landings as strays on a
+   * flight that has already cleared. The count still has to land exactly right,
+   * which is the only part of this a child would ever notice.
+   */
+  it("still reaches the true total when the book covers the world mid-flight", async () => {
+    preferMotion("full");
+    bankStars(3);
+    await renderApp();
+    await waitFor(() => expect(meterTotal()).toBe("3"));
+
+    finish("El encuentro");
+    await collectStars();
+    await openChest();
+
+    /* Mid-flight: at least one star has landed, and more are still coming. */
+    await waitFor(() => expect(meterTotal()).toBe("4"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Mis animales" }));
+    expect(document.querySelector(".star-flight")).toBeNull();
+    tapOutsideTheBook();
+
+    await waitFor(() => expect(meterTotal()).toBe("6"));
+    await waitFor(() =>
+      expect(document.querySelector(".star-flight")).toBeNull()
+    );
+    /* And it stays there: the restarted flight's surplus timers pay nothing. */
+    await new Promise((resolve) => setTimeout(resolve, STAR_STAGGER_MS * 4));
+    expect(meterTotal()).toBe("6");
   });
 });
 
