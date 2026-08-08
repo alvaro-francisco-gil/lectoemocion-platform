@@ -2,33 +2,54 @@
 
 ## Status
 
-- **Updated:** 2026-08-07
-- **Stage:** Step 1 — Expo app hosting the player in a WebView
+- **Updated:** 2026-08-08
+- **Stage:** Step 1 — Expo app hosting the player in a WebView. **Complete.**
 - **Branch:** `main`
 - **Done:** `apps/mobile` scaffolded and rendering the player in a WebView;
   `playerUrl` resolver with 11 tests; scripted Android emulator workflow
-  (`scripts/mobile-emulator.mjs`, 30 tests) that creates the AVD, tunnels the
-  ports, and reports what is up; `LectoEmocion_Tablet` AVD created and booting
+  (`scripts/mobile-emulator.mjs`) that creates the AVD, tunnels the ports, and
+  reports what is up; `LectoEmocion_Tablet` AVD created and booting; **and the
+  player running on physical hardware** — a Pixel 8 on Android 16, over WiFi,
+  via `pnpm mobile:lan`
 - **Next:** the four seams under "Native feel", and the offline-launch test
   [ADR 0009](../../decisions/0009-one-hosted-player.md) makes a release
   criterion
 - **Blockers:** none.
 
-Two things bit during that first run and are now fixed and covered by tests.
+Two things bit during the first emulator run and are fixed and covered by tests.
 Metro's `disableHierarchicalLookup` was on, which is right for npm's flat
 `node_modules` and wrong for pnpm, where a package's dependencies sit beside it
 in the store — it failed with `Unable to resolve "expo-modules-core"`, which
 reads as a broken install. And Expo's LAN default made Expo Go fetch over the
 network and fail with `Failed to download remote update`; `--localhost` over the
 `adb reverse` tunnel avoids the network entirely.
+
+Reaching a phone that is **not** plugged in needed three more, each of which
+failed silently rather than loudly — the reason they cost an evening between
+them:
+
+- Turbo runs tasks in strict env mode, so `PLAYER_HOST` never reached Vite and
+  the dev server stayed on loopback while looking healthy locally. It is now
+  declared in `turbo.json`'s `passThroughEnv`, with a test deriving the list
+  from `vite.config.ts`. `PLAYER_PORT` had the same latent defect.
+- Metro advertised `127.0.0.1` in the QR while the bundle carried
+  `EXPO_PUBLIC_PLAYER_URL=http://localhost:4173`. Two halves, two addresses,
+  one generic Expo Go error naming neither. `pnpm mobile:lan` now sets both
+  from one resolved address.
+- A Windows firewall rule scoped `-Profile Private` on a network Windows
+  classifies as *Public* is created without complaint, appears in
+  `Get-NetFirewallRule`, and never matches. Indistinguishable from no rule.
+  The rule must be `-Profile Any`.
 - **Handoff:** the hosted-versus-bundled decision is settled — see
   [ADR 0009](../../decisions/0009-one-hosted-player.md). Step 1 points at a dev
   server; a release build points the same variable at Firebase Hosting.
 
 The earlier WSL2 NAT blocker recorded here is resolved: `.wslconfig` now sets
-`networkingMode=mirrored`. It stopped mattering anyway — `adb reverse` tunnels
-the ports from the device, so nothing has to traverse the LAN and the player's
-dev server stays on loopback.
+`networkingMode=mirrored`. For the emulator and USB paths it stopped mattering
+anyway — `adb reverse` tunnels the ports from the device, so nothing traverses
+the LAN and the dev server stays on loopback. Mirrored networking does matter
+for `pnpm mobile:lan`, where a server bound to `0.0.0.0` inside WSL is reachable
+at the Windows host's LAN address with no port-proxy in between.
 
 ## Goal
 
@@ -68,7 +89,8 @@ apps/mobile/
   vitest.config.ts
 
 scripts/
-  mobile-emulator.mjs     the CLI: doctor, boot, wire, open, up, shot, logs
+  mobile-emulator.mjs     the CLI: doctor, boot, wire, open, up, start, lan,
+                          shot, logs, stop
   lib/emulator.mjs        pure logic — no spawning, no filesystem
   lib/emulator.test.ts
 ```
@@ -88,14 +110,28 @@ already derived per checkout so a worktree never tests against the primary
 checkout's code; a `.env` holding a fixed port would reintroduce that, and a
 WebView showing another checkout's player looks exactly like a working app.
 
-The device reaches it through `adb reverse`, not over the LAN. Expo's bundle
-loader rejects a cross-network bundle URL, so the emulator's `10.0.2.2` alias
-cannot serve Metro at all — and that alias does not exist on real hardware, so
-anything written that way breaks the first time a tablet is plugged in.
-Tunnelling makes `localhost` correct on both, and keeps the dev server on
-loopback instead of exposing it to the network. `PLAYER_HOST` on
-[`apps/player-web/vite.config.ts`](../../../apps/player-web/vite.config.ts)
-remains for the LAN case, unused by this workflow.
+A plugged-in device reaches it through `adb reverse`, not over the LAN. Expo's
+bundle loader rejects a cross-network bundle URL, so the emulator's `10.0.2.2`
+alias cannot serve Metro at all — and that alias does not exist on real
+hardware, so anything written that way breaks the first time a tablet is
+plugged in. Tunnelling makes `localhost` correct on both, and keeps the dev
+server on loopback instead of exposing it to the network. This is the default
+and the path to prefer.
+
+A phone that is *not* plugged in has no tunnel, so `pnpm mobile:lan` starts both
+servers bound to the network instead, using `PLAYER_HOST` on
+[`apps/player-web/vite.config.ts`](../../../apps/player-web/vite.config.ts). It
+is one command rather than two terminals because the QR's address and the
+bundle's `EXPO_PUBLIC_PLAYER_URL` must agree, and a human keeping them in sync
+by hand is precisely the bug it replaces.
+
+The address is chosen by `selectLanHost`, not by Expo's `--lan`. A development
+machine typically offers several plausible private addresses — VPN tunnels,
+container bridges, hypervisor switches, adapters with no DHCP lease — and only
+one is reachable from a phone. Picking wrong yields a QR that scans correctly
+and then fails with no indication of the address it tried, so the resolver
+refuses to guess: exactly one surviving candidate, or a stated failure listing
+what it rejected.
 
 Expo Go runs this without a native build: `react-native-webview` is one of the
 libraries it bundles. No EAS account, no store credentials, no Xcode.
@@ -114,15 +150,29 @@ libraries it bundles. No EAS account, no store credentials, no Xcode.
 - [x] Verified in the Android emulator via Expo Go: the map hub renders
       full-screen in landscape, and "El encuentro" plays through to its reward
       screen. Touch input, progression, and the star counter all work.
-- [ ] Verified on physical hardware. Same commands — `adb reverse` makes
-      `localhost` mean the dev machine over USB too.
+- [x] `pnpm mobile:lan` for a phone that is not plugged in: one command, both
+      servers on the network, `selectLanHost` choosing the address and refusing
+      to guess between candidates.
+- [x] Verified on physical hardware — a Pixel 8 on Android 16, over WiFi, with
+      the PC wired to the same router. Expo Go fetched the bundle from the LAN
+      address and the WebView loaded the player.
+
+      Expo Go's version is coupled to the project's SDK and this is where it
+      bites: the phone had 54.0.8 against an SDK 57 project, which fails with
+      "Project is incompatible with this version of Expo Go" and nothing about
+      versions. Expo publishes matching APKs per SDK at
+      `github.com/expo/expo-go-releases`; `adb install -r` over USB is the quick
+      path. Downgrading the project's SDK to meet an old Expo Go is not — the
+      app is the same size at every SDK, so it buys a React Native downgrade and
+      no smaller download.
 
 ## Verification
 
-- `pnpm check` passes, including all five guardrails.
-- `pnpm test` covers `playerUrl`.
+- `pnpm check` passes, including every guardrail.
+- `pnpm test` covers `playerUrl`, `selectLanHost`, and every failure message
+  the emulator and LAN workflows can print.
 - Manual: the world map and at least one minigame are playable on a phone
-  through Expo Go.
+  through Expo Go. Done in the emulator; the map hub is confirmed on a Pixel 8.
 
 Deliberately no Playwright coverage: the shell is a WebView around an already
 end-to-end-tested player, and Playwright cannot drive Expo Go.
