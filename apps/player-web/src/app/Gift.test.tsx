@@ -61,6 +61,19 @@ describe("a gift that is ready", () => {
     show(READY_PRESET);
     expect(screen.queryByText("Encuentra tu regalo en el patio")).toBeNull();
   });
+
+  /*
+   * A child who is not ready to open it — or an adult who opened this screen
+   * to look — must be able to leave without spending the gift. This was the
+   * one state of the three with no way out: the wrapped box took the screen
+   * and the only button on it opened the box.
+   */
+  it("can be left wrapped, by the same door as everywhere else", () => {
+    const props = show(READY_PRESET);
+    fireEvent.click(screen.getByRole("button", { name: "Volver al mapa" }));
+    expect(props.onContinue).toHaveBeenCalled();
+    expect(props.onOpen).not.toHaveBeenCalled();
+  });
 });
 
 describe("a gift that is open", () => {
