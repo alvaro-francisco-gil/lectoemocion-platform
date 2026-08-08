@@ -66,17 +66,23 @@ export function GiftIcon() {
   );
 }
 
-/** Three bars: the one shape an adult reads as "everything else" without a word. */
-export function MenuIcon() {
+/**
+ * The same gift, as the shape it casts rather than the thing itself.
+ *
+ * It sits inside the prize meter's ring, where what is being drawn is not a
+ * present a child has but the one they are filling the ring towards. One
+ * flat colour from the surface it is drawn on, so it reads as an outline of
+ * something still to come — and the same silhouette as `GiftIcon`, so the
+ * gift that arrives is recognisably the one that was promised.
+ */
+export function GiftShadow() {
   return (
-    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
-      <path
-        d="M4 7h16M4 12h16M4 17h16"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
+    <svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true">
+      <g fill="currentColor">
+        <rect x="10" y="38" width="80" height="52" rx="6" />
+        <rect x="6" y="26" width="88" height="18" rx="6" />
+        <path d="M50 26c-10-14-28-8-22 2 4 6 14 5 22-2Zm0 0c10-14 28-8 22 2-4 6-14 5-22-2Z" />
+      </g>
     </svg>
   );
 }

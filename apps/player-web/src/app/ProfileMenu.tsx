@@ -55,6 +55,10 @@ function ageLabel(birth: Birth, today: Date): string {
  * Switching is open to anyone. Adding, editing and deleting are behind
  * `AdultGate`: a child picking their own face is the point of the drawer, and
  * a child deleting their brother is not.
+ *
+ * It is also the way into the adult area, which used to have a button of its
+ * own in the world's corner. One door rather than two: everything an adult
+ * does is now reached from here, and the world keeps the avatar alone.
  */
 export function ProfileMenu({
   book,
@@ -63,6 +67,7 @@ export function ProfileMenu({
   onAdd,
   onUpdate,
   onRemove,
+  onOpenAdultArea,
   onClose
 }: {
   book: ProfileBook;
@@ -71,6 +76,7 @@ export function ProfileMenu({
   onAdd: (draft: ProfileDraft) => void;
   onUpdate: (id: PlayerProfileId, draft: ProfileDraft) => void;
   onRemove: (id: PlayerProfileId) => void;
+  onOpenAdultArea: () => void;
   onClose: () => void;
 }) {
   const [view, setView] = useState<View>({ kind: "list" });
@@ -232,14 +238,26 @@ export function ProfileMenu({
             </button>
 
             {/*
-              Planned, and shown as planned. Each has a scoped document under
+              Planned, and shown as planned. It has a scoped document under
               `docs/plans/ideas/`; a disabled row that says "próximamente" is a
               promise the repository can be held to, where a row that silently
               did nothing would be a lie.
             */}
             <hr className="profile-menu__rule" />
             <SoonRow label="Progreso" />
-            <SoonRow label="Zona de adultos" />
+            {/*
+              The one door into the adult area, and no gate of its own: the area
+              carries `AdultGate` around itself, so a second keypad here would
+              ask the same question twice and be the second place it could be
+              got wrong.
+            */}
+            <button
+              type="button"
+              className="profile-menu__adults"
+              onClick={onOpenAdultArea}
+            >
+              Zona de adultos
+            </button>
           </>
         ) : null}
       </div>

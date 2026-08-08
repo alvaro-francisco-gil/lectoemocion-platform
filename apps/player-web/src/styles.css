@@ -94,14 +94,28 @@ main { height: 100dvh; }
   /*
    * The band the world's own chrome lives in, in one place.
    *
-   * Three boxes hang off the top corners — the avatar and the menu button on
-   * the left, the prize meter alone on the right — and the menu button has to
-   * sit under the face above it. Written once here so that stack cannot drift:
-   * `--readout-top` is how far in from the edge the first box starts, and
-   * `--avatar-size` is the face's own.
+   * Two boxes hang off the top corners — the child's avatar on the left, the
+   * letriestrella count on the right — and they start at the same height and
+   * are the same height. Written once here so that line cannot drift:
+   * `--readout-top` is how far in from the edge they both start, and
+   * `--readout-size` is how tall they both are.
+   *
+   * Measured in `vmin` rather than `vw`, like every other piece of world
+   * chrome. A width-only measure reads a phone held upright and a classroom
+   * panel as the same narrow screen, so the chrome that fit the panel swallowed
+   * the phone, and every `vw` ceiling froze at 1920 — a 4K panel got the HD
+   * chrome at half the apparent size. `vmin` is the shorter side whichever way
+   * the device is held, which is the side that decides whether chrome crowds
+   * the world.
+   *
+   * One height rather than two because a corner pair that agrees on nothing
+   * reads as two accidents rather than as the world's chrome. It settles
+   * between the face's old size and the pill's, but nearer the face: the pill
+   * can afford to grow, while an avatar that has to be recognised as a
+   * particular child from across a classroom cannot afford to shrink much.
    */
   --readout-top: clamp(0.5rem, 2vh, 1.25rem);
-  --avatar-size: clamp(72px, 8vw, 104px);
+  --readout-size: clamp(60px, 8vmin, 132px);
   position: relative;
   display: grid;
   grid-template-rows: 1fr;
@@ -417,44 +431,93 @@ main { height: 100dvh; }
  * because it is a readout, not a control — it must never eat a tap aimed at the
  * first card of the row, and it sits above the reach band a child's hands work
  * in anyway.
+ *
+ * A ring with the gift inside it, rather than a bar with "24 / 30" beside it.
+ * The shape is the sentence: a child who cannot read either number can see how
+ * much of the circle is gold, and what the gold is for.
+ *
+ * The two halves stand in opposite corners because they answer two questions.
+ * What has been won is a count, and it keeps the top-right corner the readout
+ * has always had. What it is being won towards is the gift, and its ring sits
+ * in the bottom-left one — clear of the avatar above it, clear of the animals
+ * opposite, and clear of the bar between them.
+ *
+ * Both are `pointer-events: none`: they are readouts, not controls, and neither
+ * may eat a tap or a drag aimed at the world underneath.
  */
-.prize-meter {
+.prize-count {
   position: absolute;
   top: var(--readout-top);
   right: clamp(0.5rem, 2vw, 1.5rem);
   z-index: 1;
+  margin: 0;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 1rem;
+  gap: 0.35rem;
+  height: var(--readout-size);
+  padding: 0 clamp(0.7rem, 1.6vw, 1.1rem) 0 clamp(0.45rem, 1vw, 0.7rem);
   border-radius: 999px;
   background: rgb(255 255 255 / 0.85);
-  font-size: clamp(1.1rem, 3vw, 1.75rem);
+  font-size: calc(var(--readout-size) * 0.34);
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: #402060;
   pointer-events: none;
 }
 
-.prize-meter > svg {
-  width: 2.5rem;
-  height: 2.5rem;
+/* Sized off the pill it sits in, so the two never drift apart. */
+.prize-count__star {
+  display: block;
+  width: calc(var(--readout-size) * 0.56);
 }
 
-.prize-meter__track {
-  display: block;
-  width: 8rem;
-  height: 0.75rem;
-  border-radius: 999px;
-  background: #e3e3e3;
-  overflow: hidden;
+/*
+ * The gift and the ring closing on it, and nothing else: no disc behind them.
+ * A plate under the shadow would be a third shape competing with the two that
+ * carry the meaning, and the world's own colour is already the ground.
+ */
+.prize-meter {
+  position: absolute;
+  bottom: clamp(0.75rem, 3vh, 2rem);
+  left: clamp(0.5rem, 3vw, 2rem);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: clamp(56px, 9vmin, 150px);
+  aspect-ratio: 1;
+  pointer-events: none;
+}
+.prize-meter > * {
+  grid-area: 1 / 1;
 }
 
-.prize-meter__fill {
-  display: block;
+.prize-meter__ring {
+  width: 100%;
   height: 100%;
-  border-radius: 999px;
-  background: #f4c95d;
-  transition: width 400ms ease-out;
+}
+
+/*
+ * The gift, as its own shape rather than as a picture of one: a shadow of the
+ * thing to come, cast on the world's own dark ground, which must never compete
+ * with the gold arc closing around it.
+ */
+.prize-meter__gift {
+  display: block;
+  width: 46%;
+  color: #000;
+  opacity: 0.38;
+}
+
+/*
+ * Butt caps, not round: a rounded cap on an empty ring draws a gold dot at
+ * twelve o'clock, which says "you have one" to a child who has none.
+ */
+.prize-meter__fill {
+  fill: none;
+  stroke: #f4c95d;
+  stroke-width: 5;
+  stroke-linecap: butt;
+  transition: stroke-dasharray 400ms ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -477,9 +540,14 @@ main { height: 100dvh; }
  * The bar grows with the viewport but its floor does not. A centred pill and a
  * right-hand collection button meet in the middle of the bottom edge, and on
  * the narrowest phone they already clear each other by a few pixels; the room
- * to be bigger is on a tablet and on a classroom panel, which is where the vw
- * term and the ceiling were raised. Anything that raises a `clamp` minimum
- * along this edge has to be checked at 320px first.
+ * to be bigger is on a tablet and on a classroom panel, which is where the
+ * `vmin` term and the ceiling were raised. Anything that raises a `clamp`
+ * minimum along this edge has to be checked at 320px first.
+ *
+ * Sized off `vmin` like the rest of the world's chrome, and measured rather
+ * than guessed: this pill was 76% of a phone's width and 16% of a 4K panel's,
+ * which is the same bar being two different pieces of furniture. It now holds
+ * near a third of the shorter side everywhere.
  */
 .tab-bar {
   position: absolute;
@@ -493,10 +561,10 @@ main { height: 100dvh; }
 .tab-bar__tabs {
   display: flex;
   align-items: stretch;
-  gap: clamp(0.25rem, 2vw, 1.5rem);
+  gap: clamp(0.25rem, 1.4vmin, 2rem);
   margin: 0;
-  padding: 0.5rem clamp(0.75rem, 3vw, 2rem);
-  border-radius: 28px;
+  padding: clamp(0.3rem, 0.7vmin, 0.9rem) clamp(0.5rem, 1.8vmin, 2.5rem);
+  border-radius: clamp(20px, 2.6vmin, 44px);
   background: #4a2a75;
   box-shadow: 0 6px 24px rgb(0 0 0 / 0.35);
   list-style: none;
@@ -507,19 +575,59 @@ main { height: 100dvh; }
   display: grid;
   justify-items: center;
   gap: 0.15rem;
-  min-width: clamp(64px, 18vw, 160px);
-  padding: 0.4rem 0.6rem;
+  min-width: clamp(56px, 15vmin, 250px);
+  padding: clamp(0.3rem, 0.7vmin, 0.9rem) clamp(0.4rem, 1vmin, 1.4rem);
   border: 0;
-  border-radius: 20px;
+  border-radius: clamp(16px, 2vmin, 34px);
   background: none;
   font: inherit;
   font-weight: 700;
-  font-size: clamp(0.75rem, 2.1vw, 1.35rem);
+  font-size: clamp(0.8rem, 2vmin, 2.4rem);
   color: #d6c4ee;
   cursor: pointer;
 }
 .tab__icon { display: grid; place-items: center; }
-.tab__icon > svg { width: clamp(24px, 6.2vw, 46px); height: auto; }
+.tab__icon > svg { width: clamp(24px, 4.3vmin, 88px); height: auto; }
+
+/*
+ * A phone: the words go, the icons stay.
+ *
+ * Three Spanish section names cannot be made narrow — "Multijugador" is
+ * eleven letters at any size — and on a 390px screen they made this bar three
+ * quarters of the width, a strip of adult text sitting across a world a child
+ * is trying to pan. The word is not the label that matters here anyway: the
+ * one person guaranteed to press this cannot read it.
+ *
+ * Hidden the accessible way, never `display: none`. The button keeps its name,
+ * so a screen reader still says "Juegos" and every test that asks for a tab by
+ * its word still finds it. The breakpoint is width alone on purpose: it is
+ * about how much room three words have across, which no other measure answers.
+ */
+@media (max-width: 520px) {
+  .tab__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* A disc, and never below the 48px a small hand needs to land on. */
+  .tab {
+    width: clamp(48px, 13vw, 66px);
+    height: clamp(48px, 13vw, 66px);
+    min-width: 0;
+    padding: 0;
+    place-content: center;
+    border-radius: 50%;
+  }
+
+  .tab__icon > svg { width: clamp(26px, 7vw, 38px); }
+}
 
 /* Where you are standing, said twice: brighter, and on a plate of its own. */
 .tab[aria-current="page"] {
@@ -540,13 +648,18 @@ main { height: 100dvh; }
  *
  * It is not a fourth section: the animals are a record of what a child has
  * done, and a tab for them would put a place to look beside two places to go.
+ *
+ * Smaller than the ring opposite it, and its paw larger inside it: the ring is
+ * a readout whose whole diameter carries the meaning, while this is a button
+ * whose meaning is the paw alone. A generous margin inside a disc this size
+ * only makes the one shape that has to be read from across a room smaller.
  */
 .collection-button {
   position: absolute;
   right: clamp(0.5rem, 3vw, 2rem);
   bottom: clamp(0.75rem, 3vh, 2rem);
   z-index: 2;
-  width: clamp(56px, 14vw, 104px);
+  width: clamp(48px, 7.4vmin, 122px);
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -558,7 +671,7 @@ main { height: 100dvh; }
   box-shadow: 0 6px 20px rgb(0 0 0 / 0.35);
   cursor: pointer;
 }
-.collection-button > svg { width: 55%; height: auto; }
+.collection-button > svg { width: 72%; height: auto; }
 .collection-button:focus-visible {
   outline: 3px solid #fff;
   outline-offset: 3px;
@@ -576,7 +689,8 @@ main { height: 100dvh; }
  * game — the same kind of control, the app talking rather than the world — but
  * a larger one: the back button carries an arrow that reads at any size, while
  * this one has to be recognised as a particular child's face from across a
- * classroom, and a 56px face is a smudge at that distance.
+ * classroom, and a 56px face is a smudge at that distance. Its size is
+ * `--readout-size`, which it shares with the count in the corner opposite.
  *
  * High and in a corner: adult chrome may sit above the world, but never in the
  * band where a child's hands land — that band is the bar's.
@@ -586,8 +700,8 @@ main { height: 100dvh; }
   top: var(--readout-top);
   left: clamp(0.5rem, 2vw, 1.5rem);
   z-index: 2;
-  width: var(--avatar-size);
-  height: var(--avatar-size);
+  width: var(--readout-size);
+  height: var(--readout-size);
   display: grid;
   place-items: center;
   padding: 0;
@@ -605,41 +719,6 @@ main { height: 100dvh; }
 }
 .profile-button:hover { background: #fff; }
 .profile-button:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
-
-/*
- * The way into the prize settings, directly under the child's face.
- *
- * Two doors an adult uses, in the same corner, because that is the rule the
- * counter opposite is placed by: what was won lives on the right, what an
- * adult can change lives on the left. It is the smaller disc of the two — the
- * avatar has to be recognised as a particular child from across a classroom,
- * this only has to be found by someone already looking for it.
- *
- * High and in a corner for the avatar's reason as well: adult chrome may sit
- * above the world, but never in the band where a child's hands land.
- *
- * Its own door for now. The prize settings and the profile drawer each carry
- * their own gate, and folding the two together is the adult-gate follow-up —
- * at which point this button is the thing most likely to go.
- */
-.menu-button {
-  position: absolute;
-  top: calc(var(--readout-top) + var(--avatar-size) + 0.5rem);
-  left: clamp(0.5rem, 2vw, 1.5rem);
-  z-index: 2;
-  width: 56px;
-  height: 56px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 2px solid #7b2cbf;
-  border-radius: 50%;
-  background: rgb(255 255 255 / 0.9);
-  color: #402060;
-  cursor: pointer;
-}
-.menu-button:hover { background: #fff; }
-.menu-button:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
 
 /*
  * A layer, not a screen — the one place this app breaks its own
@@ -815,6 +894,29 @@ main { height: 100dvh; }
 }
 .profile-menu__soon-label { font-weight: 800; }
 .profile-menu__soon-note { font-size: 0.78rem; }
+
+/*
+ * The way into the adult area, in the row it was promised in.
+ *
+ * Reads like the planned rows above it rather than like a button, because that
+ * is what it is: a line in a list of everything an adult can reach from here.
+ */
+.profile-menu__adults {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+.profile-menu__adults:hover { background: rgb(255 255 255 / 0.16); }
+.profile-menu__adults:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 
 .profile-menu__actions {
   margin-top: 1.25rem;

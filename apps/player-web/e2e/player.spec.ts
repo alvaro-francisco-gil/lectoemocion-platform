@@ -205,10 +205,9 @@ test("playing the first chapter unlocks the next node and persists", async ({
   page
 }) => {
   await page.goto("/");
-  const stars = page.getByRole("meter", {
-    name: "Letriestrellas hacia el próximo regalo"
-  });
-  await expect(stars).toHaveText(`0 / ${DEFAULT_PRIZE_GOAL}`);
+  const stars = page.locator(".prize-count");
+  /* Not on screen at all until the first one is won. */
+  await expect(stars).toHaveCount(0);
 
   await page.getByRole("button", { name: ENTRY }).click();
   await expect(page.locator("canvas")).toBeVisible();
@@ -220,11 +219,11 @@ test("playing the first chapter unlocks the next node and persists", async ({
      letriestrellas it paid, and then the chests it owes. */
   await takeTheReward(page);
   await expect(page.getByRole("button", { name: SECOND })).toBeEnabled();
-  await expect(stars).toHaveText(`3 / ${DEFAULT_PRIZE_GOAL}`);
+  await expect(stars).toHaveText("3");
 
   await page.reload();
   await expect(page.getByRole("button", { name: SECOND })).toBeEnabled();
-  await expect(stars).toHaveText(`3 / ${DEFAULT_PRIZE_GOAL}`);
+  await expect(stars).toHaveText("3");
 });
 
 test("finishing a chapter hands out an animal for the collection", async ({
@@ -1061,11 +1060,33 @@ async function openGiftForm(page: Page): Promise<void> {
   await passAdultGate(page);
 }
 
-test("the meter reads 0 / 30 on a fresh session", async ({ page }) => {
+/*
+ * A fresh device shows neither half. The count is nothing to read and the ring
+ * is a promise nobody has started earning, so the world's corners are the
+ * avatar and the animals alone until the first chapter is finished.
+ */
+test("the readout is absent on a fresh session, and arrives with the first stars", async ({
+  page
+}) => {
   await page.goto("/");
-  await expect(
-    page.getByRole("meter", { name: "Letriestrellas hacia el próximo regalo" })
-  ).toHaveText(`0 / ${DEFAULT_PRIZE_GOAL}`);
+  const meter = page.getByRole("meter", {
+    name: "Letriestrellas hacia el próximo regalo"
+  });
+  await expect(page.getByRole("navigation", { name: "Mundo" })).toBeVisible();
+  await expect(meter).toHaveCount(0);
+  await expect(page.locator(".prize-count")).toHaveCount(0);
+
+  await page.getByRole("button", { name: ENTRY }).click();
+  await completed(page, "encuentro");
+  await takeTheReward(page);
+
+  await expect(page.locator(".prize-count")).toHaveText("3");
+  /* The goal is only ever said here, which is where a screen reader reads it. */
+  await expect(meter).toHaveAttribute(
+    "aria-valuemax",
+    String(DEFAULT_PRIZE_GOAL)
+  );
+  await expect(page.locator(".prize-meter__gift")).toBeVisible();
 });
 
 test("reaching the goal shows the gift screen after the letriestrellas", async ({
@@ -1084,9 +1105,12 @@ test("Seguir leaves the gift reachable on the map, and the meter restarts", asyn
   await page.getByRole("button", { name: "Seguir" }).click();
 
   await expect(page.getByRole("button", { name: "Tu regalo" })).toBeVisible();
+  /* Spent on the gift, so both halves leave rather than stand at a full goal
+     that has already been paid out. */
+  await expect(page.locator(".prize-count")).toHaveCount(0);
   await expect(
     page.getByRole("meter", { name: "Letriestrellas hacia el próximo regalo" })
-  ).toHaveText(`0 / ${PRIZE_GOAL}`);
+  ).toHaveCount(0);
 });
 
 test("Preparar el regalo reaches the gate, refuses an implausible year, and 1988 opens the settings", async ({
@@ -1159,8 +1183,12 @@ test("a custom gift with a photo reveals both the words and the picture", async 
 test("the goal field refuses 0 and accepts 12, and the meter then reads against 12", async ({
   page
 }) => {
+  /* Some already banked, because the meter the new goal is read off does not
+     exist for a child who has not earned anything yet. */
+  await withBankedStars(page, STARS_PER_COMPLETION);
   await page.goto("/");
-  await page.getByRole("button", { name: "Menú" }).click();
+  await page.getByRole("button", { name: /^Quién juega/ }).click();
+  await page.getByRole("button", { name: "Zona de adultos" }).click();
   await passAdultGate(page);
 
   const goalField = page.getByLabel("Letriestrellas para el próximo regalo");
@@ -1176,7 +1204,7 @@ test("the goal field refuses 0 and accepts 12, and the meter then reads against 
 
   await expect(
     page.getByRole("meter", { name: "Letriestrellas hacia el próximo regalo" })
-  ).toHaveText("0 / 12");
+  ).toHaveAttribute("aria-valuemax", "12");
 });
 
 /*

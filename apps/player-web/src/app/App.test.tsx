@@ -70,16 +70,44 @@ async function collectStars(): Promise<string> {
   return won;
 }
 
-/** The fill meter in the world's corner. */
+/** The ring closing on the gift, in the world's bottom-left corner. */
 function prizeMeter(): HTMLElement {
   return screen.getByRole("meter", {
     name: "Letriestrellas hacia el próximo regalo"
   });
 }
 
-/** What the meter reads, as "filled / goal". */
+/**
+ * The count in the opposite corner — "" until the first letriestrella, because
+ * until then neither it nor the meter is on screen at all.
+ */
 function meterTotal(): string {
-  return prizeMeter().textContent ?? "";
+  return document.querySelector(".prize-count")?.textContent ?? "";
+}
+
+/**
+ * Seeds letriestrellas from an earlier sitting, nothing else played.
+ *
+ * The readout only exists once there is something to read, so a test about how
+ * it looks has to arrive with some — through the same key the app reads, so it
+ * fails if that key changes shape.
+ */
+function bankStars(stars: number): void {
+  localStorage.setItem(
+    storageKey(LOCAL_OWNER),
+    JSON.stringify({
+      completedNodes: [],
+      lastPlayedNode: null,
+      rewards: [],
+      stars
+    })
+  );
+}
+
+/** Opens the adult area the way the drawer offers it. */
+async function openAdultArea(): Promise<void> {
+  await openProfiles();
+  fireEvent.click(screen.getByRole("button", { name: "Zona de adultos" }));
 }
 
 /**
@@ -337,7 +365,7 @@ describe("the world shell", () => {
     await renderApp();
     expect(screen.queryByRole("dialog", { name: "Ajustes" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+    await openAdultArea();
     /* The gate first, and nothing of the area behind it. */
     expect(screen.queryByRole("dialog", { name: "Ajustes" })).toBeNull();
     passAdultGate();
@@ -354,11 +382,11 @@ describe("the world shell", () => {
    */
   it("asks again the next time the adult area is opened", async () => {
     await renderApp();
-    fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+    await openAdultArea();
     passAdultGate();
     fireEvent.click(screen.getByRole("button", { name: "Cerrar los ajustes" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+    await openAdultArea();
 
     expect(
       screen.getByRole("dialog", { name: "Sólo para adultos" })
@@ -369,7 +397,7 @@ describe("the world shell", () => {
   /* A panel with no way out is a trap on a device with no back button. */
   it("closes the adult area on Escape", async () => {
     await renderApp();
-    fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+    await openAdultArea();
     passAdultGate();
 
     fireEvent.keyDown(document, { key: "Escape" });
@@ -381,7 +409,7 @@ describe("the world shell", () => {
   /* And on the gate's side of it, where there is nothing to close but the ask. */
   it("closes the adult gate on Escape, back to the world", async () => {
     await renderApp();
-    fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+    await openAdultArea();
 
     fireEvent.keyDown(document, { key: "Escape" });
 
@@ -399,7 +427,7 @@ describe("the world shell", () => {
    */
   it("puts the world away while the adult area is open", async () => {
     await renderApp();
-    fireEvent.click(screen.getByRole("button", { name: "Menú" }));
+    await openAdultArea();
     expect(screen.queryByRole("navigation", { name: "Mundo" })).toBeNull();
 
     passAdultGate();
@@ -1039,9 +1067,9 @@ describe("the letriestrellas every finish is worth", () => {
     completeActiveResource();
   }
 
-  it("starts a new player at zero", async () => {
+  it("starts a new player with nothing on the meter", async () => {
     await renderApp();
-    expect(meterTotal()).toBe("0 / 30");
+    expect(meterTotal()).toBe("");
   });
 
   it("pays three stars the moment a chapter is finished", async () => {
@@ -1054,7 +1082,7 @@ describe("the letriestrellas every finish is worth", () => {
     expect(screen.getByRole("button", { name: "Abrir el cofre 1" })).toBeInTheDocument();
 
     await openChest();
-    await waitFor(() => expect(meterTotal()).toBe("3 / 30"));
+    await waitFor(() => expect(meterTotal()).toBe("3"));
   });
 
   /* The animals are once each; the stars are every time. */
@@ -1068,7 +1096,7 @@ describe("the letriestrellas every finish is worth", () => {
     expect(await collectStars()).toContain("+3");
 
     /* Straight back to the map: no second chest for the same chapter. */
-    await waitFor(() => expect(meterTotal()).toBe("6 / 30"));
+    await waitFor(() => expect(meterTotal()).toBe("6"));
     expect(screen.queryByRole("button", { name: /Abrir el cofre/ })).toBeNull();
   });
 
@@ -1077,16 +1105,21 @@ describe("the letriestrellas every finish is worth", () => {
     finish("El encuentro");
     await collectStars();
     await openChest();
-    await waitFor(() => expect(meterTotal()).toBe("3 / 30"));
+    await waitFor(() => expect(meterTotal()).toBe("3"));
 
     cleanup();
     await renderApp();
 
-    await waitFor(() => expect(meterTotal()).toBe("3 / 30"));
+    await waitFor(() => expect(meterTotal()).toBe("3"));
   });
 
   it("keeps the meter off a running game and out of the ceremonies", async () => {
+    /* Banked, so the readout is on the world to begin with and its absence
+       during play is this test's finding rather than its starting point. */
+    bankStars(3);
     await renderApp();
+    await waitFor(() => expect(prizeMeter()).toBeInTheDocument());
+
     fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
     expect(
       screen.queryByRole("meter", {
@@ -1106,12 +1139,19 @@ describe("the letriestrellas every finish is worth", () => {
 
   /* A readout, not a route: nothing in the corner opens anything. */
   it("keeps the meter unpressable", async () => {
+    bankStars(3);
     await renderApp();
+    await waitFor(() => expect(meterTotal()).toBe("3"));
     expect(prizeMeter().querySelectorAll("button")).toHaveLength(0);
   });
 });
 
 describe("the prize meter", () => {
+  /* These seed their own letriestrellas, so none may inherit another's. */
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   /*
    * One readout, not two. A lifetime total beside the meter is a second number
    * in the same corner, saying something different, for a child who cannot
@@ -1119,23 +1159,79 @@ describe("the prize meter", () => {
    * was drawn with.
    */
   it("is the only readout in the world's corner", async () => {
+    bankStars(15);
     await renderApp();
     expect(await screen.findByRole("meter")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Letriestrellas" })).toBeNull();
     expect(screen.getAllByRole("meter")).toHaveLength(1);
   });
 
-  it("shows what is filled against the goal", async () => {
+  /*
+   * The goal is spoken but not drawn. A child of three cannot read "0 / 30",
+   * and the second number is the one they can do least with: how full the ring
+   * is says how much further, in the one language they already have. A screen
+   * reader still gets the whole sentence from the meter's own attributes, and
+   * only from there — the count opposite is hidden from it rather than said
+   * twice in two corners.
+   */
+  it("draws the count alone and leaves the goal to the ring", async () => {
+    bankStars(15);
     await renderApp();
     const meter = await screen.findByRole("meter", {
       name: "Letriestrellas hacia el próximo regalo"
     });
-    expect(meter).toHaveAttribute("aria-valuenow", "0");
+    await waitFor(() => expect(meter).toHaveAttribute("aria-valuenow", "15"));
     expect(meter).toHaveAttribute("aria-valuemax", "30");
-    expect(meter).toHaveTextContent("0 / 30");
+    expect(meterTotal()).toBe("15");
+    expect(document.body.textContent).not.toContain("15 / 30");
+    expect(document.querySelector(".prize-count")).toHaveAttribute(
+      "aria-hidden",
+      "true"
+    );
+  });
+
+  /*
+   * Nothing at all rather than a nought and an empty ring.
+   *
+   * A child who has not started has nothing to be told: "0" is a fact only a
+   * reader can take, and the gift's shadow with no gold around it is a promise
+   * made to someone who has not begun earning it. Both halves arrive with the
+   * first letriestrella, which makes the readout itself part of the reward.
+   */
+  it("shows nothing at all until the first letriestrella", async () => {
+    await renderApp();
+    expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("meter", {
+        name: "Letriestrellas hacia el próximo regalo"
+      })
+    ).toBeNull();
+    expect(document.querySelector(".prize-count")).toBeNull();
+    expect(document.querySelector(".prize-meter__gift")).toBeNull();
+  });
+
+  /* And it is there the moment there is something to say. */
+  it("appears with the first letriestrella, gift and all", async () => {
+    bankStars(3);
+    await renderApp();
+
+    await waitFor(() => expect(meterTotal()).toBe("3"));
+    expect(prizeMeter().querySelector(".prize-meter__gift")).not.toBeNull();
+  });
+
+  /* The ring is the picture of the same fraction the attributes state. */
+  it("fills the ring in proportion to the goal", async () => {
+    bankStars(15);
+    await renderApp();
+
+    await waitFor(() => expect(meterTotal()).toBe("15"));
+    const ring = prizeMeter().querySelector(".prize-meter__fill");
+    expect(ring?.getAttribute("stroke-dasharray")).toBe("50 50");
   });
 
   it("is display only, so nothing a child touches sits out of reach", async () => {
+    bankStars(15);
     await renderApp();
     const meter = await screen.findByRole("meter", {
       name: "Letriestrellas hacia el próximo regalo"
@@ -1190,17 +1286,26 @@ describe("reaching the goal", () => {
     ).toBeVisible();
   });
 
-  it("starts the meter refilling the moment the gift is awarded", async () => {
+  /*
+   * The letriestrellas were spent on the gift, so the meter is back to where a
+   * new player's is: away entirely, rather than left standing full at a goal
+   * that has already been paid out.
+   */
+  it("empties the meter the moment the gift is awarded", async () => {
     nearlyThere();
     await renderApp();
     await playFirstChapter();
     await collectStars();
     await openFirstChest();
     fireEvent.click(screen.getByRole("button", { name: "Seguir" }));
-    const meter = await screen.findByRole("meter", {
-      name: "Letriestrellas hacia el próximo regalo"
-    });
-    expect(meter).toHaveAttribute("aria-valuenow", "0");
+
+    await screen.findByRole("button", { name: "Tu regalo" });
+    expect(
+      screen.queryByRole("meter", {
+        name: "Letriestrellas hacia el próximo regalo"
+      })
+    ).toBeNull();
+    expect(meterTotal()).toBe("");
   });
 
   /**
@@ -1349,7 +1454,7 @@ describe("profiles", () => {
 
     await renderApp();
 
-    await waitFor(() => expect(meterTotal()).toBe("27 / 30"));
+    await waitFor(() => expect(meterTotal()).toBe("27"));
   });
 
   /**
@@ -1393,7 +1498,7 @@ describe("profiles", () => {
     expect(
       await screen.findByRole("button", { name: "Tu regalo" })
     ).toBeVisible();
-    await waitFor(() => expect(meterTotal()).toBe("3 / 6"));
+    await waitFor(() => expect(meterTotal()).toBe("3"));
 
     await openProfiles();
     addChild("Vera");
@@ -1404,7 +1509,7 @@ describe("profiles", () => {
       ).toBeInTheDocument()
     );
     /* Vera's own meter, against the goal the adult set for both of them. */
-    await waitFor(() => expect(meterTotal()).toBe("0 / 6"));
+    await waitFor(() => expect(meterTotal()).toBe(""));
     expect(screen.queryByRole("button", { name: "Tu regalo" })).toBeNull();
 
     /* And Peque still has it when they come back. */
@@ -1413,7 +1518,7 @@ describe("profiles", () => {
     expect(
       await screen.findByRole("button", { name: "Tu regalo" })
     ).toBeVisible();
-    await waitFor(() => expect(meterTotal()).toBe("3 / 6"));
+    await waitFor(() => expect(meterTotal()).toBe("3"));
   });
 
   /* The gifts are filed under the playing child's id, exactly as progress is. */
@@ -1445,7 +1550,7 @@ describe("profiles", () => {
     completeActiveResource();
     await collectStars();
     await openChest();
-    await waitFor(() => expect(meterTotal()).toBe("3 / 30"));
+    await waitFor(() => expect(meterTotal()).toBe("3"));
 
     await openProfiles();
     fireEvent.click(screen.getByRole("button", { name: "Añadir niño" }));
@@ -1455,7 +1560,7 @@ describe("profiles", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
 
-    await waitFor(() => expect(meterTotal()).toBe("0 / 30"));
+    await waitFor(() => expect(meterTotal()).toBe(""));
     expect(
       screen.getByRole("button", { name: "Quién juega: Vera" })
     ).toBeInTheDocument();
@@ -1467,7 +1572,7 @@ describe("profiles", () => {
     completeActiveResource();
     await collectStars();
     await openChest();
-    await waitFor(() => expect(meterTotal()).toBe("3 / 30"));
+    await waitFor(() => expect(meterTotal()).toBe("3"));
 
     await openProfiles();
     fireEvent.click(screen.getByRole("button", { name: "Añadir niño" }));
@@ -1476,12 +1581,12 @@ describe("profiles", () => {
       target: { value: "Vera" }
     });
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
-    await waitFor(() => expect(meterTotal()).toBe("0 / 30"));
+    await waitFor(() => expect(meterTotal()).toBe(""));
 
     await openProfiles();
     fireEvent.click(screen.getByRole("button", { name: "Jugar como Peque" }));
 
-    await waitFor(() => expect(meterTotal()).toBe("3 / 30"));
+    await waitFor(() => expect(meterTotal()).toBe("3"));
   });
 
   /* Switching is the one thing a child may do here unaided. */
@@ -1607,7 +1712,7 @@ describe("profiles", () => {
     completeActiveResource();
     await collectStars();
     await openChest();
-    await waitFor(() => expect(meterTotal()).toBe("3 / 30"));
+    await waitFor(() => expect(meterTotal()).toBe("3"));
 
     await openProfiles();
     fireEvent.click(screen.getByRole("button", { name: "Editar a Vera" }));
@@ -1628,12 +1733,24 @@ describe("profiles", () => {
     expect(progressKeys).toEqual([]);
   });
 
-  /* Planned work, shown as planned. Neither pretends to be ready. */
-  it("shows the rows that are not built yet as unavailable", async () => {
+  /* Planned work, shown as planned. It does not pretend to be ready. */
+  it("shows the row that is not built yet as unavailable", async () => {
     await renderApp();
     await openProfiles();
 
     expect(screen.getByRole("button", { name: /Progreso/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Zona de adultos/ })).toBeDisabled();
+  });
+
+  /* The drawer is the one door to the adult area, and it is a real one. */
+  it("offers the adult area, and puts the drawer away behind it", async () => {
+    await renderApp();
+    await openAdultArea();
+
+    passAdultGate();
+    expect(screen.getByRole("dialog", { name: "Ajustes" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar los ajustes" }));
+    expect(screen.queryByRole("dialog", { name: "Quién juega" })).toBeNull();
+    expect(screen.getByRole("navigation", { name: "Mundo" })).toBeInTheDocument();
   });
 });
