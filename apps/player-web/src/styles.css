@@ -162,7 +162,20 @@ main { height: 100dvh; }
   align-content: center;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-block: clamp(0.75rem, 4vh, 3rem);
+  /*
+   * Centred between the chrome, not between the edges.
+   *
+   * The band is the whole screen, so centring the row in it centres it under
+   * the avatar and the count rather than below them — and the higher those
+   * corners sit, the closer the top card creeps to them. On a phone held
+   * sideways there were fifteen pixels between the two while a hundred went
+   * spare underneath. Starting the band where the top chrome ends is what puts
+   * that space where it is missing, and it is measured off the same two tokens
+   * the corners are, so it cannot fall behind them again.
+   */
+  padding-top: calc(
+    var(--readout-top) + var(--readout-size) + clamp(0.5rem, 2vh, 1.5rem)
+  );
   /* Clear of the bar, which floats over this band rather than pushing it. */
   padding-bottom: clamp(6rem, 18vh, 11rem);
 }
