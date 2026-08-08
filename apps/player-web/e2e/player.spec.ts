@@ -1089,6 +1089,32 @@ test("the readout is absent on a fresh session, and arrives with the first stars
   await expect(page.locator(".prize-meter__gift")).toBeVisible();
 });
 
+/*
+ * jsdom reports every box as zero, so "the stars land on the pill" is a claim
+ * only a browser can check: three of them airborne at once, the pill still
+ * holding the old total while they travel, and the overlay gone once the
+ * corner has settled on the new one.
+ */
+test("flies the letriestrellas into the counter", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: ENTRY }).click();
+  await completed(page, "encuentro");
+  await takeTheStars(page);
+  await page.getByRole("button", { name: "Abrir el cofre 1" }).click();
+  await page.getByRole("button", { name: "Seguir" }).click();
+
+  /* Still what the pill held before this finish: the stars have not landed
+     yet, so the count they are carrying has not moved. */
+  await expect(page.locator(".prize-count")).toHaveText("0");
+
+  /* Three in the air before any of them has arrived. */
+  await expect(page.locator(".star-flight__star")).toHaveCount(3);
+
+  /* And gone again, with the corner holding what they carried. */
+  await expect(page.locator(".star-flight")).toHaveCount(0);
+  await expect(page.locator(".prize-count")).toHaveText(/^3/);
+});
+
 test("reaching the goal shows the gift screen after the letriestrellas", async ({
   page
 }) => {
