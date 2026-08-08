@@ -11,10 +11,14 @@ export const MAX_PRIZE_IMAGE_EDGE = 512;
 export const PRIZE_IMAGE_QUALITY = 0.7;
 
 /**
- * One key per picture.
+ * One key per picture, under the child whose gift it is inside.
  *
  * Separate from the prize list on purpose: a quota failure then costs one
  * picture, and the prize survives with the words the adult will read aloud.
+ *
+ * `owner` is the playing profile's id, because a picture belongs to the gift it
+ * is inside and a gift belongs to the child who earned it. The goal is the only
+ * part of the prizes that is the group's.
  */
 export function prizeImageKey(owner: string, id: PrizeImageId): string {
   return `lectoemocion.prizeImage.${owner}.${id}`;
