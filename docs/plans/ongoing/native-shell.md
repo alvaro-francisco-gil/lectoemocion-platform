@@ -3,7 +3,8 @@
 ## Status
 
 - **Updated:** 2026-08-08
-- **Stage:** Step 1 — Expo app hosting the player in a WebView. **Complete.**
+- **Stage:** Step 1 — Expo app hosting the player in a WebView. The embedding
+  seam is done on hardware; one verification task remains open below.
 - **Branch:** `main`
 - **Done:** `apps/mobile` scaffolded and rendering the player in a WebView;
   `playerUrl` resolver with 11 tests; scripted Android emulator workflow
@@ -153,9 +154,9 @@ libraries it bundles. No EAS account, no store credentials, no Xcode.
 - [x] `pnpm mobile:lan` for a phone that is not plugged in: one command, both
       servers on the network, `selectLanHost` choosing the address and refusing
       to guess between candidates.
-- [x] Verified on physical hardware — a Pixel 8 on Android 16, over WiFi, with
-      the PC wired to the same router. Expo Go fetched the bundle from the LAN
-      address and the WebView loaded the player.
+- [x] The shell verified on physical hardware — a Pixel 8 on Android 16, over
+      WiFi, with the PC wired to the same router. Expo Go fetched the bundle
+      from the LAN address and the WebView loaded the player.
 
       Expo Go's version is coupled to the project's SDK and this is where it
       bites: the phone had 54.0.8 against an SDK 57 project, which fails with
@@ -165,6 +166,11 @@ libraries it bundles. No EAS account, no store credentials, no Xcode.
       path. Downgrading the project's SDK to meet an old Expo Go is not — the
       app is the same size at every SDK, so it buys a React Native downgrade and
       no smaller download.
+- [ ] A minigame played through to its reward screen **on hardware**. Done in
+      the emulator; on the phone only the map hub has been seen. Touch on real
+      glass, real GPU, and real audio output are the three things the emulator
+      is least trustworthy about, so this stays open until someone plays
+      "El encuentro" through on the Pixel.
 
 ## Verification
 
