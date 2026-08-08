@@ -1,5 +1,12 @@
-import { useEffect, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  type CSSProperties,
+  type RefObject
+} from "react";
 import { GiftShadow, StarIcon } from "./icons";
+import type { StarFlightState } from "../world/starArrival";
 
 /** How long a landing is marked for, so the flare reads as one beat. */
 export const FLARE_MS = 420;
@@ -160,5 +167,151 @@ export function PrizeRing({
         <GiftShadow />
       </span>
     </section>
+  );
+}
+
+/** Between one star setting off and the next. Three stars, three beats. */
+export const STAR_STAGGER_MS = 110;
+/** How long one star is on its way. */
+export const STAR_TRAVEL_MS = 520;
+/** How far apart the stars start, so three do not leave as one. */
+const STAR_SPREAD_PX = 56;
+/** Where they set off from: the middle, a little high, where the award was. */
+const ORIGIN_HEIGHT = 0.42;
+
+/**
+ * The letriestrellas on their way to the corner.
+ *
+ * Mounted with the world and nothing else, which is what makes its mount the
+ * signal that the world is on screen: `onArrive` is the whole of how the
+ * reducer learns that, and `App` never has to restate the order the screens
+ * come in.
+ *
+ * The pill is measured rather than derived. Its position is stated once, in the
+ * stylesheet, in `clamp()`s that depend on the viewport — reading it back out
+ * here in TypeScript would be a second copy of a geometry that is free to
+ * change.
+ */
+export function StarFlight({
+  flight,
+  pill,
+  onArrive,
+  onLanded
+}: {
+  flight: StarFlightState | null;
+  pill: RefObject<HTMLParagraphElement | null>;
+  onArrive: () => void;
+  onLanded: () => void;
+}) {
+  useEffect(onArrive, [onArrive]);
+
+  if (flight === null) return null;
+
+  /*
+   * Keyed by the flight, so one flight's stars are one stable list. Without
+   * the key a second flight would reuse the first's elements, inheriting the
+   * transforms they had already reached.
+   */
+  return (
+    <Flight
+      key={flight.id}
+      count={flight.count}
+      pill={pill}
+      onLanded={onLanded}
+    />
+  );
+}
+
+function Flight({
+  count,
+  pill,
+  onLanded
+}: {
+  count: number;
+  pill: RefObject<HTMLParagraphElement | null>;
+  onLanded: () => void;
+}) {
+  const [course, setCourse] = useState<{
+    readonly originX: number;
+    readonly originY: number;
+    readonly targetX: number;
+    readonly targetY: number;
+  } | null>(null);
+  const [flying, setFlying] = useState(false);
+
+  useLayoutEffect(() => {
+    const box = pill.current?.getBoundingClientRect();
+    /*
+     * No pill to aim at means no flight — but the landings below still fire,
+     * so the counter reaches the truth either way. What is lost is the
+     * decoration, never the number.
+     */
+    if (box === undefined) return undefined;
+
+    setCourse({
+      originX: window.innerWidth / 2,
+      originY: window.innerHeight * ORIGIN_HEIGHT,
+      targetX: box.left + box.width / 2,
+      targetY: box.top + box.height / 2
+    });
+
+    /* One frame at the origin, so there is something to transition from. */
+    const frame = window.requestAnimationFrame(() => setFlying(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [pill]);
+
+  useEffect(() => {
+    const timers = Array.from({ length: count }, (_unused, index) =>
+      window.setTimeout(onLanded, index * STAR_STAGGER_MS + STAR_TRAVEL_MS)
+    );
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [count, onLanded]);
+
+  return (
+    <div
+      className="star-flight"
+      aria-hidden="true"
+      style={
+        {
+          "--star-travel": `${STAR_TRAVEL_MS}ms`
+        } as CSSProperties
+      }
+    >
+      {Array.from({ length: count }, (_unused, index) => {
+        const spread = (index - (count - 1) / 2) * STAR_SPREAD_PX;
+        const startX = (course?.originX ?? 0) + spread;
+        const across = flying && course !== null ? course.targetX - startX : 0;
+        const up = flying && course !== null ? course.targetY - course.originY : 0;
+        const delay = `${index * STAR_STAGGER_MS}ms`;
+        return (
+          /*
+            Two elements, one star. The outer one carries it sideways at a
+            constant rate and the inner one lifts it with a curve of its own,
+            which is what makes the path an arc rather than a diagonal — and
+            both are transforms, so nothing here touches layout.
+          */
+          <span
+            key={index}
+            className="star-flight__star"
+            style={{
+              left: `${startX}px`,
+              top: `${course?.originY ?? 0}px`,
+              transitionDelay: delay,
+              transform: `translateX(${across}px)`
+            }}
+          >
+            <span
+              className="star-flight__lift"
+              style={{
+                transitionDelay: delay,
+                transform: `translateY(${up}px) scale(${flying ? 0.42 : 1})`
+              }}
+            >
+              <StarIcon />
+            </span>
+          </span>
+        );
+      })}
+    </div>
   );
 }

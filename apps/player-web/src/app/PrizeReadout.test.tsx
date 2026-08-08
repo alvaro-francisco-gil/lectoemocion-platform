@@ -1,7 +1,14 @@
 import { render, screen } from "@testing-library/react";
 import { act, createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FLARE_MS, PrizeCount, PrizeRing } from "./PrizeReadout";
+import {
+  FLARE_MS,
+  PrizeCount,
+  PrizeRing,
+  StarFlight,
+  STAR_STAGGER_MS,
+  STAR_TRAVEL_MS
+} from "./PrizeReadout";
 
 describe("the counter in the corner", () => {
   /* Nothing to say, and nothing on screen saying it. */
@@ -124,5 +131,103 @@ describe("the ring", () => {
     expect(
       meter.querySelector(".prize-meter__fill")?.getAttribute("stroke-dasharray")
     ).toBe("50 50");
+  });
+});
+
+describe("the flight to the counter", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /*
+   * The world screen is the only thing that renders this, so its mount is how
+   * the reducer learns the world is on screen. Deriving that in `App` from the
+   * screens that precede it would be a second copy of their ordering.
+   */
+  it("reports that the world has arrived, once", () => {
+    const onArrive = vi.fn();
+    const { rerender } = render(
+      <StarFlight
+        flight={null}
+        pill={createRef<HTMLParagraphElement>()}
+        onArrive={onArrive}
+        onLanded={vi.fn()}
+      />
+    );
+    rerender(
+      <StarFlight
+        flight={{ id: 1, count: 3, landed: 0 }}
+        pill={createRef<HTMLParagraphElement>()}
+        onArrive={onArrive}
+        onLanded={vi.fn()}
+      />
+    );
+    expect(onArrive).toHaveBeenCalledTimes(1);
+  });
+
+  it("draws one star per letriestrella still in the air", () => {
+    render(
+      <StarFlight
+        flight={{ id: 1, count: 3, landed: 0 }}
+        pill={createRef<HTMLParagraphElement>()}
+        onArrive={vi.fn()}
+        onLanded={vi.fn()}
+      />
+    );
+    expect(document.querySelectorAll(".star-flight__star")).toHaveLength(3);
+  });
+
+  /* Staggered, so three stars are three arrivals rather than one. */
+  it("lands them one at a time", () => {
+    const onLanded = vi.fn();
+    render(
+      <StarFlight
+        flight={{ id: 1, count: 3, landed: 0 }}
+        pill={createRef<HTMLParagraphElement>()}
+        onArrive={vi.fn()}
+        onLanded={onLanded}
+      />
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(STAR_TRAVEL_MS);
+    });
+    expect(onLanded).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(STAR_STAGGER_MS * 2);
+    });
+    expect(onLanded).toHaveBeenCalledTimes(3);
+  });
+
+  /* Decoration only: it must not be read out, and it must not eat a tap. */
+  it("is hidden from a screen reader", () => {
+    render(
+      <StarFlight
+        flight={{ id: 1, count: 3, landed: 0 }}
+        pill={createRef<HTMLParagraphElement>()}
+        onArrive={vi.fn()}
+        onLanded={vi.fn()}
+      />
+    );
+    expect(document.querySelector(".star-flight")).toHaveAttribute(
+      "aria-hidden",
+      "true"
+    );
+  });
+
+  it("draws nothing when nothing is in the air", () => {
+    render(
+      <StarFlight
+        flight={null}
+        pill={createRef<HTMLParagraphElement>()}
+        onArrive={vi.fn()}
+        onLanded={vi.fn()}
+      />
+    );
+    expect(document.querySelector(".star-flight")).toBeNull();
   });
 });
