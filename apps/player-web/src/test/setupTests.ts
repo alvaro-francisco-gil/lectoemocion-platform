@@ -13,8 +13,8 @@ afterEach(cleanup);
  * jsdom has no compositor, so `reduce` is the honest answer to every motion
  * query: nothing here can draw a transition, and a test that waited for one
  * would be waiting on a wall clock rather than on the app. A test that is
- * *about* an animation calls `preferMotion("full")` and drives it with fake
- * timers, which is the only way any of this is deterministic.
+ * *about* an animation calls `preferMotion("full")` instead, and waits on the
+ * real clock for the flight it deliberately turned on.
  */
 export function preferMotion(motion: "full" | "reduced"): void {
   window.matchMedia = (query: string): MediaQueryList =>

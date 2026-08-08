@@ -1688,6 +1688,58 @@ describe("profiles", () => {
     await waitFor(() => expect(meterTotal()).toBe("3"));
   });
 
+  /*
+   * Readiness used to be tracked as a boolean that stayed `true` across a
+   * profile switch for exactly one render — long enough for the reset and the
+   * reading that follows it to fire in that same flush, seeding the new
+   * child's counter with the child just switched away from. Under reduced
+   * motion that self-corrects on the very next reading; under full motion the
+   * reducer withholds what looks like an increase and waits for an `arrived`
+   * that, mid-session, never comes again — so the wrong child's number would
+   * simply stay there.
+   */
+  it("shows the newly chosen child's own total, never the child switched away from", async () => {
+    preferMotion("full");
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
+    completeActiveResource();
+    await collectStars();
+    await openChest();
+    await waitFor(() => expect(meterTotal()).toBe("3"));
+
+    await openProfiles();
+    addChild("Vera");
+    await waitFor(() => expect(meterTotal()).toBe(""));
+
+    /* Vera earns more than Peque had, so a switch back to her cannot be
+       mistaken for a regalo spent — the reducer's other, self-correcting
+       path — and the counter is actually put to the test. */
+    fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
+    completeActiveResource();
+    await collectStars();
+    await openChest();
+    fireEvent.click(screen.getByRole("button", { name: "El encuentro" }));
+    completeActiveResource();
+    await collectStars();
+    await waitFor(() => expect(meterTotal()).toBe("6"), { timeout: 2000 });
+
+    await openProfiles();
+    fireEvent.click(screen.getByRole("button", { name: "Jugar como Peque" }));
+    await waitFor(() => expect(meterTotal()).toBe("3"));
+
+    await openProfiles();
+    fireEvent.click(screen.getByRole("button", { name: "Jugar como Vera" }));
+
+    /*
+     * Under the bug this never happens: the reducer withholds the increase
+     * from 3 to 6 forever, waiting on an `arrived` that mid-session does not
+     * come again, so the counter is left showing Peque's number rather than
+     * Vera's own.
+     */
+    await waitFor(() => expect(meterTotal()).toBe("6"));
+    expect(meterTotal()).not.toBe("3");
+  });
+
   /* Switching is the one thing a child may do here unaided. */
   it("lets a child change to another profile with no gate", async () => {
     await renderApp();

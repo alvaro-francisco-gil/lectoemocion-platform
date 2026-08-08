@@ -12,6 +12,7 @@ import {
 import {
   assertNever,
   type ChildRecord,
+  type PlayerProfileId,
   type PrizeContent,
   type PrizeId,
   type PrizeImageId
@@ -297,21 +298,31 @@ export function App({
   );
 
   /*
-   * Whether the truth for the child now selected has actually been read back,
-   * as opposed to the placeholder shown while storage is asked.
+   * Which child's truth `progress` and `prizes` actually answer for, as
+   * opposed to the placeholder shown while storage is asked.
    *
    * The arrival reducer's `!started` branch exists so a session opening on
    * stars already banked shows them outright instead of flying them in — "what
    * is already banked is not an event". But `progress` and `prizes` load one
-   * network-of-storage round trip after `selectedId` settles, so the corner's
-   * very first reading of them would otherwise land on the placeholder's zero
-   * rather than the child's real total, spending that one no-fly opportunity on
-   * a number that was never true. `progress`/`prizes` cannot answer this
-   * themselves: a freshly loaded, genuinely empty profile is indistinguishable
-   * from the placeholder by value, so readiness is tracked here instead.
+   * storage round trip after `selectedId` settles, so the corner's very first
+   * reading of them would otherwise land on the placeholder's zero rather than
+   * the child's real total, spending that one no-fly opportunity on a number
+   * that was never true.
+   *
+   * An identity rather than a boolean, and compared against `selectedId` at
+   * render time rather than latched in an effect: a boolean set `true` by the
+   * previous child's read is still `true`, unchanged, on the very render
+   * `selectedId` moves to the next child — a stale "ready" that seeds the new
+   * child's counter with the old child's number. Comparing *which child* each
+   * store last answered for cannot lag that way, because `selectedId` itself
+   * is already the fresh value on that same render.
    */
-  const [progressReady, setProgressReady] = useState(false);
-  const [prizesReady, setPrizesReady] = useState(false);
+  const [progressReadFor, setProgressReadFor] = useState<PlayerProfileId | null>(
+    null
+  );
+  const [prizesReadFor, setPrizesReadFor] = useState<PlayerProfileId | null>(
+    null
+  );
 
   useEffect(() => {
     if (progressStore === null) return;
@@ -322,17 +333,27 @@ export function App({
      * child stars that are not theirs.
      */
     setProgress(EMPTY_PROGRESS);
-    setProgressReady(false);
-    void progressStore.read().then((stored) => {
-      if (!cancelled) {
-        setProgress(stored);
-        setProgressReady(true);
+    void progressStore.read().then(
+      (stored) => {
+        if (!cancelled) {
+          setProgress(stored);
+          setProgressReadFor(selectedId);
+        }
+      },
+      (error: unknown) => {
+        /*
+         * Invariant 6: a broken read fails closed with an adult-facing error
+         * rather than leaving the child's readout silently absent forever.
+         * Routed through the same failure screen a profile read already uses,
+         * rather than a second error surface for the same kind of problem.
+         */
+        if (!cancelled) setProfileError(describeProfileFailure(error));
       }
-    });
+    );
     return () => {
       cancelled = true;
     };
-  }, [progressStore]);
+  }, [progressStore, selectedId]);
 
   /* Cleared before the read for the same reason, and it matters more here: a
      frame of the previous child's gifts is a wrapped box on the map that is not
@@ -341,17 +362,21 @@ export function App({
     if (prizeStore === null) return;
     let cancelled = false;
     setPrizes(EMPTY_PRIZES);
-    setPrizesReady(false);
-    void prizeStore.read().then((stored) => {
-      if (!cancelled) {
-        setPrizes(stored);
-        setPrizesReady(true);
+    void prizeStore.read().then(
+      (stored) => {
+        if (!cancelled) {
+          setPrizes(stored);
+          setPrizesReadFor(selectedId);
+        }
+      },
+      (error: unknown) => {
+        if (!cancelled) setProfileError(describeProfileFailure(error));
       }
-    });
+    );
     return () => {
       cancelled = true;
     };
-  }, [prizeStore]);
+  }, [prizeStore, selectedId]);
 
   const view = useMemo(
     () =>
@@ -378,7 +403,8 @@ export function App({
     dispatchArrival({ type: "reset" });
   }, [selectedId]);
 
-  const dataReady = progressReady && prizesReady;
+  const dataReady =
+    progressReadFor === selectedId && prizesReadFor === selectedId;
   useEffect(() => {
     if (!dataReady) return;
     dispatchArrival({ type: "reading", filled: prizeView.filled, motion });
@@ -790,6 +816,15 @@ export function App({
   const standing = tab === "juegos" ? view.games : view.resources;
   const playing =
     book.profiles.find((profile) => profile.id === book.selectedId) ?? null;
+  /*
+   * Whether the animal book is covering the world right now — stamping an
+   * arrival in on its own, or opened by the child's own tap on the paw. One
+   * name for both, used at both places it draws: a flight gate and a render
+   * condition that read this two different ways could drift the moment either
+   * one changes without the other, which is exactly how the flight gate below
+   * once fell out of step with what the book actually opens on.
+   */
+  const bookOverlaid = animalBookOpen || stamping !== null;
 
   return (
     <main className="world">
@@ -810,22 +845,23 @@ export function App({
         pill={pill}
       />
       {/*
-        Withheld while the animal book is stamping an arrival in.
-        `StarFlight`'s mount is the one signal `arrival` gets that the corner is
-        actually visible — but the book is an overlay drawn over this same
-        world, not a screen that replaces it, and it covers the corner for the
-        whole `STAMP_VISIBLE_MS` beat. Mounting underneath it would spend that
-        signal, and the flight it starts, on a child who cannot see either: by
-        the time the book closes the stars would already have landed unwatched.
+        Withheld while the animal book is overlaying the world — stamping an
+        arrival in, or opened by the child's own tap. `StarFlight`'s mount is
+        the one signal `arrival` gets that the corner is actually visible, and
+        a flight that plays out behind the book is a flight the child never
+        sees, landing in a corner the book is covering. Gated on `bookOverlaid`
+        rather than `stamping` alone, so a child opening the book mid-flight
+        does not unmount `StarFlight`, clear its timers, and have already-
+        landed stars fly again from the start on remount.
       */}
-      {stamping === null ? (
+      {bookOverlaid ? null : (
         <StarFlight
           flight={arrival.flight}
           pill={pill}
           onArrive={arrive}
           onLanded={land}
         />
-      ) : null}
+      )}
       {/*
         The reward corner, as one column.
 
@@ -926,7 +962,7 @@ export function App({
         opening it must not move a child anywhere, and closing it must not cost
         them the section and the scroll position they were standing in.
       */}
-      {(animalBookOpen || stamping !== null) && (
+      {bookOverlaid && (
         <AnimalBook
           slots={view.collection}
           stamping={stamping}
