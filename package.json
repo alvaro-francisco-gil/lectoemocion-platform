@@ -6,6 +6,7 @@
     "commands": "node scripts/help.mjs",
     "build": "turbo run build",
     "check": "pnpm guardrails && pnpm typecheck && pnpm test && pnpm build",
+    "deploy:player": "firebase deploy --only hosting",
     "dev": "turbo run dev --filter=@lectoemocion/player-web",
     "mobile": "node scripts/mobile-emulator.mjs",
     "mobile:up": "node scripts/mobile-emulator.mjs up",

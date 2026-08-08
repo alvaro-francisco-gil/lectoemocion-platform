@@ -40,6 +40,41 @@ pnpm test:e2e
 Only synthetic records are permitted until pilot-readiness controls are
 approved.
 
+## Sharing a build with a tester
+
+The player is deployed to Firebase Hosting, as
+[ADR 0009](docs/decisions/0009-one-hosted-player.md) decided.
+
+```bash
+pnpm deploy:player
+```
+
+It publishes to <https://lectoemocion-game.web.app>. `firebase.json` runs
+`pnpm build` as a predeploy hook, because `dist/` is gitignored and turbo-cached
+— without it a deploy could ship whatever was last built rather than what is on
+disk. Assets are served immutable and `index.html` is not, so a tester picks up
+a new build on reload instead of reporting bugs you already fixed. That caching
+is the fallback ADR 0009 names for offline launch, not an optimisation.
+
+`.firebaserc` pins the project to `lectoemocion-game`, whose Firestore is in
+`europe-southwest1`. The project belongs to a different Google account than the
+Firebase CLI's global default, so each checkout needs the account set once:
+
+```bash
+firebase login:use <account>
+```
+
+The CLI stores that per absolute directory, so **a new worktree under
+`.worktrees/` needs it again** — otherwise `firebase deploy` runs as the global
+default account and fails with a permission error. It cannot deploy to the
+wrong project: `.firebaserc` pins the target, so the failure is loud.
+
+Deploying publishes product-authored default content. The player keeps progress
+and prize images in the browser, so nothing a tester enters leaves their device.
+This stays true only until the [backend](docs/plans/ready/backend-and-adult-auth.md)
+lands; a public URL is acceptable now because there is nothing personal behind
+it.
+
 ## Documentation
 
 - [Product and architecture design](docs/product/platform-design.md)

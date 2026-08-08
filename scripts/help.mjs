@@ -34,6 +34,12 @@ const SECTIONS = [
     ]
   },
   {
+    title: "Share a build",
+    commands: [
+      ["pnpm deploy:player", "build, then publish the player to Firebase Hosting"]
+    ]
+  },
+  {
     title: "Guardrails (each runs standalone)",
     commands: [
       ["node scripts/check-engine-neutral.mjs", "invariant 2: contracts stay engine-neutral"],
