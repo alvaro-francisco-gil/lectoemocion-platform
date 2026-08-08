@@ -737,20 +737,47 @@ export function App({
           <img src={avatarImageUrl(playing.avatarId)} alt="" />
         </button>
       ) : null}
-      <PrizeMeter filled={prizeView.filled} goal={prizeView.goal} />
-      {waiting ? (
-        <button
-          type="button"
-          className="world__gift"
-          aria-label="Tu regalo"
-          onClick={() => {
-            setCeremonyPrizeId(waiting.id);
-            setDetour("gift");
-          }}
-        >
-          <GiftIcon />
-        </button>
-      ) : null}
+      <PrizeCount filled={prizeView.filled} />
+      {/*
+        The reward corner, as one column.
+
+        What is already won and what is still filling are two answers to the
+        same question, so they stand in one place rather than two: the box at
+        the bottom, where a hand lands and where the child's eye starts, and
+        the ring above it. Rendered even when both halves are empty — an empty
+        column draws nothing, and a container that appears and disappears would
+        make the corner's order a thing each branch has to remember.
+      */}
+      <div className="world__gifts">
+        <PrizeRing filled={prizeView.filled} goal={prizeView.goal} />
+        {waiting ? (
+          <button
+            type="button"
+            className="world__gift"
+            aria-label={
+              prizeView.pending.length > 1
+                ? `Tus regalos: ${prizeView.pending.length}`
+                : "Tu regalo"
+            }
+            onClick={() => {
+              setCeremonyPrizeId(waiting.id);
+              setDetour("gift");
+            }}
+          >
+            <GiftIcon />
+            {/*
+              How many are wrapped, drawn only when it is more than one. The
+              button's own name says it in words, so the badge is decoration:
+              a screen reader that read both would hear the number twice.
+            */}
+            {prizeView.pending.length > 1 ? (
+              <span className="world__gift-count" aria-hidden="true">
+                {prizeView.pending.length}
+              </span>
+            ) : null}
+          </button>
+        ) : null}
+      </div>
       {/*
         An ordered list because a section is a sequence: that is what a screen
         reader should hear, and it is what the connecting line draws.
@@ -927,7 +954,12 @@ function describeProfileFailure(error: unknown): string {
  * has is a count of letriestrellas, and it sits top-right where the readout has
  * always been. What they are working towards is the gift, and the ring closing
  * around it sits bottom-left, out of the way of both the avatar above it and
- * the animals opposite.
+ * the animals opposite — directly above the gift already won, when there is
+ * one, because "what is coming" belongs over "what is here".
+ *
+ * Which is why these are two components and not one. They are rendered into
+ * two different places on the screen: `PrizeCount` into its own corner, and
+ * `PrizeRing` into the reward column that the waiting gift shares.
  *
  * A ring rather than a bar, and no second number. "24 / 30" asks a pre-reader
  * to hold two figures and divide them; a ring three-quarters round says the
@@ -952,61 +984,65 @@ function describeProfileFailure(error: unknown): string {
  * hands land. They live on the world alone, because a meter filling beside a
  * running game is a second thing to watch.
  */
-function PrizeMeter({ filled, goal }: { filled: number; goal: number }) {
+function PrizeCount({ filled }: { filled: number }) {
   /* Nothing yet is nothing to show, in either corner. */
+  if (filled === 0) return null;
+
+  return (
+    /*
+      Hidden from a screen reader, not because it says nothing but because the
+      ring says it already, and in fuller words.
+
+      The number first, then what it counts: "3 letriestrellas", the way it is
+      said aloud, rather than a label with a figure hung off it.
+    */
+    <p className="prize-count" aria-hidden="true">
+      {filled}
+      <span className="prize-count__star">
+        <StarIcon />
+      </span>
+    </p>
+  );
+}
+
+function PrizeRing({ filled, goal }: { filled: number; goal: number }) {
   if (filled === 0) return null;
 
   /* Whole percent, because the ring is drawn in hundredths of its own path. */
   const percentFilled = Math.round((filled / goal) * 100);
   return (
-    <>
+    <section
+      className="prize-meter"
+      role="meter"
+      aria-label="Letriestrellas hacia el próximo regalo"
+      aria-valuenow={filled}
+      aria-valuemin={0}
+      aria-valuemax={goal}
+    >
       {/*
-        Hidden from a screen reader, not because it says nothing but because
-        the meter below says it already, and in fuller words.
-      */}
-      {/*
-        The number first, then what it counts: "3 letriestrellas", the way it
-        is said aloud, rather than a label with a figure hung off it.
-      */}
-      <p className="prize-count" aria-hidden="true">
-        {filled}
-        <span className="prize-count__star">
-          <StarIcon />
-        </span>
-      </p>
-      <section
-        className="prize-meter"
-        role="meter"
-        aria-label="Letriestrellas hacia el próximo regalo"
-        aria-valuenow={filled}
-        aria-valuemin={0}
-        aria-valuemax={goal}
-      >
-        {/*
-          Decoration: the meter itself already states the fill and the goal, and
-          a screen reader reading the ring as well would say it twice.
+        Decoration: the meter itself already states the fill and the goal, and
+        a screen reader reading the ring as well would say it twice.
 
-          `pathLength="100"` makes the dash array a percentage regardless of the
-          radius, so the geometry can be retuned without recomputing anything —
-          and the ring starts at twelve o'clock, which is where a child watching
-          something fill expects it to start.
-        */}
-        <svg className="prize-meter__ring" viewBox="0 0 48 48" aria-hidden="true">
-          <circle
-            className="prize-meter__fill"
-            cx="24"
-            cy="24"
-            r="21"
-            pathLength="100"
-            strokeDasharray={`${percentFilled} ${100 - percentFilled}`}
-            transform="rotate(-90 24 24)"
-          />
-        </svg>
-        <span className="prize-meter__gift" aria-hidden="true">
-          <GiftShadow />
-        </span>
-      </section>
-    </>
+        `pathLength="100"` makes the dash array a percentage regardless of the
+        radius, so the geometry can be retuned without recomputing anything —
+        and the ring starts at twelve o'clock, which is where a child watching
+        something fill expects it to start.
+      */}
+      <svg className="prize-meter__ring" viewBox="0 0 48 48" aria-hidden="true">
+        <circle
+          className="prize-meter__fill"
+          cx="24"
+          cy="24"
+          r="21"
+          pathLength="100"
+          strokeDasharray={`${percentFilled} ${100 - percentFilled}`}
+          transform="rotate(-90 24 24)"
+        />
+      </svg>
+      <span className="prize-meter__gift" aria-hidden="true">
+        <GiftShadow />
+      </span>
+    </section>
   );
 }
 

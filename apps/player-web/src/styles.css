@@ -440,7 +440,9 @@ main { height: 100dvh; }
  * What has been won is a count, and it keeps the top-right corner the readout
  * has always had. What it is being won towards is the gift, and its ring sits
  * in the bottom-left one — clear of the avatar above it, clear of the animals
- * opposite, and clear of the bar between them.
+ * opposite, and clear of the bar between them. The ring is placed by
+ * `.world__gifts` rather than by itself: the corner it stands in is a column it
+ * shares with the gift already waiting there.
  *
  * Both are `pointer-events: none`: they are readouts, not controls, and neither
  * may eat a tap or a drag aimed at the world underneath.
@@ -487,10 +489,6 @@ main { height: 100dvh; }
  * carry the meaning, and the world's own colour is already the ground.
  */
 .prize-meter {
-  position: absolute;
-  bottom: clamp(0.75rem, 3vh, 2rem);
-  left: clamp(0.5rem, 3vw, 2rem);
-  z-index: 1;
   display: grid;
   place-items: center;
   width: clamp(56px, 9vmin, 150px);
@@ -1692,46 +1690,86 @@ main { height: 100dvh; }
 .gift__prepare:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
 
 /*
- * The gift waiting on the world, low in the reach band.
+ * The reward corner: the gift already won, and the ring still filling above it.
  *
- * Everything else in a world corner — the counter, the meter, the menu button,
- * the avatar — is chrome a child never needs to touch, so it lives up where an
- * 86-inch panel is out of reach. This is the one control down here that a child
- * does touch, so it sits where their hands actually land, with a touch target
- * no smaller than the chests they already tap to choose an animal.
+ * One column rather than two placements. The gift used to float halfway up the
+ * left edge, measured against the height of the section bar, while the ring sat
+ * in the corner below it — which put the thing a child can act on above the
+ * thing they can only watch, and made the corner's order depend on a number
+ * that had to be rechecked every time the bar changed size. Stacked, the gift
+ * takes the bottom, where hands land and where a child's eye starts, and the
+ * ring reads as what it is: the next one, on its way.
  *
- * Clear of the section bar rather than low enough to sit on top of it. This
- * used to be measured against the collection strip that ran along the bottom of
- * the map; that strip is gone — the animals are a modal book now, reached from
- * `.collection-button` in the opposite corner — so the number is measured
- * against what is actually down here instead.
+ * `pointer-events` are off on the column and back on for the button alone. The
+ * ring is a readout, and the space around both must stay part of the surface a
+ * hand can grab to pan the world.
  *
- * `.tab-bar__tabs` is the tallest thing in the band. At its own maximum that
- * pill is 6.5rem (`0.5rem` of padding above and below, a `46px`/`2.875rem`
- * icon, a `0.15rem` gap and a `1.35rem` label at roughly `1.2` line height),
- * and it floats at most `2rem` off the bottom: 8.5rem to its top edge. `9.5rem`
- * clears that at the phone, the classroom-HD panel and the classroom-4K panel
- * this ships to. The other bottom control, `.collection-button`, is anchored to
- * the opposite corner and never reaches this one.
+ * The column is anchored to the same corner inset as `.collection-button`
+ * opposite it, and the centred `.tab-bar__tabs` passes between them. That
+ * clearance is the constraint on how wide anything here may get: at 320px the
+ * bar's left edge is the wall this column must stay behind.
+ */
+.world__gifts {
+  position: absolute;
+  bottom: clamp(0.75rem, 3vh, 2rem);
+  left: clamp(0.5rem, 3vw, 2rem);
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  gap: clamp(0.35rem, 1.2vmin, 1rem);
+  pointer-events: none;
+}
+
+/*
+ * The one control in a world corner. Everything else up there — the counter,
+ * the ring, the avatar — is chrome a child never needs to touch, so this is
+ * sized as the largest thing in the band it sits in, and never below the 56px
+ * a small hand needs to land on.
  */
 .world__gift {
-  position: absolute;
-  bottom: 9.5rem;
-  left: 2rem;
-  z-index: 1;
-  min-width: 6rem;
-  min-height: 6rem;
+  /* Its own size, named once: the badge is measured off it too. */
+  --gift-size: clamp(56px, 11vmin, 168px);
+  width: var(--gift-size);
+  height: var(--gift-size);
+  position: relative;
   display: grid;
   place-items: center;
-  padding: 0.5rem;
+  padding: 0;
   border: 2px solid #7b2cbf;
   border-radius: 50%;
   background: rgb(255 255 255 / 0.9);
   cursor: pointer;
+  pointer-events: auto;
 }
 .world__gift:hover { background: #fff; }
 .world__gift:focus-visible { outline: 3px solid #402060; outline-offset: 3px; }
-.world__gift > svg { width: 3.5rem; height: 3.5rem; }
+.world__gift > svg { width: 62%; height: auto; }
+
+/*
+ * How many are wrapped, when it is more than one.
+ *
+ * A badge rather than a second box behind the first: two boxes drawn overlapped
+ * say "two" only to someone who counts edges, and say nothing at all at three.
+ * A digit on a disc is the same shape a child already meets on the chests, and
+ * it is the only part of this screen where a number is the point.
+ */
+.world__gift-count {
+  position: absolute;
+  top: -4%;
+  right: -4%;
+  display: grid;
+  place-items: center;
+  min-width: 38%;
+  height: 38%;
+  padding: 0 0.2em;
+  border-radius: 999px;
+  background: #7b2cbf;
+  color: #fff;
+  font-size: calc(var(--gift-size) * 0.26);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
 
 /* Announced, never drawn. */
 .visually-hidden {

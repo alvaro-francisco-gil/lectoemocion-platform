@@ -1260,6 +1260,25 @@ describe("reaching the goal", () => {
     localStorage.setItem(prizeGoalKey(LOCAL_GROUP), JSON.stringify({ goal: 6 }));
   }
 
+  /*
+   * Seeds a session that owes two gifts and has started on a third: twelve
+   * letriestrellas against a goal of five. Two prizes are awarded the moment
+   * the app mounts, which spends ten of them, and the two left over are what
+   * puts a partly filled ring in the same corner as the boxes still wrapped.
+   */
+  function twoOwedAndCounting(): void {
+    localStorage.setItem(
+      storageKey(LOCAL_OWNER),
+      JSON.stringify({
+        completedNodes: [],
+        lastPlayedNode: null,
+        rewards: [],
+        stars: 12
+      })
+    );
+    localStorage.setItem(prizeGoalKey(LOCAL_GROUP), JSON.stringify({ goal: 5 }));
+  }
+
   beforeEach(() => {
     localStorage.clear();
     createGame.mockClear();
@@ -1311,10 +1330,13 @@ describe("reaching the goal", () => {
   /**
    * Takes an unconfigured gift through the adult area, back to the map, and
    * into the reveal — the same door a real classroom panel walks through.
+   *
+   * `gift` is the name the corner button carries on the way back, which says
+   * how many are wrapped: one gift is "Tu regalo", several are counted.
    */
   async function configureAndOpenTheGift(
     fill: () => void,
-    { formIndex = 0 }: { formIndex?: number } = {}
+    { formIndex = 0, gift = "Tu regalo" }: { formIndex?: number; gift?: string } = {}
   ): Promise<void> {
     fireEvent.click(
       screen.getAllByRole("button", { name: "Preparar el regalo" })[0]!
@@ -1325,7 +1347,7 @@ describe("reaching the goal", () => {
       screen.getAllByRole("button", { name: "Guardar el regalo" })[formIndex]!
     );
     fireEvent.click(screen.getByRole("button", { name: "Cerrar los ajustes" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Tu regalo" }));
+    fireEvent.click(await screen.findByRole("button", { name: gift }));
     fireEvent.click(await screen.findByRole("button", { name: "¡Ábrelo!" }));
   }
 
@@ -1398,18 +1420,65 @@ describe("reaching the goal", () => {
     render(<App />);
     await screen.findByText("Un regalo te está esperando");
 
-    await configureAndOpenTheGift(() => {
-      fireEvent.click(
-        screen.getAllByRole("radio", {
-          name: "Encuentra tu regalo en el patio"
-        })[0]!
-      );
-    });
+    await configureAndOpenTheGift(
+      () => {
+        fireEvent.click(
+          screen.getAllByRole("radio", {
+            name: "Encuentra tu regalo en el patio"
+          })[0]!
+        );
+      },
+      { gift: "Tus regalos: 2" }
+    );
 
     expect(
       await screen.findByText("Encuentra tu regalo en el patio")
     ).toBeVisible();
     expect(screen.queryByText("Un regalo te está esperando")).toBeNull();
+  });
+
+  /*
+   * The corner a child looks to for a reward answers two questions at once:
+   * what is here now, and what is coming. They belong in one column, in that
+   * order — the box already won at the bottom where a hand lands, the ring
+   * still filling above it.
+   */
+  it("stacks the meter above the gift waiting in the same corner", async () => {
+    /* Two prizes owed at 5 apiece, and two letriestrellas into the next. */
+    twoOwedAndCounting();
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Seguir" }));
+
+    const corner = document.querySelector(".world__gifts");
+    expect(corner).not.toBeNull();
+    const stacked = [...corner!.children].map((child) => child.className);
+    expect(stacked).toEqual(["prize-meter", "world__gift"]);
+  });
+
+  /*
+   * A second box behind the first is a fact a child can act on — there is more
+   * to open — and the only honest way to say "more than one" without words.
+   */
+  it("counts the gifts when more than one is waiting", async () => {
+    twoOwedAndCounting();
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Seguir" }));
+
+    const gift = await screen.findByRole("button", { name: "Tus regalos: 2" });
+    expect(gift.querySelector(".world__gift-count")).toHaveTextContent("2");
+  });
+
+  /* One gift is just a gift: a "1" beside it is a number about nothing. */
+  it("puts no count on a single waiting gift", async () => {
+    nearlyThere();
+    await renderApp();
+    await playFirstChapter();
+    await collectStars();
+    await openFirstChest();
+    fireEvent.click(screen.getByRole("button", { name: "Seguir" }));
+
+    const gift = await screen.findByRole("button", { name: "Tu regalo" });
+    expect(gift.querySelector(".world__gift-count")).toBeNull();
   });
 });
 
