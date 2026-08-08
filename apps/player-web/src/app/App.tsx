@@ -3,6 +3,7 @@ import {
   useEffect,
   useId,
   useMemo,
+  useReducer,
   useRef,
   useState,
   type CSSProperties,
@@ -45,6 +46,11 @@ import {
   type PrizePick
 } from "../world/prizeImageStore";
 import { unlockAllEnabled } from "../world/unlockAll";
+import {
+  NO_ARRIVAL,
+  nextArrival,
+  type Motion
+} from "../world/starArrival";
 import { bookShape } from "./bookShape";
 import { cardTint, type CardTint } from "./cardTints";
 import { useDragScroll } from "./useDragScroll";
@@ -59,7 +65,7 @@ import { ProfileMenu } from "./ProfileMenu";
 import { AdultArea } from "./adult";
 import { Gift } from "./Gift";
 import { BackArrow, ChestIcon, GiftIcon, StarIcon } from "./icons";
-import { PrizeCount, PrizeRing } from "./PrizeReadout";
+import { PrizeCount, PrizeRing, StarFlight } from "./PrizeReadout";
 
 /*
  * A store that answers nothing, for a browser that has no storage at all —
@@ -204,6 +210,24 @@ export function App({
   const pill = useRef<HTMLParagraphElement>(null);
   const panWorld = useDragScroll();
 
+  /*
+   * What the corner is drawing, which is behind what the child has earned for
+   * about a second after every finish. It lives here rather than on the world
+   * screen because the world is unmounted for the whole ceremony — the stars,
+   * the chests, the reveal, the regalo — and state inside it would be rebuilt
+   * from the new truth before anyone could see the old one.
+   */
+  const [arrival, dispatchArrival] = useReducer(nextArrival, NO_ARRIVAL);
+
+  /* Read once: a preference that changes mid-session changes nothing in flight. */
+  const motion: Motion = useMemo(
+    () =>
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "reduced"
+        : "full",
+    []
+  );
+
   useEffect(() => {
     let cancelled = false;
     void profiles.read().then(
@@ -272,6 +296,23 @@ export function App({
     [selectedId]
   );
 
+  /*
+   * Whether the truth for the child now selected has actually been read back,
+   * as opposed to the placeholder shown while storage is asked.
+   *
+   * The arrival reducer's `!started` branch exists so a session opening on
+   * stars already banked shows them outright instead of flying them in — "what
+   * is already banked is not an event". But `progress` and `prizes` load one
+   * network-of-storage round trip after `selectedId` settles, so the corner's
+   * very first reading of them would otherwise land on the placeholder's zero
+   * rather than the child's real total, spending that one no-fly opportunity on
+   * a number that was never true. `progress`/`prizes` cannot answer this
+   * themselves: a freshly loaded, genuinely empty profile is indistinguishable
+   * from the placeholder by value, so readiness is tracked here instead.
+   */
+  const [progressReady, setProgressReady] = useState(false);
+  const [prizesReady, setPrizesReady] = useState(false);
+
   useEffect(() => {
     if (progressStore === null) return;
     let cancelled = false;
@@ -281,8 +322,12 @@ export function App({
      * child stars that are not theirs.
      */
     setProgress(EMPTY_PROGRESS);
+    setProgressReady(false);
     void progressStore.read().then((stored) => {
-      if (!cancelled) setProgress(stored);
+      if (!cancelled) {
+        setProgress(stored);
+        setProgressReady(true);
+      }
     });
     return () => {
       cancelled = true;
@@ -296,8 +341,12 @@ export function App({
     if (prizeStore === null) return;
     let cancelled = false;
     setPrizes(EMPTY_PRIZES);
+    setPrizesReady(false);
     void prizeStore.read().then((stored) => {
-      if (!cancelled) setPrizes(stored);
+      if (!cancelled) {
+        setPrizes(stored);
+        setPrizesReady(true);
+      }
     });
     return () => {
       cancelled = true;
@@ -317,6 +366,26 @@ export function App({
     () => derivePrizeView(prizes, view.stars),
     [prizes, view.stars]
   );
+
+  /*
+   * Declared before the reading below, and the reading depends on `selectedId`
+   * as well as on the number itself. Effects run in the order they are written,
+   * so the reset lands first — and the reading that follows it is what re-seeds
+   * the new child's count, including when their total happens to equal the last
+   * child's and the number alone would not have changed.
+   */
+  useEffect(() => {
+    dispatchArrival({ type: "reset" });
+  }, [selectedId]);
+
+  const dataReady = progressReady && prizesReady;
+  useEffect(() => {
+    if (!dataReady) return;
+    dispatchArrival({ type: "reading", filled: prizeView.filled, motion });
+  }, [prizeView.filled, motion, selectedId, dataReady]);
+
+  const arrive = useCallback(() => dispatchArrival({ type: "arrived" }), []);
+  const land = useCallback(() => dispatchArrival({ type: "landed" }), []);
 
   /**
    * The open chapter and the colour its card was wearing, together.
@@ -735,11 +804,28 @@ export function App({
         </button>
       ) : null}
       <PrizeCount
-        shown={prizeView.filled}
-        arriving={false}
-        landings={0}
+        shown={arrival.shown}
+        arriving={arrival.flight !== null}
+        landings={arrival.landings}
         pill={pill}
       />
+      {/*
+        Withheld while the animal book is stamping an arrival in.
+        `StarFlight`'s mount is the one signal `arrival` gets that the corner is
+        actually visible — but the book is an overlay drawn over this same
+        world, not a screen that replaces it, and it covers the corner for the
+        whole `STAMP_VISIBLE_MS` beat. Mounting underneath it would spend that
+        signal, and the flight it starts, on a child who cannot see either: by
+        the time the book closes the stars would already have landed unwatched.
+      */}
+      {stamping === null ? (
+        <StarFlight
+          flight={arrival.flight}
+          pill={pill}
+          onArrive={arrive}
+          onLanded={land}
+        />
+      ) : null}
       {/*
         The reward corner, as one column.
 
@@ -751,7 +837,11 @@ export function App({
         make the corner's order a thing each branch has to remember.
       */}
       <div className="world__gifts">
-        <PrizeRing shown={prizeView.filled} goal={prizeView.goal} landings={0} />
+        <PrizeRing
+          shown={arrival.shown}
+          goal={prizeView.goal}
+          landings={arrival.landings}
+        />
         {waiting ? (
           <button
             type="button"

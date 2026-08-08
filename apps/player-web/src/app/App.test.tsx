@@ -15,6 +15,7 @@ import { LOCAL_OWNER, storageKey } from "../world/progressStore";
 import { giftsKey, LOCAL_GROUP, prizeGoalKey } from "../world/prizeStore";
 import { App } from "./App";
 import { cardTint } from "./cardTints";
+import { preferMotion } from "../test/setupTests";
 
 type Destroyable = { destroy: () => void };
 
@@ -1143,6 +1144,35 @@ describe("the letriestrellas every finish is worth", () => {
     await renderApp();
     await waitFor(() => expect(meterTotal()).toBe("3"));
     expect(prizeMeter().querySelectorAll("button")).toHaveLength(0);
+  });
+
+  /*
+   * The counter is the child's record of what they just did, so it has to still
+   * be showing the old number when they get back to the world to watch it
+   * change. Three stars, three steps.
+   */
+  it("counts the letriestrellas up one at a time on the way back", async () => {
+    preferMotion("full");
+    bankStars(3);
+    await renderApp();
+    await waitFor(() => expect(meterTotal()).toBe("3"));
+
+    finish("El encuentro");
+    await collectStars();
+    await openChest();
+
+    /* Back on the world, and the corner has not moved yet. */
+    await waitFor(() =>
+      expect(document.querySelectorAll(".star-flight__star")).toHaveLength(3)
+    );
+    expect(meterTotal()).toBe("3");
+
+    await waitFor(() => expect(meterTotal()).toBe("4"));
+    await waitFor(() => expect(meterTotal()).toBe("5"));
+    await waitFor(() => expect(meterTotal()).toBe("6"));
+    await waitFor(() =>
+      expect(document.querySelector(".star-flight")).toBeNull()
+    );
   });
 });
 
