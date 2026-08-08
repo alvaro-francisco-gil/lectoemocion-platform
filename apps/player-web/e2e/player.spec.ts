@@ -1104,7 +1104,12 @@ test("flies the letriestrellas into the counter", async ({ page }) => {
   await page.getByRole("button", { name: "Seguir" }).click();
 
   /* Still what the pill held before this finish: the stars have not landed
-     yet, so the count they are carrying has not moved. */
+     yet, so the count they are carrying has not moved.
+
+     This is a race the test wins by a margin rather than by construction: the
+     first star lands `STAR_TRAVEL_MS` — 520ms, in `PrizeReadout.tsx` — after
+     the world appears, and this assertion has to be read inside that window.
+     Shortening that constant is what would make this flake. */
   await expect(page.locator(".prize-count")).toHaveText("0");
 
   /* Three in the air before any of them has arrived. */

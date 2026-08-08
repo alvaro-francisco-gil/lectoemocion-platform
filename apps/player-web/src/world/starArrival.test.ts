@@ -67,8 +67,9 @@ describe("the star arrival", () => {
   });
 
   /*
-   * A second arrival mid-flight — the profile drawer opening and closing over
-   * the world, say — must not launch the same stars twice.
+   * A second arrival mid-flight — the animal book covering the world and going
+   * away again, or a chapter or the adult area taking the screen and handing it
+   * back — must not launch the same stars twice.
    */
   it("ignores an arrival while stars are still in the air", () => {
     const state = run([

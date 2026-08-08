@@ -704,7 +704,8 @@ export function App({
   }, [active, complete, roster]);
 
   /*
-   * Profiles that cannot be read stop everything, deliberately.
+   * A child's own data that cannot be read stops everything, deliberately —
+   * their profiles, their progress, and their regalos all land here.
    *
    * Invariant 6: this is a broken invariant, not a missing nicety, and the
    * alternative — carrying on with an invented profile — would write a fresh
@@ -714,7 +715,7 @@ export function App({
   if (profileError !== null) {
     return (
       <main className="profile-failure" role="alert">
-        <h1>No se pueden leer los perfiles</h1>
+        <h1>No se pueden leer los datos del niño</h1>
         <p>{profileError}</p>
         <p>
           No se ha borrado nada. Vuelve a abrir la aplicación; si sigue igual,
