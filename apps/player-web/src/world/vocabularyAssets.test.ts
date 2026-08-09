@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import sharp from "sharp";
@@ -89,6 +89,28 @@ describe("every chapter's map icon is actually served", () => {
       .filter((url) => !named.has(url));
 
     expect(orphans).toEqual([]);
+  });
+});
+
+/*
+ * `index.html` names the five stars a second time, to have them on their way
+ * before the bundle has parsed. Two lists of the same five files is exactly
+ * the duplication that drifts — a star renamed in one place and preloaded from
+ * the other, which costs a fetch and shows nothing for it, and which no screen
+ * would look broken enough to report.
+ */
+describe("the letriestrellas are preloaded", () => {
+  const html = readFileSync(join(publicDir, "..", "index.html"), "utf8");
+  const preloaded = [
+    ...html.matchAll(/<link rel="preload" as="image" href="([^"]+)"/g)
+  ].map((match) => match[1]);
+
+  it("preloads exactly the stars the award screen draws", () => {
+    expect(preloaded).toEqual([...LETRIESTRELLAS]);
+  });
+
+  it.each([...LETRIESTRELLAS])("%s is actually served", (url) => {
+    expect(existsSync(fileFor(url)), url).toBe(true);
   });
 });
 

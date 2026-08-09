@@ -28,9 +28,20 @@ export function ChestIcon() {
 /**
  * A letriestrella, drawn rather than loaded.
  *
- * Same reason as the chest: it is on screen the instant a game ends, and on a
- * classroom panel's cold cache a picture that arrives late would make the
- * reward look like an afterthought.
+ * There is real art for this now — five stars, one per vowel, in
+ * `letriestrellas.ts` — and the award screen draws that. This survives beside
+ * it because the two places it is used are not that screen.
+ *
+ * The counter's pill and the flight arc render the star near 24px. At that
+ * size the art's heavy black outline is a smudge and its gradient is a single
+ * muddy tone, while a path is exact at any size and costs nothing to draw a
+ * dozen of at once, which the flight does. The award screen shows one star
+ * large and alone, which is where the art is the reward.
+ *
+ * The original reason holds for both halves regardless: this is on screen the
+ * instant a game ends, and on a classroom panel's cold cache a picture that
+ * arrives late would make the reward look like an afterthought. The art is
+ * preloaded by `index.html` for exactly that reason.
  */
 export function StarIcon() {
   return (

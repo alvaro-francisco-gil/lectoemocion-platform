@@ -16,6 +16,7 @@ import { LOCAL_OWNER, storageKey } from "../world/progressStore";
 import { giftsKey, LOCAL_GROUP, prizeGoalKey } from "../world/prizeStore";
 import { App } from "./App";
 import { cardTint } from "./cardTints";
+import { LETRIESTRELLA_COUNT, letriestrella } from "./letriestrellas";
 import { STAR_STAGGER_MS } from "./PrizeReadout";
 import { preferMotion } from "../test/setupTests";
 
@@ -1108,6 +1109,39 @@ describe("the letriestrellas every finish is worth", () => {
   it("starts a new player with nothing on the meter", async () => {
     await renderApp();
     expect(meterTotal()).toBe("");
+  });
+
+  /*
+   * The three stars are three *different* stars, and the same three every
+   * time. A child who finishes a chapter sees an A, an E and an I, and sees
+   * those three again tomorrow: the vowel is decoration cycled by position,
+   * so it can never disagree with the number beside it.
+   *
+   * They are queried as `presentation` rather than as `img`, and that is the
+   * accessibility assertion rather than a detail of the query: a picture only
+   * takes that role by carrying an empty `alt`. The line under the row is what
+   * says how many, and a screen reader naming three stars would say it twice.
+   */
+  it("draws one letriestrella per star, each a different vowel", async () => {
+    await renderApp();
+    finish("El encuentro");
+
+    const stars = within(await screen.findByRole("status")).getAllByRole(
+      "presentation",
+      { hidden: true }
+    );
+    expect(stars.map((star) => star.getAttribute("src"))).toEqual([
+      "/world/letriestrella-a.webp",
+      "/world/letriestrella-e.webp",
+      "/world/letriestrella-i.webp"
+    ]);
+  });
+
+  /* Six stars is more than there are vowels, and the row wraps rather than
+     running out. Nothing downstream knows the difference. */
+  it("wraps back to the first vowel past the fifth star", () => {
+    expect(letriestrella(0)).toBe(letriestrella(LETRIESTRELLA_COUNT));
+    expect(letriestrella(LETRIESTRELLA_COUNT + 1)).toBe(letriestrella(1));
   });
 
   it("pays three stars the moment a chapter is finished", async () => {

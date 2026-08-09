@@ -67,7 +67,8 @@ import {
 import { ProfileMenu } from "./ProfileMenu";
 import { AdultArea } from "./adult";
 import { Gift } from "./Gift";
-import { BackArrow, ChestIcon, GiftIcon, StarIcon } from "./icons";
+import { BackArrow, ChestIcon, GiftIcon } from "./icons";
+import { letriestrella } from "./letriestrellas";
 import { PrizeCount, PrizeRing, StarFlight } from "./PrizeReadout";
 
 /*
@@ -1155,11 +1156,19 @@ function StarAward({
   return (
     <main className="award" style={ceremonyTiming}>
       <div className="award__prize" role="status">
-        {/* Decoration: the line below is what says how many. */}
+        {/*
+          Decoration: the line below is what says how many, and every `alt` is
+          empty so a screen reader does not count the row a second time.
+
+          The one place the letriestrella is drawn as itself rather than as an
+          icon. It is large and alone here, which is where the art is the
+          reward; the counter and the flight keep `StarIcon`, where a heavy
+          outline at 24px is mud. See the note on that function.
+        */}
         <ul className="award__stars" aria-hidden="true">
           {Array.from({ length: amount }, (_, index) => (
             <li key={index}>
-              <StarIcon />
+              <img src={letriestrella(index)} alt="" />
             </li>
           ))}
         </ul>

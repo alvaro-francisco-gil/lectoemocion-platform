@@ -4,6 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LectoEmoción Player</title>
+    <!--
+      The five letriestrellas, fetched before the player runs.
+
+      They are the first thing a child sees when a chapter ends, and on a
+      classroom panel's cold cache a reward that arrives a beat late looks like
+      an afterthought — which is why the counter and the flight draw their star
+      instead of loading it (see `src/app/icons.tsx`). The award screen shows
+      the art, so the art has to already be here.
+
+      This is the document's job rather than React's: they must be on their way
+      before the bundle has parsed, and a warm-up inside a component would put
+      a cache in the app that nothing else needs. Kept in step with
+      `src/app/letriestrellas.ts`, which is the list every consumer reads.
+    -->
+    <link rel="preload" as="image" href="/world/letriestrella-a.webp" />
+    <link rel="preload" as="image" href="/world/letriestrella-e.webp" />
+    <link rel="preload" as="image" href="/world/letriestrella-i.webp" />
+    <link rel="preload" as="image" href="/world/letriestrella-o.webp" />
+    <link rel="preload" as="image" href="/world/letriestrella-u.webp" />
   </head>
   <body>
     <div id="root"></div>

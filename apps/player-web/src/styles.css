@@ -1652,6 +1652,17 @@ main { height: 100dvh; }
   width: clamp(70px, 16vw, 170px);
 }
 
+/*
+ * The star fills the width its item was given and keeps its own proportions.
+ * `block` because an inline image sits on the text baseline, and the gap under
+ * it would land differently from the row's own spacing.
+ */
+.award__stars img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .award__count {
   margin: 0;
   font-size: clamp(1.5rem, 5vw, 3.5rem);
