@@ -310,19 +310,23 @@ main { height: 100dvh; }
 /*
  * `contain`, not `cover`.
  *
- * These are cut-out illustrations, not photographs of a scene: most are taller
+ * These are cut-out illustrations, not photographs of a scene: some are taller
  * than they are wide, and covering a 4:3 rectangle crops the rooster down to a
  * patch of yellow. The whole subject has to survive, because the subject is the
  * only thing a child who cannot read navigates by. The card's own colour is
  * what fills the rest.
  *
- * The bottom inset is the chip's: the title rides over the picture, and a
- * silhouette running under it would be cut in half by a word.
+ * The inset is even, and small. It used to reserve a fifth of the card along
+ * the bottom so the title chip would never cross the picture — but that band is
+ * a fifth of the only thing a child navigates by, spent on a label written for
+ * the adult beside them. The chip rides over the picture now and the picture
+ * gets the card. What remains keeps the artwork off the rounded corners, which
+ * would otherwise clip a scene drawn to its own edges.
  */
 .world-node__icon {
   width: 100%;
   height: 100%;
-  padding: 5% 5% 20%;
+  padding: 4%;
   object-fit: contain;
 }
 

@@ -1416,7 +1416,8 @@ function Reveal({
  * named nothing: the picture is what they remember a chapter by and what they
  * aim a finger at, and a rectangle is the shape that gives an illustration the
  * most of itself. The title rides on a chip over the picture, for the adult and
- * the screen reader.
+ * the screen reader — over it, not above it: the card reserves no band for the
+ * label, because a band is picture taken from the child and given to the word.
  *
  * A locked chapter says so with a padlock over its picture rather than by
  * hiding it, because what is behind the lock is the reason to come back.
