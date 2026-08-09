@@ -1,5 +1,11 @@
 # Card scenes and letriestrella art
 
+## Status
+
+- **Updated:** 2026-08-09
+- **Stage:** approved, implementing on `main` in the primary checkout.
+- **Done:** nothing yet.
+
 The repository owner supplied eighteen SVGs: five letriestrellas carrying the
 five vowels, and thirteen illustrated scenes of children's games. This plan
 puts the scenes on the eight game cards and the stars on the award screen.
