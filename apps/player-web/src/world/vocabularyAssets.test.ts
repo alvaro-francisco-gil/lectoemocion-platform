@@ -7,6 +7,7 @@ import { worldNodes } from "@lectoemocion/resource-schema";
 // @ts-expect-error -- plain .mjs script module, deliberately untyped
 import { TARGET_COVERAGE, inkArea } from "../../../../scripts/lib/normalise-ink-area.mjs";
 import { defaultVocabulary, world } from "@lectoemocion/template-catalog";
+import { LETRIESTRELLAS } from "../app/letriestrellas";
 
 /**
  * The catalogue names pictures; this app is what serves them.
@@ -68,6 +69,26 @@ describe("every chapter's map icon is actually served", () => {
   it("gives each chapter a picture of its own", () => {
     const icons = worldNodes(world).map((node) => node.icon);
     expect(new Set(icons).size).toBe(icons.length);
+  });
+
+  /*
+   * The same seam the vocabulary has, in the other direction. `world/` holds
+   * two kinds of picture and nothing else: a chapter's card, and the
+   * letriestrella a chapter pays out. A file that is neither is weight shipped
+   * to a classroom panel over a school network, and the likeliest way to get
+   * one is a card repointed at a new picture while the old one stays behind.
+   */
+  it("ships no world picture nothing points at", () => {
+    const named = new Set([
+      ...worldNodes(world).map((node) => decodeURIComponent(node.icon)),
+      ...LETRIESTRELLAS
+    ]);
+    const orphans = readdirSync(join(publicDir, "world"))
+      .filter((name) => name.endsWith(".webp"))
+      .map((name) => `/world/${name}`)
+      .filter((url) => !named.has(url));
+
+    expect(orphans).toEqual([]);
   });
 });
 

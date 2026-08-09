@@ -27,12 +27,25 @@ import {
 /**
  * Where a shared picture is served from.
  *
- * One library for the whole world — reward animals and map icons alike — so
- * there is a single provenance record
+ * Every reward animal, and the two chapters whose card is still a single
+ * object — the rooster the story is about, the heart on the book of names.
+ * One library, so there is a single provenance record
  * (apps/player-web/public/vocabulary/PROVENANCE.md) rather than one per use.
  */
 function picture(vocabularyItemId: string): string {
   return `/vocabulary/${encodeURIComponent(vocabularyItemId)}.webp`;
+}
+
+/**
+ * Where a picture drawn for the world itself is served from.
+ *
+ * Separate from `picture` because these are not shared. A vocabulary item is a
+ * word the games teach and the map happens to borrow; these are compositions
+ * drawn for one card apiece, and `apps/player-web/public/world/PROVENANCE.md`
+ * records them by what they depict rather than by which chapter they sit on.
+ */
+function scene(name: string): string {
+  return `/world/${name}.webp`;
 }
 
 /**
@@ -60,7 +73,7 @@ export const world: World = parseWorld({
     {
       id: "encuentro",
       title: "El encuentro",
-      icon: "/world/duende.webp",
+      icon: scene("duende"),
       surface: "juegos",
       unlockedBy: [],
       resource: { template: "name-story", seed: "encuentro" },
@@ -114,7 +127,7 @@ export const world: World = parseWorld({
     {
       id: "iniciales",
       title: "Las iniciales",
-      icon: picture("abeja"),
+      icon: scene("valla-vacia"),
       surface: "juegos",
       unlockedBy: ["encuentro"],
       resource: {
@@ -129,7 +142,7 @@ export const world: World = parseWorld({
     {
       id: "parejas",
       title: "El bosque de parejas",
-      icon: picture("dados"),
+      icon: scene("perro-carta"),
       surface: "juegos",
       unlockedBy: ["iniciales"],
       /* Named, not drawn: three short, unrelated words a child can tell apart. */
@@ -145,7 +158,7 @@ export const world: World = parseWorld({
     {
       id: "cual-es",
       title: "¿Cuál es?",
-      icon: picture("manzana"),
+      icon: scene("pollito-burbujas"),
       surface: "juegos",
       unlockedBy: ["parejas"],
       resource: {
@@ -162,7 +175,7 @@ export const world: World = parseWorld({
     {
       id: "primeras-letras",
       title: "Las primeras letras",
-      icon: picture("luna"),
+      icon: scene("granero-letra"),
       surface: "juegos",
       unlockedBy: ["cual-es"],
       /*
@@ -183,7 +196,7 @@ export const world: World = parseWorld({
     {
       id: "silabas",
       title: "El puente de sílabas",
-      icon: picture("mariposa"),
+      icon: scene("valla-primeras"),
       surface: "juegos",
       unlockedBy: ["parejas"],
       resource: {
@@ -198,7 +211,7 @@ export const world: World = parseWorld({
     {
       id: "letras",
       title: "El taller de letras",
-      icon: picture("pato"),
+      icon: scene("valla-armada"),
       surface: "juegos",
       unlockedBy: ["silabas"],
       /* Four letters, four distinct ones: nothing to place by elimination. */
@@ -214,7 +227,7 @@ export const world: World = parseWorld({
     {
       id: "empieza-igual",
       title: "Empieza igual",
-      icon: picture("gato"),
+      icon: scene("granero-vaca"),
       surface: "juegos",
       unlockedBy: ["letras"],
       /*
@@ -234,7 +247,7 @@ export const world: World = parseWorld({
     {
       id: "album",
       title: "Nuestro álbum",
-      icon: picture("camara"),
+      icon: scene("conejo-cartas"),
       surface: "juegos",
       unlockedBy: ["primeras-letras", "empieza-igual"],
       resource: { template: "memory-album", seed: "album" },
