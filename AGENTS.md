@@ -301,3 +301,45 @@ inline change when it is under about ten lines — whenever you notice:
 - **A guardrail that would not have caught the bug you just fixed** → propose
   strengthening it.
 
+
+## Autonomy contract
+
+**The user is a decider, not a merge gate.** A change should cost them two
+messages: their request, and one decision. The `ship-a-feature` skill owns the
+procedure — read the code first, then send **one** message carrying every
+business and technical question with a recommended pick on each, and take `go`
+as "take all your picks". No drip-feed of clarifying questions, no mid-flight
+progress reports.
+
+- **`ship-a-feature` and `managing-plans-lifecycle` are shared, not local.**
+  Both are symlinks into the `.agents/_shared` submodule
+  ([agent-skills](https://github.com/alvaro-francisco-gil/agent-skills)),
+  consumed by several repos. **Do not edit them to fix something about this
+  repo** — they carry procedure only. Every LectoEmoción-specific value lives
+  here and in `.agents/land.config.json`. Run `git submodule update --init`
+  after cloning, or the skills are empty.
+- **Land with `pnpm pr:land`**, never a hand-rolled `gh pr merge` — the script
+  carries the vacuous-green, staleness and hard-stop checks a manual merge
+  silently skips. Run it, act on the exit code, run it again: `0` merged ·
+  `10` CI red · `20` review requested changes · `30` **hand to a human** ·
+  `40` preflight failed.
+- **`main` is both the base branch and production.** There is no staging branch
+  to absorb a mistake, so this repo is deliberately more conservative than one
+  with a `develop`. No `ai-review` reviewer is wired here yet, which means every
+  PR currently ends at exit `30` and you merge it. That is fail-closed on
+  purpose: turning the review requirement off would auto-merge straight to
+  production on CI alone, which *removes* review rather than replacing it.
+- **Hard stops — never self-merge, however green:** `scripts/check-*.mjs`,
+  `scripts/guardrails.mjs`, `scripts/rules.test.ts`, any `*.rules`, and
+  `firebase.json`. Weakening a checker is how an invariant dies quietly, and a
+  gutted checker still passes — so "green" is exactly the wrong signal there.
+  The enforced list is `.agents/land.config.json`; keep it in step with the
+  "Every invariant is enforced" table above.
+- **A red lane is not automatically your bug.** Read the log before changing
+  code. Inventing a fix to satisfy broken infrastructure is worse than a red
+  build.
+
+`superpowers:brainstorming`'s one-question-per-message rule and
+`superpowers:finishing-a-development-branch`'s stop-and-ask merge menu are
+**superseded by `ship-a-feature`** here. Every other superpowers skill still
+applies.

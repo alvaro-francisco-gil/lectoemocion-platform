@@ -1,0 +1,26 @@
+{
+  "_baseBranch": "This repo is single-branch: main is both the base AND production. There is no develop to absorb a mistake, so nothing here should be read as being as safe as the same setting in a repo with a staging branch.",
+  "baseBranch": "main",
+  "protectedBranches": [],
+
+  "_reviewLabel": "No ai-review reviewer is wired for this repo yet. TRUE deliberately: with no reviewer, pr:land does every step up to the merge and then exits 30 for a human. Setting it false would auto-merge straight to production on CI alone — and here that IS production, with no intermediate branch. No change needed once a reviewer starts posting.",
+  "reviewLabel": "ai-review",
+  "requireApprovingReview": true,
+  "maxReviewRounds": 5,
+  "_reviewTimeoutMs": "Short until a reviewer exists — no point idling for a review that cannot arrive.",
+  "reviewTimeoutMs": 120000,
+
+  "_ciPaths": "check.yml has an unqualified `pull_request:` trigger and no paths: filter, so every PR runs it.",
+  "ciPaths": ["**"],
+
+  "sharedBlastRadius": ["packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml"],
+
+  "_hardStop": "This repo enforces its architecture invariants through scripts/check-*.mjs, listed in AGENTS.md's 'Every invariant is enforced' table. Weakening a checker is how an invariant dies quietly, so those files never self-merge even when the checker they gut still passes. There are no Firestore/Storage rules files in this repo today; add them here the moment there are.",
+  "hardStop": [
+    { "pattern": "^scripts/check-.*\\.mjs$", "why": "architecture-invariant checker" },
+    { "pattern": "^scripts/guardrails\\.mjs$", "why": "guardrail runner" },
+    { "pattern": "^scripts/rules\\.test\\.ts$", "why": "proves each checker flags a real violation" },
+    { "pattern": "\\.rules$", "why": "security rules" },
+    { "pattern": "^firebase\\.json$", "why": "hosting and deploy configuration" }
+  ]
+}

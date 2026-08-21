@@ -17,7 +17,8 @@
     "test": "vitest run",
     "test:e2e": "pnpm --filter @lectoemocion/player-web test:e2e",
     "typecheck": "turbo run typecheck",
-    "verify:deployment": "node scripts/verify-deployment.mjs"
+    "verify:deployment": "node scripts/verify-deployment.mjs",
+    "pr:land": "node scripts/pr-land.js"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.10",
