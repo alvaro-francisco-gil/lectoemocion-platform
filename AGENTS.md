@@ -336,10 +336,16 @@ progress reports.
   still never self-merge, and no merge ships anything by itself. Restore
   `requireApprovingReview: true` in `.agents/land.config.json` the day reviews
   start landing here; it matters more here than in the repos that have a
-  staging branch. `check.yml`'s `request-review` job is already wired and inert,
-  but it is only the first of three steps — this repo also needs an entry in
-  homelab's `personal/agent-review.yml`, and then the `SELF_HOSTED_REVIEW`
-  variable.
+  staging branch.
+- **Reviews can only reach this repo by poll.** ordago gets an immediate trigger
+  from a `request-review` job calling homelab's reusable workflow. That is
+  impossible here: **this repo is public and homelab is private**, and a public
+  repo cannot call a private repo's reusable workflow. GitHub resolves the callee
+  when it *creates* the run, before evaluating job-level `if` — so such a job is
+  not inert-until-enabled, it fails the whole workflow to load and takes `check`
+  and `e2e` down with it. Don't add one back; it was tried on 2026-08-22 and run
+  `32594747047` completed with zero jobs. What is actually missing is an entry
+  for this repo in homelab's `personal/agent-review.yml`.
 - **Hard stops — never self-merge, however green:** `scripts/check-*.mjs`,
   `scripts/guardrails.mjs`, `scripts/rules.test.ts`, any `*.rules`, and
   `firebase.json`. Weakening a checker is how an invariant dies quietly, and a
