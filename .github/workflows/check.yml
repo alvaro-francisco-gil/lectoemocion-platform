@@ -57,3 +57,27 @@ jobs:
           name: playwright-report
           path: apps/player-web/playwright-report/
           retention-days: 7
+
+  # Immediate trigger for the self-hosted agentic reviewer, so a PR opened and
+  # merged inside one poll interval is not missed by github-review's 15-minute
+  # poll backstop.
+  #
+  # INERT, and further from working than the same job in the other repos: it needs
+  # a `lectoemocion-platform` entry in homelab's personal/agent-review.yml (which
+  # lists homelab, ordago-apps and cultuvilla only) AND the SELF_HOSTED_REVIEW
+  # repository variable. It lands now so that turning review back on is config, not
+  # workflow authoring — see the flip-back note in .agents/land.config.json.
+  #
+  # `!failure() && !cancelled()` rather than `success()`: a skipped job is not a
+  # reason to skip review, but a real test failure is.
+  request-review:
+    needs: [check, e2e]
+    if: >-
+      github.event_name == 'pull_request' && !failure() && !cancelled()
+      && github.event.pull_request.draft == false
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && vars.SELF_HOSTED_REVIEW == 'true'
+      && contains(github.event.pull_request.labels.*.name, 'ai-review')
+    uses: alvaro-francisco-gil/homelab/.github/workflows/request-review.yml@main
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
