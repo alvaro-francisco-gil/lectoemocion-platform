@@ -323,12 +323,29 @@ progress reports.
   silently skips. Run it, act on the exit code, run it again: `0` merged ·
   `10` CI red · `20` review requested changes · `30` **hand to a human** ·
   `40` preflight failed.
-- **`main` is both the base branch and production.** There is no staging branch
-  to absorb a mistake, so this repo is deliberately more conservative than one
-  with a `develop`. No `ai-review` reviewer is wired here yet, which means every
-  PR currently ends at exit `30` and you merge it. That is fail-closed on
-  purpose: turning the review requirement off would auto-merge straight to
-  production on CI alone, which *removes* review rather than replacing it.
+- **`main` is the trunk, and it is not auto-deployed.** `check.yml` is the only
+  workflow and it only tests; shipping is a deliberate `pnpm deploy:player`. So
+  a merge here reaches the trunk, not users — the earlier claim that `main`
+  "is production" was wrong in the way that mattered, because it was the stated
+  reason for keeping a human in the merge.
+- **A green PR merges itself.** On an explicit decision (2026-08-22) the agent
+  merges without a human. Say plainly what that costs: no `ai-review` reviewer
+  is wired here yet, so **nothing reads the diff but the test suite** — a weaker
+  bar than requiring a review, not an equal one, and this repo has no staging
+  branch to catch what slips through. Two things bound it: the hard stops below
+  still never self-merge, and no merge ships anything by itself. Restore
+  `requireApprovingReview: true` in `.agents/land.config.json` the day reviews
+  start landing here; it matters more here than in the repos that have a
+  staging branch.
+- **Reviews can only reach this repo by poll.** ordago gets an immediate trigger
+  from a `request-review` job calling homelab's reusable workflow. That is
+  impossible here: **this repo is public and homelab is private**, and a public
+  repo cannot call a private repo's reusable workflow. GitHub resolves the callee
+  when it *creates* the run, before evaluating job-level `if` — so such a job is
+  not inert-until-enabled, it fails the whole workflow to load and takes `check`
+  and `e2e` down with it. Don't add one back; it was tried on 2026-08-22 and run
+  `32594747047` completed with zero jobs. What is actually missing is an entry
+  for this repo in homelab's `personal/agent-review.yml`.
 - **Hard stops — never self-merge, however green:** `scripts/check-*.mjs`,
   `scripts/guardrails.mjs`, `scripts/rules.test.ts`, any `*.rules`, and
   `firebase.json`. Weakening a checker is how an invariant dies quietly, and a
