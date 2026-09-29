@@ -3,6 +3,7 @@
 ## Status
 
 - **Updated:** 2026-08-08
+- **Priority:** medium
 - **Stage:** Step 1 — Expo app hosting the player in a WebView. The embedding
   seam is done on hardware; one verification task remains open below.
 - **Branch:** `main`

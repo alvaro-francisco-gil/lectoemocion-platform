@@ -3,7 +3,8 @@
 Date: 2026-08-08  
 Status: Accepted
 
-Distilled from the prizes plan, which shipped and was verified on 2026-08-07.
+Distilled from the prizes plan, which shipped and was verified on 2026-08-07,
+and from the star-flight plan, which shipped on 2026-08-08.
 
 ## Context
 
@@ -77,13 +78,62 @@ measured against.
 The star on the meter is the meter's picture, so a lifetime total drawn with
 the same star beside it is the same symbol carrying two different numbers in
 one corner. A child of three reads neither number; what they can use is the one
-that says how much further, and the collapse to `PrizeMeter` alone is what
-makes the corner say one thing.
+that says how much further, and collapsing to the meter alone — a count and a
+ring, both of the fill — is what makes the corner say one thing.
 
 The lifetime total is not lost, only undrawn: `Progress.stars` is still what
 the meter is derived from, and `starsClaimed` still records what each regalo
 cost, so a screen that ever needs "how many have you earned in all" can ask
 `derivePrizeView` for it rather than keeping a second badge on a child's map.
+
+### The stars arrive; the count does not jump
+
+A finish used to return the child to a world whose count already read the new
+total. The three stars the award screen had just shown went nowhere; a larger
+number simply replaced a smaller one in a corner the child was not looking at.
+For a child of three, arithmetic that happens off-screen did not happen. So the
+world comes back showing the **old** count, and the stars fly from where the
+child last saw them to the counter, each landing adding one to the count and
+one step to the ring.
+
+That makes what the corner draws (`shown`) a deliberate lag behind what was
+earned (`filled`), and the lag is a model with rules, not an animation detail:
+
+- **The flight happens on the world, never on the award screen.** After the
+  award a child may pass through the chests, the reveal and the gift ceremony,
+  one screen at a time; a flight begun on the award screen would have to
+  survive two or three screen swaps to reach a counter mounted on none of them.
+  The world is the only screen with the counter, and the one a child is
+  guaranteed to land on.
+- **The lag lives above the screen switch.** The world is unmounted for the
+  whole ceremony, so anything remembering the old number inside it would be
+  reinitialised from the new truth on return.
+- **The world reports its own arrival.** Re-deriving "the world is on screen"
+  from the screen ordering would be a second copy of that ordering, drifting
+  in silence. The flight starts when the world's own overlay mounts.
+- **A decrease snaps.** Reaching the goal spends the meter, so the count falls;
+  counting down would add a fourth beat straight after a ceremony that had
+  already ended.
+- **A cold start, or a change of child, never flies.** Twelve stars on opening
+  is a state, not an event; another profile's total is a different fact, not an
+  achievement.
+- **The readout appears under the first star.** A count of zero is never drawn,
+  so a child's first letriestrella brings the readout into being. The first
+  flight still aims at where it will be: it is laid out and measured but hidden.
+
+Two corrections made while building it, each a rule for whatever next touches
+this seam:
+
+- **Readiness is an identity, not a flag.** The first reading must wait until
+  progress and prizes have answered *for the child now selected*. A placeholder
+  zero read first spends the cold-start rule, after which the real total
+  arrives as an increase and flies. A boolean lags one render behind the
+  selection and showed the previous child's total on a profile switch; the
+  comparison is "read for this id", made at render.
+- **The flight is held while the animal book is over the world**, by the same
+  predicate that draws the book — not merely while a stamp is landing. A flight
+  behind the book is one the child never sees, landing in a corner the book
+  covers.
 
 ### A prize is a three-state union
 
@@ -133,6 +183,10 @@ offers, a purchase history: a three-year-old has to hold a price list, a
 running balance, and a choice at once. Watching a meter fill needs none of
 that — it is the mechanism that actually teaches waiting at this age, because
 the child's only job is to notice progress, not to reason about value.
+
+**Flying the stars on the award screen**, where they already are. See above:
+the counter is not on that screen, and the ceremonies that may follow it
+would have to be survived by the animation.
 
 **Resetting the meter only on opening.** Consuming `costStars` at open time
 instead of award time throws away every letriestrella earned while a gift sits
@@ -191,6 +245,13 @@ against, and it has to be re-measured when that changes.
   became that child's only with this split. The pictures cannot be enumerated
   through the `Storage` slice the stores are given, so this is a change to that
   seam rather than a line, and it is the next thing owed here.
+- **Something pays letriestrellas without unmounting the world.** The arrival
+  rule learns the world is on screen only from a mount — a one-shot signal, not
+  an arrive/leave pair. Today every increase comes from a finish, which always
+  leaves the world for the award screen, so every increase gets a fresh mount.
+  The first thing that pays stars while the world stays up would leave the
+  count permanently behind the truth; giving the arrival an arrive/leave pair
+  is the fix, and it belongs in the same change.
 - A fifth preset place is wanted. Adding it to `PrizePresetKey` is the one
   change; the compiler names every switch and record that then needs a case.
 - The gate needs to resist more than a curious child — a family sharing one
