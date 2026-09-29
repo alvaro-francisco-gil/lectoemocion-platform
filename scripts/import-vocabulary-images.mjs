@@ -26,7 +26,7 @@ import { removeWhiteBackground } from "./lib/remove-white-background.mjs";
 /* Some networks advertise IPv6 for github.com but cannot route it. */
 setDefaultResultOrder("ipv4first");
 
-const SOURCE_REPO = "alvaro-francisco-gil/lectoemocion";
+const SOURCE_REPO = "lectoemocion/lectoemocion";
 const SOURCE_PATH = "assets/images";
 const OUTPUT_DIR = "apps/player-web/public/vocabulary";
 const FIXTURE = "packages/template-catalog/src/fixtures/defaultVocabulary.ts";

@@ -6,7 +6,7 @@ every file here; do not add pictures by hand.
 ## Source and rights
 
 Imported from the `assets/images` directory of the LectoEmoción Godot
-prototype (`alvaro-francisco-gil/lectoemocion`), which is assessed in
+prototype (`lectoemocion/lectoemocion`), which is assessed in
 `docs/migration/godot-prototype.md`.
 
 The repository owner states these are **free-licence stock images** (CC0 or

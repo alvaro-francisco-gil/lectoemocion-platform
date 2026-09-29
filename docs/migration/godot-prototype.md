@@ -1,7 +1,7 @@
 # Godot prototype assessment
 
 Date assessed: 2026-07-09  
-Source: `alvaro-francisco-gil/lectoemocion`
+Source: `lectoemocion/lectoemocion`
 
 ## Recommendation
 

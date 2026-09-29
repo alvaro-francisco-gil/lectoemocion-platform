@@ -15,7 +15,7 @@ never reached `main`; this document carries the record of why the concept
 changed. It was drafted as 0008 and renumbered to 0012 when it merged: `main`
 had reached 0011 in the meantime, and two ADRs cannot share a number.
 
-[pr2]: https://github.com/alvaro-francisco-gil/lectoemocion-platform/pull/2
+[pr2]: https://github.com/lectoemocion/lectoemocion-platform/pull/2
 
 ## Decision
 
