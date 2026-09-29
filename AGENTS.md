@@ -8,8 +8,7 @@ Optimize for strict types, small explicit interfaces, deterministic scripts,
 fast feedback, searchable names, durable decisions, and tests at real
 boundaries. Avoid ceremony documentation that duplicates code.
 
-`CLAUDE.md` is a symlink to this file. Edit `AGENTS.md`; never create a second
-copy for one tool.
+Claude Code and Codex read this file directly. Keep one shared instruction source.
 
 Scoped contracts exist for the areas with their own rules — read the one for
 where you are working rather than only this file:
@@ -313,9 +312,7 @@ as "take all your picks". No drip-feed of clarifying questions, no mid-flight
 progress reports.
 
 - **`ship-a-feature` and `managing-plans-lifecycle` are shared, not local.**
-  Both are symlinks into the `.agents/_shared` submodule
-  ([agent-skills](https://github.com/alvaro-francisco-gil/agent-skills)),
-  consumed by several repos. **Do not edit them to fix something about this
+  `ship-a-feature` is a symlink into the `.agents/_shared` submodule; `managing-plans-lifecycle` is vendored from agent-plans (see `.agents/README.md`). The [agent-skills](https://github.com/alvaro-francisco-gil/agent-skills) submodule is consumed by several repos. **Do not edit them to fix something about this
   repo** — they carry procedure only. Every LectoEmoción-specific value lives
   here and in `.agents/land.config.json`. Run `git submodule update --init`
   after cloning, or the skills are empty.
@@ -361,3 +358,9 @@ progress reports.
 `superpowers:finishing-a-development-branch`'s stop-and-ask merge menu are
 **superseded by `ship-a-feature`** here. Every other superpowers skill still
 applies.
+
+## Shared agent setup
+
+`AGENTS.md` is the shared instruction entry point. Project skills live in
+`.agents/skills/`; `.claude/skills` points to that directory. See
+[`.agents/README.md`](.agents/README.md) for discovery requirements and dependencies.
