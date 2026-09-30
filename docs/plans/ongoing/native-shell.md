@@ -1,11 +1,14 @@
 # Native shell
 
-## Status
+**Priority:** medium
+**Gate:** none
+**Next:** build the four seams under "Native feel", and the offline-launch test [ADR 0009](../../decisions/0009-one-hosted-player.md) makes a release criterion
 
-- **Updated:** 2026-08-08
-- **Priority:** medium
-- **Stage:** Step 1 — Expo app hosting the player in a WebView. The embedding
-  seam is done on hardware; one verification task remains open below.
+## Handoff
+
+Step 1 — Expo app hosting the player in a WebView. The embedding seam is done
+on hardware; one verification task remains open below.
+
 - **Branch:** `main`
 - **Done:** `apps/mobile` scaffolded and rendering the player in a WebView;
   `playerUrl` resolver with 11 tests; scripted Android emulator workflow
@@ -13,10 +16,6 @@
   reports what is up; `LectoEmocion_Tablet` AVD created and booting; **and the
   player running on physical hardware** — a Pixel 8 on Android 16, over WiFi,
   via `pnpm mobile:lan`
-- **Next:** the four seams under "Native feel", and the offline-launch test
-  [ADR 0009](../../decisions/0009-one-hosted-player.md) makes a release
-  criterion
-- **Blockers:** none.
 
 Two things bit during the first emulator run and are fixed and covered by tests.
 Metro's `disableHierarchicalLookup` was on, which is right for npm's flat

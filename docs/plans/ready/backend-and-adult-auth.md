@@ -1,16 +1,13 @@
 # Backend and adult authentication
 
+**Priority:** medium
+**Gate:** none
+**Next:** scaffold `packages/auth-core` with its session-machine unit tests first, then `packages/firebase` with emulator Rules tests
+
 The first of four slices that together give the product accounts, child records
 kept on the phone and the web, uploaded photos and recordings, and a QR that
 signs a browser in from a phone. This document specifies slice A and nothing
 else.
-
-## Status
-
-- **Updated:** 2026-08-08
-- **Priority:** medium
-- **Next:** scaffold `packages/auth-core` with its session-machine unit tests first,
-  then `packages/firebase` with emulator Rules tests
 
 ## The four slices
 

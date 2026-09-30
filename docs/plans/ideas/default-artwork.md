@@ -1,5 +1,8 @@
 # Default artwork
 
+**Priority:** medium
+**Gate:** blocked:character art and voice recording
+
 ## Problem
 
 The vocabulary games now ship real pictures. The **characters** do not.

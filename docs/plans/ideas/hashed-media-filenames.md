@@ -1,6 +1,6 @@
 # Content-hashed media filenames
 
-Status: idea. Not scoped, not scheduled.
+**Priority:** low — not scoped, not scheduled; release-blocking once a pilot date exists
 
 ## The problem
 

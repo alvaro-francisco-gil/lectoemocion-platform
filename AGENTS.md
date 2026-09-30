@@ -231,8 +231,8 @@ Use the `managing-plans-lifecycle` skill.
 
 - `docs/plans/ideas/`: proposed or unresolved.
 - `docs/plans/ready/`: approved and fully planned.
-- `docs/plans/ongoing/`: implementation in progress, with a current Status
-  block.
+- `docs/plans/ongoing/`: implementation in progress, with `Priority`, `Gate` and
+  `Next` under the title (agent-plans v2).
 - `docs/decisions/`: durable rationale after decisions ship.
 
 Do not create `docs/superpowers`, archive completed plans, or invent another

@@ -1,5 +1,7 @@
 # Parents area
 
+**Priority:** low
+
 ## Why this document exists
 
 The profile drawer shows a **Zona de adultos** row, disabled and marked

@@ -1,5 +1,7 @@
 # Progress reports
 
+**Priority:** low
+
 ## Why this document exists
 
 The profile drawer shows a **Progreso** row, disabled and marked
