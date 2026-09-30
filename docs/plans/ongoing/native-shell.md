@@ -3,6 +3,7 @@
 **Priority:** medium
 **Gate:** none
 **Next:** build the four seams under "Native feel", and the offline-launch test [ADR 0009](../../decisions/0009-one-hosted-player.md) makes a release criterion
+**Landed:** none
 
 ## Handoff
 
